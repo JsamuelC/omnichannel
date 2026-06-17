@@ -8,8 +8,57 @@
 
 /* ─── Base ─────────────────────────────────────────────────── */
 @layer base {
-  body { @apply text-gray-900 antialiased; }
+  body { @apply text-gray-900 antialiased dark:text-slate-100 dark:bg-slate-950; }
   * { box-sizing: border-box; }
+}
+
+/* Transición suave al cambiar entre modo claro / oscuro */
+html, body, #root {
+  color-scheme: light;
+}
+html.dark, html.dark body, html.dark #root {
+  color-scheme: dark;
+}
+html * {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+/* Variables de color del Dashboard — usa estilos inline, se adapta vía estas vars */
+:root {
+  --db-bg: #f8fafc;
+  --db-text: #334155;
+  --db-text-strong: #0f172a;
+  --db-text-muted: #94a3b8;
+  --db-text-subtle: #64748b;
+  --db-text-faint: #94a3b8;
+  --db-card-bg: #ffffff;
+  --db-card-border: #e2e8f0;
+  --db-row-border: #f1f5f9;
+  --db-pill-bg: #f1f5f9;
+  --db-pill-border: #e2e8f0;
+  --db-track-bg: #e2e8f0;
+  --db-error-bg: #fef2f2;
+  --db-error-border: #fecaca;
+  --db-error-text: #dc2626;
+  --db-skeleton-bg: #e2e8f0;
+}
+html.dark {
+  --db-bg: #0f172a;
+  --db-text: #e2e8f0;
+  --db-text-strong: #ffffff;
+  --db-text-muted: #64748b;
+  --db-text-subtle: #94a3b8;
+  --db-text-faint: #475569;
+  --db-card-bg: rgba(255,255,255,0.03);
+  --db-card-border: rgba(255,255,255,0.07);
+  --db-row-border: rgba(255,255,255,0.04);
+  --db-pill-bg: rgba(255,255,255,0.05);
+  --db-pill-border: rgba(255,255,255,0.1);
+  --db-track-bg: rgba(255,255,255,0.05);
+  --db-error-bg: rgba(239,68,68,0.1);
+  --db-error-border: rgba(239,68,68,0.3);
+  --db-error-text: #f87171;
+  --db-skeleton-bg: rgba(255,255,255,0.04);
 }
 
 /* ─── Componentes reutilizables ─────────────────────────────── */

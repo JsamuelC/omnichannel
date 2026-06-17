@@ -67,7 +67,9 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./backend/logs:/app/logs  # Persistir logs
+      - ./backend/logs:/app/logs          # Logs
+      - wa_sessions:/app/sessions         # Credenciales Baileys (QR solo una vez)
+      - uploads_data:/app/uploads         # Archivos subidos (catálogos, media, vouchers)
     depends_on:
       postgres:
         condition: service_healthy
@@ -104,6 +106,10 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  wa_sessions:
+    driver: local
+  uploads_data:
     driver: local
 
 # ============================

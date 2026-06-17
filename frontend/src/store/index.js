@@ -49,6 +49,24 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  forgotPassword: async (email) => {
+    try {
+      const res = await api.post('/auth/forgot-password', { email });
+      return { success: true, message: res.message, resetLink: res.resetLink };
+    } catch (error) {
+      return { success: false, message: error.message || 'Error al procesar la solicitud.' };
+    }
+  },
+
+  resetPassword: async (token, newPassword) => {
+    try {
+      const res = await api.post('/auth/reset-password', { token, newPassword });
+      return { success: true, message: res.message };
+    } catch (error) {
+      return { success: false, message: error.message || 'Error al restablecer la contraseña.' };
+    }
+  },
+
   can: (permission) => {
     const { permissions } = get();
     return permissions?.[permission] === true;
@@ -140,6 +158,18 @@ export const useConversationStore = create((set, get) => ({
     }));
   },
 
+  updateActiveConversationMeta: (metaPatch) => {
+    set((s) => {
+      if (!s.activeConversation) return s;
+      return {
+        activeConversation: {
+          ...s.activeConversation,
+          metadata: { ...(s.activeConversation.metadata || {}), ...metaPatch }
+        }
+      };
+    });
+  },
+
   unreadByChannel: () => {
     const { conversations } = get();
     return conversations.reduce((acc, c) => {
@@ -203,6 +233,15 @@ export const useWhatsappStore = create((set, get) => ({
   chats:         {},
   activeChat:    null,
 
+  // ── Estado persistente WA Business (sobrevive navegación) ──
+  bizSessionId:  null,
+  bizStatus:     'not_found',
+  bizChatList:   [],
+
+  setBizSession: (sessionId, status) => set({ bizSessionId: sessionId, bizStatus: status }),
+  setBizChatList: (list) => set({ bizChatList: list }),
+  updateBizChatList: (updater) => set((s) => ({ bizChatList: updater(s.bizChatList) })),
+
   setSessions: (sessions) => set({ sessions }),
 
   updateSessionStatus: (sessionId, status) => set((s) => ({
@@ -230,8 +269,11 @@ export const useWhatsappStore = create((set, get) => ({
     const sessionChats = s.chats[sessionId] || {};
     const jid  = msg.from;
     const msgs = sessionChats[jid] || [];
-    // Evitar duplicados
-    const exists = msgs.some(m => m.timestamp === msg.timestamp && m.body === msg.body);
+    // Deduplicar por externalId primero, luego por timestamp+body
+    const exists = msgs.some(m =>
+      (msg.externalId && m.externalId && msg.externalId === m.externalId) ||
+      (m.timestamp === msg.timestamp && m.body === msg.body && m.fromMe === msg.fromMe)
+    );
     if (exists) return s;
     return {
       chats: {
@@ -263,4 +305,79 @@ export const useWhatsappStore = create((set, get) => ({
     });
     return counts;
   }
+}));
+
+// ══════════════════════════════════════════════════════════════
+// LABEL STORE — etiquetas globales (caché)
+// ══════════════════════════════════════════════════════════════
+export const useLabelStore = create((set, get) => ({
+  labels: [],
+  loaded: false,
+
+  fetchLabels: async (force = false) => {
+    if (get().loaded && !force) return;
+    try {
+      const res = await api.get('/labels');
+      if (res.success) {
+        set({ labels: res.data, loaded: true });
+      }
+    } catch (e) {
+      console.error('Error cargando etiquetas:', e);
+    }
+  },
+
+  invalidate: () => set({ loaded: false })
+}));
+
+// ══════════════════════════════════════════════════════════════
+// THEME STORE — modo claro / oscuro
+// ══════════════════════════════════════════════════════════════
+const THEME_KEY = 'ts-theme';
+
+const applyTheme = (theme) => {
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+};
+
+const getInitialTheme = () => {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'dark' || saved === 'light') return saved;
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+};
+
+const initialTheme = getInitialTheme();
+applyTheme(initialTheme);
+
+export const useThemeStore = create((set, get) => ({
+  theme: initialTheme,
+
+  setTheme: (theme) => {
+    localStorage.setItem(THEME_KEY, theme);
+    applyTheme(theme);
+    set({ theme });
+  },
+
+  toggleTheme: () => {
+    const next = get().theme === 'dark' ? 'light' : 'dark';
+    get().setTheme(next);
+  },
+}));
+
+// ══════════════════════════════════════════════════════════════
+// MODULE STORE
+// ══════════════════════════════════════════════════════════════
+export const useModuleStore = create((set) => ({
+  modules:  [],
+  loading:  false,
+
+  fetchModules: async () => {
+    try {
+      set({ loading: true });
+      const res = await api.get('/custom-modules');
+      set({ modules: res.data || [], loading: false });
+    } catch {
+      set({ loading: false });
+    }
+  },
+
+  setModules: (modules) => set({ modules }),
 }));

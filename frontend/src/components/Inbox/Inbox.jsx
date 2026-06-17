@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import { useConversationStore } from '../../store';
 import ConversationList          from './ConversationList';
 import ChatWindow                from '../Chat/ChatWindow';
-import WhatsappPersonalPanel     from './WhatsappPersonalPanel';
 import WhatsappBusinessPanel     from './WhatsappBusinessPanel';
 import ConversationInfoPanel     from './ConversationInfoPanel';
 import { PanelRight, Briefcase } from 'lucide-react';
@@ -24,15 +23,15 @@ export default function Inbox() {
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* TABS */}
-      <div className="flex border-b border-slate-200 bg-white flex-shrink-0">
+      <div className="flex border-b border-[#d1d7db] dark:border-[#2a3942] bg-white dark:bg-[#202c33] flex-shrink-0">
 
         {/* Bandeja general */}
         <button
           onClick={() => setInboxTab('general')}
           className={`flex items-center gap-2 px-6 py-3 text-sm font-medium transition-all border-b-2
             ${inboxTab === 'general'
-              ? 'text-indigo-600 border-indigo-500 bg-indigo-50/50'
-              : 'text-slate-500 border-transparent hover:text-slate-700 hover:bg-slate-50'}`}
+              ? 'text-[#00a884] border-[#00a884] bg-[#f0fdf4] dark:bg-[#00a884]/10'
+              : 'text-[#54656f] dark:text-[#8696a0] border-transparent hover:text-[#111b21] dark:hover:text-[#e9edef] hover:bg-[#f5f6f6] dark:hover:bg-white/5'}`}
         >
           <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor">
             <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/>
@@ -41,30 +40,16 @@ export default function Inbox() {
           Bandeja general
         </button>
 
-        {/* WhatsApp personal */}
-        <button
-          onClick={() => setInboxTab('personal')}
-          className={`flex items-center gap-2 px-6 py-3 text-sm font-medium transition-all border-b-2
-            ${inboxTab === 'personal'
-              ? 'text-green-600 border-green-500 bg-green-50/50'
-              : 'text-slate-500 border-transparent hover:text-slate-700 hover:bg-slate-50'}`}
-        >
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.49"/>
-          </svg>
-          WhatsApp personal
-        </button>
-
-        {/* WhatsApp Business — NUEVO */}
+        {/* WhatsApp Business (Baileys) */}
         <button
           onClick={() => setInboxTab('business')}
           className={`flex items-center gap-2 px-6 py-3 text-sm font-medium transition-all border-b-2
             ${inboxTab === 'business'
-              ? 'text-blue-600 border-blue-500 bg-blue-50/50'
-              : 'text-slate-500 border-transparent hover:text-slate-700 hover:bg-slate-50'}`}
+              ? 'text-blue-600 dark:text-blue-400 border-blue-500 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-500/10'
+              : 'text-slate-500 dark:text-[#8696a0] border-transparent hover:text-slate-700 dark:hover:text-[#e9edef] hover:bg-slate-50 dark:hover:bg-white/5'}`}
         >
           <Briefcase size={15} />
-          WA Business
+          WhatsApp Personal/Business
         </button>
 
         {/* Toggle panel info — solo en general */}
@@ -75,8 +60,8 @@ export default function Inbox() {
               title={showInfo ? 'Ocultar panel' : 'Ver informacion'}
               className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors font-medium
                 ${showInfo
-                  ? 'bg-indigo-50 text-indigo-600 border border-indigo-200'
-                  : 'text-slate-500 hover:bg-slate-100 border border-transparent'}`}
+                  ? 'bg-[#f0fdf4] dark:bg-[#00a884]/10 text-[#00a884] border border-[#00a884]/30'
+                  : 'text-[#54656f] dark:text-[#8696a0] hover:bg-[#f5f6f6] dark:hover:bg-white/5 border border-transparent'}`}
             >
               <PanelRight size={14} />
               Info
@@ -91,7 +76,7 @@ export default function Inbox() {
 
           {/* Lista de conversaciones */}
           <div className={`
-            h-full flex-shrink-0 bg-white border-r border-slate-200 flex flex-col
+            h-full flex-shrink-0 bg-white dark:bg-[#111b21] border-r border-[#d1d7db] dark:border-[#2a3942] flex flex-col
             transition-all duration-300
             md:w-80 md:flex
             ${showList ? 'w-full flex' : 'w-0 hidden md:w-80 md:flex'}
@@ -105,14 +90,14 @@ export default function Inbox() {
 
           {/* Chat */}
           <div className={`
-            flex-1 flex flex-col h-full bg-slate-50 overflow-hidden
+            flex-1 flex flex-col h-full bg-[#f8f9fa] dark:bg-[#0b141a] overflow-hidden
             ${showList ? 'hidden md:flex' : 'flex'}
           `}>
             {activeConversation && (
               <button
                 onClick={() => setShowList(true)}
-                className="md:hidden flex items-center gap-2 px-4 py-3 bg-white border-b border-slate-200
-                           text-sm font-medium text-indigo-600 hover:bg-indigo-50 transition-colors"
+                className="md:hidden flex items-center gap-2 px-4 py-3 bg-[#f0f2f5] dark:bg-[#202c33] border-b border-[#d1d7db] dark:border-[#2a3942]
+                           text-sm font-medium text-[#00a884] hover:bg-[#f0fdf4] dark:hover:bg-white/5 transition-colors"
               >
                 <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor">
                   <path fillRule="evenodd"
@@ -127,15 +112,10 @@ export default function Inbox() {
 
           {/* Panel de informacion lateral */}
           {activeConversation && showInfo && (
-            <div className="hidden lg:flex flex-col h-full w-72 xl:w-80 flex-shrink-0 border-l border-slate-200 bg-white overflow-hidden">
+            <div className="hidden lg:flex flex-col h-full w-72 xl:w-80 flex-shrink-0 border-l border-[#d1d7db] dark:border-[#2a3942] bg-white dark:bg-[#111b21] overflow-hidden">
               <ConversationInfoPanel conversation={activeConversation} />
             </div>
           )}
-        </div>
-
-      ) : inboxTab === 'personal' ? (
-        <div className="flex-1 overflow-hidden">
-          <WhatsappPersonalPanel />
         </div>
 
       ) : (

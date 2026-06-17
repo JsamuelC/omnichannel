@@ -2,6 +2,18 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { Key, MessageSquare, Calendar, FileText, Target, ArrowLeftRight } from 'lucide-react';
+
+function getTypeIcon(type) {
+  const map = {
+    keyword:       <Key size={16} className="text-indigo-400" />,
+    message_count: <MessageSquare size={16} className="text-blue-400" />,
+    date_urgency:  <Calendar size={16} className="text-amber-400" />,
+    after_quote:   <FileText size={16} className="text-green-400" />,
+    intent:        <Target size={16} className="text-purple-400" />,
+  };
+  return map[type] || <ArrowLeftRight size={16} className="text-slate-400" />;
+}
 
 const TYPES = [
   { value: 'keyword',       label: 'Palabra clave',           desc: 'El cliente menciona una palabra específica' },
@@ -22,7 +34,7 @@ export default function TransferCriteriaPanel() {
     name:             '',
     type:             'keyword',
     config:           { keywords: [], message_limit: 10, days_threshold: 30 },
-    transfer_message: 'Te conecto con uno de nuestros asesores. Un momento por favor. 🙏',
+    transfer_message: 'Te conecto con uno de nuestros asesores. Un momento por favor.',
     is_active:        true,
     priority:         0
   });
@@ -55,7 +67,7 @@ export default function TransferCriteriaPanel() {
         name:             '',
         type:             'keyword',
         config:           { keywords: [], message_limit: 10, days_threshold: 30 },
-        transfer_message: 'Te conecto con uno de nuestros asesores. Un momento por favor. 🙏',
+        transfer_message: 'Te conecto con uno de nuestros asesores. Un momento por favor.',
         is_active:        true,
         priority:         0
       });
@@ -108,14 +120,6 @@ export default function TransferCriteriaPanel() {
       await api.put(`/transfer-criteria/${item.id}`, { ...item, is_active: !item.is_active });
       fetchCriteria();
     } catch (e) { toast.error(e.message); }
-  };
-
-  const TYPE_ICONS = {
-    keyword:       '🔑',
-    message_count: '💬',
-    date_urgency:  '📅',
-    after_quote:   '📄',
-    intent:        '🎯'
   };
 
   return (
@@ -176,8 +180,8 @@ export default function TransferCriteriaPanel() {
                       onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
                       className="mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-gray-800">
-                        {TYPE_ICONS[t.value]} {t.label}
+                      <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                        {getTypeIcon(t.value)} {t.label}
                       </p>
                       <p className="text-xs text-gray-400">{t.desc}</p>
                     </div>
@@ -256,7 +260,7 @@ export default function TransferCriteriaPanel() {
           </div>
         ) : criteria.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
-            <p className="text-4xl mb-3">🔀</p>
+            <ArrowLeftRight size={40} className="mx-auto mb-3 text-gray-300" />
             <p className="text-sm">Sin criterios de transferencia</p>
             <p className="text-xs mt-1">Crea criterios para que el bot sepa cuándo pasar al asesor</p>
           </div>
@@ -268,9 +272,9 @@ export default function TransferCriteriaPanel() {
                   ${!item.is_active ? 'opacity-60' : ''}`}
                 style={{ border: '0.5px solid #e2e8f0' }}
               >
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                      style={{ background: '#f8fafc' }}>
-                  {TYPE_ICONS[item.type]}
+                  {getTypeIcon(item.type)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">

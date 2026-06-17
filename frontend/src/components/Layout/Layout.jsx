@@ -8,8 +8,9 @@
 // ─────────────────────────────────────────────────────────────
 import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useAuthStore, useConversationStore } from '../../store';
+import { useAuthStore, useConversationStore, useThemeStore, useModuleStore } from '../../store';
 import { getSocket } from '../../services/socket';
+import { ModuleIcon } from '../Modules/ModulosConfig';
 import toast from 'react-hot-toast';
 
 // ─── Icono SVG inline para cada canal ───────────────────────
@@ -28,6 +29,18 @@ const MessengerIcon = () => (
 const InstagramIcon = () => (
   <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
     <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+  </svg>
+);
+
+const TemplateIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.75}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+  </svg>
+);
+
+const CalendarIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.75}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v1.5M17.25 3v1.5M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
   </svg>
 );
 
@@ -79,31 +92,50 @@ const VoucherIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
   </svg>
 );
+
+const SunIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1.5m0 15V21m9-9h-1.5M4.5 12H3m15.364-6.364l-1.06 1.06M6.696 17.304l-1.06 1.06m12.728 0l-1.06-1.06M6.696 6.696l-1.06-1.06M16.5 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+  </svg>
+);
+
+const MoonIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+  </svg>
+);
 // ─── Configuración de nav por rol ───────────────────────────
 const NAV_ITEMS = {
   admin: [
     { to: '/inbox',      icon: <InboxIcon />,     label: 'Bandeja',        id: 'inbox'      },
+    { to: '/calendar',   icon: <CalendarIcon />,  label: 'Calendario',     id: 'calendar'   },
+    { to: '/templates',  icon: <TemplateIcon />,  label: 'Documentos',     id: 'templates'  },
     { to: '/campaigns',  icon: <CampaignIcon />,  label: 'Campañas',       id: 'campaigns'  },
     { to: '/vouchers',   icon: <VoucherIcon />,   label: 'Comprobantes',   id: 'vouchers'   },
     { to: '/config',     icon: <SettingsIcon />,  label: 'Configuración',  id: 'config'     },
     { to: '/dashboard',  icon: <DashboardIcon />, label: 'Dashboard',      id: 'dashboard'  },
   ],
   agent: [
-    { to: '/inbox',      icon: <InboxIcon />,   label: 'Bandeja',      id: 'inbox'    },
-    { to: '/vouchers',   icon: <VoucherIcon />, label: 'Comprobantes', id: 'vouchers' },
+    { to: '/inbox',      icon: <InboxIcon />,    label: 'Bandeja',      id: 'inbox'    },
+    { to: '/calendar',   icon: <CalendarIcon />, label: 'Calendario',   id: 'calendar' },
+    { to: '/vouchers',   icon: <VoucherIcon />,  label: 'Comprobantes', id: 'vouchers' },
   ]
 };
 
-const CHANNEL_EMOJI = { whatsapp: '📱', messenger: '💬', instagram: '📸' };
+const CHANNEL_LABEL = { whatsapp: 'WhatsApp', messenger: 'Messenger', instagram: 'Instagram' };
 
 export default function Layout() {
   const { user, logout, isAdmin }        = useAuthStore();
   const { addIncomingMessage, fetchConversations } = useConversationStore();
+  const { theme, toggleTheme }           = useThemeStore();
+  const { modules, fetchModules }        = useModuleStore();
   const [sidebarOpen, setSidebarOpen]    = useState(false); // móvil
   const navigate = useNavigate();
 
   const role = user?.role || 'agent';
   const navItems = NAV_ITEMS[role] || NAV_ITEMS.agent;
+
+  useEffect(() => { fetchModules(); }, []);
 
   // ── Socket.io ────────────────────────────────────────────
   useEffect(() => {
@@ -112,32 +144,41 @@ export default function Layout() {
 
     const onNewMessage = (data) => {
       addIncomingMessage(data);
-      const emoji = CHANNEL_EMOJI[data.conversation?.channel] || '💬';
-      toast(`${emoji} ${data.contact?.name || 'Contacto'}: ${data.message?.content?.substring(0, 40) || '...'}`,
-        { icon: '🔔', duration: 4000 }
+      const ch = CHANNEL_LABEL[data.conversation?.channel] || 'Mensaje';
+      toast(`[${ch}] ${data.contact?.name || 'Contacto'}: ${data.message?.content?.substring(0, 40) || '...'}`,
+        { duration: 4000 }
       );
     };
 
     const onEscalated = () => {
-      toast('⚡ Conversación escalada a agente', { icon: '⚠️', duration: 5000 });
+      toast('Conversación escalada a agente', { duration: 5000 });
       fetchConversations();
     };
 
     const onAssignedToYou = () => {
-      toast('🎯 Se te asignó una nueva conversación', { icon: '📋', duration: 5000 });
+      toast('Se te asignó una nueva conversación', { duration: 5000 });
       fetchConversations();
+    };
+
+    const onDocReady = (data) => {
+      toast(`📄 Documento listo para revisar: "${data?.templateName || 'Documento'}"`, {
+        duration: 7000,
+        icon: '📄',
+      });
     };
 
     socket.on('message:new',               onNewMessage);
     socket.on('conversation:escalated',    onEscalated);
     socket.on('conversation:assigned',     fetchConversations);
     socket.on('conversation:assigned_to_you', onAssignedToYou);
+    socket.on('document:ready',            onDocReady);
 
     return () => {
       socket.off('message:new',               onNewMessage);
       socket.off('conversation:escalated',    onEscalated);
       socket.off('conversation:assigned',     fetchConversations);
       socket.off('conversation:assigned_to_you', onAssignedToYou);
+      socket.off('document:ready',            onDocReady);
     };
   }, []);
 
@@ -151,7 +192,7 @@ export default function Layout() {
     : '?';
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-slate-100 dark:bg-slate-950 overflow-hidden">
 
       {/* ── Overlay móvil ─────────────────────────────────── */}
       {sidebarOpen && (
@@ -245,8 +286,61 @@ export default function Layout() {
   )}
 </nav>
 
+        {/* ── Módulos personalizados ──────────────────── */}
+        {modules.length > 0 && (
+          <div className="px-2 pb-1">
+            <p className={`ts-sidebar-label text-[10px] font-semibold uppercase tracking-widest text-slate-600 px-2.5 mb-1 ${sidebarOpen ? '' : 'hidden md:block'}`}>
+              Módulos
+            </p>
+            {modules.map(mod => (
+              <NavLink
+                key={mod.id}
+                to={`/modules/${mod.slug}`}
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-2.5 py-2 rounded-xl transition-all duration-150 group
+                   ${isActive
+                     ? 'bg-white/10 text-white'
+                     : 'text-slate-400 hover:bg-white/5 hover:text-white'}`
+                }
+                title={mod.name}
+              >
+                <span className="flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center" style={{ background: mod.color }}>
+                  <ModuleIcon name={mod.icon} size={11} className="text-white" />
+                </span>
+                <span className={`ts-sidebar-label text-sm font-medium truncate ${sidebarOpen ? '' : 'hidden md:block'}`}>
+                  {mod.name}
+                </span>
+              </NavLink>
+            ))}
+          </div>
+        )}
+
+        {/* ── Modo claro / oscuro ─────────────────────── */}
+        <div className={`px-2 pt-2 ${sidebarOpen ? '' : 'hidden md:block'}`}>
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Cambiar a modo día' : 'Cambiar a modo noche'}
+            className="flex items-center gap-3 px-2.5 py-2.5 rounded-xl transition-all duration-150 w-full
+                       text-slate-400 hover:bg-white/5 hover:text-white"
+          >
+            <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
+              {theme === 'dark' ? <MoonIcon /> : <SunIcon />}
+            </span>
+            <span className={`ts-sidebar-label text-sm font-medium truncate flex-1 text-left ${sidebarOpen ? '' : 'hidden md:block'}`}>
+              {theme === 'dark' ? 'Modo noche' : 'Modo día'}
+            </span>
+            {/* Switch visual */}
+            <span className={`ts-sidebar-label relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors duration-200
+                              ${theme === 'dark' ? 'bg-indigo-500' : 'bg-slate-600'} ${sidebarOpen ? '' : 'hidden md:inline-flex'}`}>
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200
+                                ${theme === 'dark' ? 'translate-x-[18px]' : 'translate-x-1'}`} />
+            </span>
+          </button>
+        </div>
+
         {/* ── Separador + Rol del usuario ─────────────── */}
-        <div className={`px-3 pb-2 border-t border-white/5 pt-2 ts-sidebar-label ${sidebarOpen ? '' : 'hidden md:block'}`}>
+        <div className={`px-3 pb-2 border-t border-white/5 pt-2 mt-1 ts-sidebar-label ${sidebarOpen ? '' : 'hidden md:block'}`}>
           <div className="flex items-center gap-2 px-1">
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
               role === 'admin'
@@ -286,10 +380,10 @@ export default function Layout() {
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* ── Barra superior móvil ─────────────────────── */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 z-10">
+        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-10">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -299,7 +393,7 @@ export default function Layout() {
         </header>
 
         {/* ── Área de contenido ──────────────────────── */}
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>

@@ -2,20 +2,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { FileText, Image, Video, Music, FileSpreadsheet, File, Folder, Bot, Paperclip } from 'lucide-react';
 
-const FILE_ICONS = {
-  'application/pdf':    '📄',
-  'image/jpeg':         '🖼️',
-  'image/png':          '🖼️',
-  'image/webp':         '🖼️',
-  'video/mp4':          '🎬',
-  'audio/mpeg':         '🎵',
-  'audio/ogg':          '🎵',
-  'application/msword': '📝',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '📝',
-  'application/vnd.ms-excel': '📊',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '📊',
-};
+function getFileIcon(mime) {
+  if (mime === 'application/pdf') return <FileText size={18} className="text-red-400" />;
+  if (mime?.startsWith('image/'))  return <Image    size={18} className="text-blue-400" />;
+  if (mime?.startsWith('video/'))  return <Video    size={18} className="text-purple-400" />;
+  if (mime?.startsWith('audio/'))  return <Music    size={18} className="text-green-400" />;
+  if (mime?.includes('excel') || mime?.includes('spreadsheet')) return <FileSpreadsheet size={18} className="text-emerald-400" />;
+  if (mime?.includes('word') || mime?.includes('document'))     return <FileText        size={18} className="text-blue-400" />;
+  return <Paperclip size={18} className="text-slate-400" />;
+}
 
 const BACKEND = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3001';
 
@@ -214,7 +211,7 @@ export default function BotFilesPanel() {
               <textarea
                 value={form.caption}
                 onChange={e => setForm(f => ({ ...f, caption: e.target.value }))}
-                placeholder="Ej: Aquí tienes tu cotización personalizada 📄"
+                placeholder="Ej: Aquí tienes tu cotización personalizada"
                 className="input-field text-sm"
                 rows={2}
               />
@@ -295,7 +292,7 @@ export default function BotFilesPanel() {
           </div>
         ) : files.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
-            <p className="text-4xl mb-3">📁</p>
+            <Folder size={40} className="mx-auto mb-3 text-gray-300" />
             <p className="text-sm">Sin archivos configurados</p>
             <p className="text-xs mt-1">Sube archivos que el bot podrá enviar automáticamente</p>
           </div>
@@ -305,7 +302,7 @@ export default function BotFilesPanel() {
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">{cat}</p>
               <div className="flex flex-col gap-3">
                 {catFiles.map(file => {
-                  const icon    = FILE_ICONS[file.file_type] || '📎';
+                  const icon    = getFileIcon(file.file_type);
                   const kws     = file.trigger_rules?.find(r => r.type === 'keyword')?.values || [];
                   const sizeKB  = file.file_size ? Math.round(file.file_size / 1024) : null;
                   return (
@@ -321,9 +318,9 @@ export default function BotFilesPanel() {
                         <div className="flex items-center gap-2 mb-1">
                           <p className="text-sm font-semibold text-gray-900 truncate">{file.name}</p>
                           {file.ai_can_send && (
-                            <span className="text-xs px-1.5 py-0.5 rounded-full"
+                            <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full"
                                   style={{ background: '#ede9fe', color: '#6d28d9' }}>
-                              🤖 IA
+                              <Bot size={10} /> IA
                             </span>
                           )}
                           {!file.is_active && (

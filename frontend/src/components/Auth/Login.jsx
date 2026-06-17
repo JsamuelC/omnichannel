@@ -5,7 +5,7 @@
 // 100% responsive
 // ─────────────────────────────────────────────────────────────
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store';
 import toast from 'react-hot-toast';
 
@@ -155,6 +155,16 @@ export default function Login() {
                   )}
                 </button>
               </div>
+            </div>
+
+            {/* Olvidaste tu contraseña */}
+            <div className="flex justify-end -mt-1">
+              <Link
+                to="/forgot-password"
+                className="text-xs text-indigo-500 hover:text-indigo-700 font-medium transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
             </div>
 
             {/* Botón */}

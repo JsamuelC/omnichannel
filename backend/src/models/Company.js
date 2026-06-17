@@ -54,6 +54,11 @@ const Company = sequelize.define('company', {
     type: DataTypes.STRING(500),
     allowNull: true,
   },
+  horarios: {
+    type:         DataTypes.JSONB,
+    allowNull:    true,
+    defaultValue: null,
+  },
 }, {
   tableName: 'company',
   timestamps: true,

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { Eye, EyeOff, Bot, Plug, Check } from 'lucide-react';
 
 const PROVIDERS = [
   {
@@ -12,7 +13,7 @@ const PROVIDERS = [
     bg:      '#FFFBEB',
     border:  '#FDE68A',
     docsUrl: 'https://console.anthropic.com',
-    icon:    '🟠'
+    dotColor: '#D97706'
   },
   {
     key:     'openai',
@@ -22,7 +23,7 @@ const PROVIDERS = [
     bg:      '#ECFDF5',
     border:  '#A7F3D0',
     docsUrl: 'https://platform.openai.com/api-keys',
-    icon:    '🟢'
+    dotColor: '#059669'
   },
   {
     key:     'gemini',
@@ -32,7 +33,7 @@ const PROVIDERS = [
     bg:      '#EFF6FF',
     border:  '#BFDBFE',
     docsUrl: 'https://aistudio.google.com/app/apikey',
-    icon:    '🔵'
+    dotColor: '#2563EB'
   }
 ];
 
@@ -67,7 +68,7 @@ export default function Integraciones() {
         api_key:  apiKey.trim(),
         label:    label || selectedProvider.name
       });
-      toast.success(`✅ ${selectedProvider.name} configurado y activado`);
+      toast.success(`${selectedProvider.name} configurado y activado`);
       setApiKey(''); setLabel('');
       fetchIntegrations();
     } catch (e) {
@@ -138,7 +139,7 @@ export default function Integraciones() {
                   color: p.color
                 }}
               >
-                <span className="text-xl">{p.icon}</span>
+                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: p.dotColor }} />
                 <div className="flex-1">
                   <p className="font-semibold text-sm" style={{ color: '#020202' }}>{p.name}</p>
                   <p className="text-xs" style={{ color: '#94a3b8' }}>{p.models.length} modelos disponibles</p>
@@ -203,7 +204,7 @@ export default function Integraciones() {
                     className="absolute right-3 top-2.5 text-xs"
                     style={{ color: '#94a3b8' }}
                   >
-                    {showKey ? '🙈' : '👁️'}
+                    {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
               </div>
@@ -244,8 +245,9 @@ export default function Integraciones() {
                   </button>
                 </div>
                 {testResponse && (
-                  <div className="mt-2 p-2 rounded-lg text-xs" style={{ background: '#fff', border: '0.5px solid #e2e8f0', color: '#475569' }}>
-                    🤖 {testResponse}
+                  <div className="mt-2 p-2 rounded-lg text-xs flex items-start gap-1.5" style={{ background: '#fff', border: '0.5px solid #e2e8f0', color: '#475569' }}>
+                    <Bot size={12} className="flex-shrink-0 mt-0.5 text-indigo-400" />
+                    {testResponse}
                   </div>
                 )}
               </div>
@@ -256,7 +258,7 @@ export default function Integraciones() {
                 className="w-full py-2.5 rounded-xl text-sm font-medium transition-all"
                 style={{ background: '#16a34a', color: '#fff', opacity: saving ? 0.7 : 1 }}
               >
-                {saving ? 'Guardando...' : '✅ Guardar y activar'}
+                {saving ? 'Guardando...' : 'Guardar y activar'}
               </button>
             </div>
           )}
@@ -275,7 +277,7 @@ export default function Integraciones() {
                   <div key={intg.id}
                        className="flex items-center gap-4 px-4 py-3 rounded-xl"
                        style={{ background: intg.is_active ? p?.bg || '#f0fdf4' : '#f8fafc', border: `0.5px solid ${intg.is_active ? p?.border || '#bbf7d0' : '#e2e8f0'}` }}>
-                    <span className="text-xl">{p?.icon || '🔌'}</span>
+                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: p?.dotColor || '#94a3b8' }} />
                     <div className="flex-1">
                       <p className="text-sm font-medium" style={{ color: '#020202' }}>
                         {intg.label || p?.name || intg.provider}
@@ -285,7 +287,7 @@ export default function Integraciones() {
                     {intg.is_active ? (
                       <span className="text-xs px-2 py-1 rounded-full font-medium"
                             style={{ background: '#dcfce7', color: '#16a34a' }}>
-                        ✓ Activo
+                        <span className="flex items-center gap-1"><Check size={11} /> Activo</span>
                       </span>
                     ) : (
                       <button

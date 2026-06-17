@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import api from '../../services/api';
 
 /* ─── Icons ─── */
 const BackIcon = () => (
@@ -372,8 +370,8 @@ export default function EtiquetasConfig() {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await axios.get(`${API_URL}/api/labels`);
-      if (data.success) setLabels(data.data);
+      const res = await api.get('/labels');
+      if (res.data.success) setLabels(res.data.data);
     } catch {
       setError('No se pudo conectar con el servidor.');
     } finally {
@@ -390,15 +388,15 @@ export default function EtiquetasConfig() {
   const handleSave = async (labelData) => {
     try {
       if (labelData.id) {
-        const { data } = await axios.put(`${API_URL}/api/labels/${labelData.id}`, labelData);
-        if (data.success) {
-          setLabels(prev => prev.map(l => l.id === labelData.id ? data.data : l));
+        const res = await api.put(`/labels/${labelData.id}`, labelData);
+        if (res.data.success) {
+          setLabels(prev => prev.map(l => l.id === labelData.id ? res.data.data : l));
           showToast('success', 'Etiqueta actualizada correctamente.');
         }
       } else {
-        const { data } = await axios.post(`${API_URL}/api/labels`, labelData);
-        if (data.success) {
-          setLabels(prev => [data.data, ...prev]);
+        const res = await api.post('/labels', labelData);
+        if (res.data.success) {
+          setLabels(prev => [res.data.data, ...prev]);
           showToast('success', 'Etiqueta creada correctamente.');
         }
       }
@@ -411,7 +409,7 @@ export default function EtiquetasConfig() {
   const handleDelete = async () => {
     const label = modal.label;
     try {
-      await axios.delete(`${API_URL}/api/labels/${label.id}`);
+      await api.delete(`/labels/${label.id}`);
       setLabels(prev => prev.filter(l => l.id !== label.id));
       showToast('success', `"${label.nombre}" eliminada.`);
     } catch {
@@ -424,9 +422,8 @@ export default function EtiquetasConfig() {
     const updated = { ...label, activo: value };
     setLabels(prev => prev.map(l => l.id === label.id ? updated : l));
     try {
-      await axios.put(`${API_URL}/api/labels/${label.id}`, updated);
+      await api.put(`/labels/${label.id}`, updated);
     } catch {
-      // revert
       setLabels(prev => prev.map(l => l.id === label.id ? label : l));
       showToast('error', 'Error al actualizar el estado.');
     }
@@ -475,7 +472,10 @@ export default function EtiquetasConfig() {
                border: `0.5px solid ${toast.type === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
                color: toast.type === 'success' ? '#16a34a' : '#dc2626',
              }}>
-          <span>{toast.type === 'success' ? '✓' : '✕'}</span>
+          <span>{toast.type === 'success'
+            ? <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            : <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          }</span>
           <span>{toast.msg}</span>
         </div>
       )}

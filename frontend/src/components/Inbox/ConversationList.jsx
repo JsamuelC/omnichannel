@@ -26,21 +26,6 @@ const CHANNELS = [
     )
   },
   {
-    key:     'whatsapp',
-    label:   'WhatsApp',
-    color:   'border-green-500',
-    iconBg:  'bg-green-50',
-    iconFg:  'text-green-600',
-    activeBg:'bg-green-600',
-    activeFg:'text-white',
-    dot:     'bg-green-500',
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
-        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.49"/>
-      </svg>
-    )
-  },
-  {
     key:     'messenger',
     label:   'Messenger',
     color:   'border-blue-500',
@@ -118,33 +103,34 @@ export default function ConversationList() {
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
 
   return (
-    <div className="flex flex-col h-full bg-white border-r border-slate-200 w-full">
+    <div className="flex flex-col h-full bg-white dark:bg-[#111b21] border-r border-[#d1d7db] dark:border-[#2a3942] w-full">
 
-      {/* ── Header ────────────────────────────────────── */}
-      <div className="px-4 pt-4 pb-3 border-b border-slate-100">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-bold text-slate-900 text-base">Bandeja</h2>
+      {/* ── Header estilo WhatsApp Web ─────────────────── */}
+      <div className="px-4 pt-3 pb-2.5 bg-[#f0f2f5] dark:bg-[#202c33] border-b border-[#d1d7db] dark:border-[#2a3942]">
+        <div className="flex items-center justify-between mb-2.5">
+          <h2 className="font-semibold text-[#111b21] dark:text-[#e9edef] text-base">Bandeja</h2>
           {totalUnread > 0 && (
-            <span className="bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[1.25rem] text-center">
+            <span className="bg-[#25d366] text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[1.25rem] text-center">
               {totalUnread > 99 ? '99+' : totalUnread}
             </span>
           )}
         </div>
 
-        {/* Buscador */}
-        <div className="relative mb-3">
-          <svg className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none"
+        {/* Buscador estilo WhatsApp (píldora redondeada) */}
+        <div className="relative mb-2">
+          <svg className="absolute left-3.5 top-2.5 w-3.5 h-3.5 text-[#54656f] dark:text-[#8696a0] pointer-events-none"
             fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
             type="text"
-            placeholder="Buscar contacto..."
+            placeholder="Buscar o empezar un chat nuevo"
             value={search}
             onChange={handleSearch}
-            className="w-full pl-8 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg
-                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+            className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-[#2a3942] text-[#111b21] dark:text-[#e9edef] placeholder-[#667781] dark:placeholder-[#8696a0]
+                       border border-transparent rounded-full
+                       focus:outline-none focus:ring-1 focus:ring-[#00a884]"
           />
         </div>
 
@@ -152,8 +138,8 @@ export default function ConversationList() {
         <select
           value={filters.status || ''}
           onChange={handleStatusFilter}
-          className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5
-                     focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="w-full text-xs bg-white dark:bg-[#2a3942] text-[#54656f] dark:text-[#8696a0] border border-[#d1d7db] dark:border-[#2a3942] rounded-lg px-2 py-1.5
+                     focus:outline-none focus:ring-1 focus:ring-[#00a884]"
         >
           <option value="">Todos los estados</option>
           <option value="bot">Bot activo</option>
@@ -164,7 +150,7 @@ export default function ConversationList() {
       </div>
 
       {/* ── Pestañas de canal ─────────────────────────── */}
-      <div className="flex border-b border-slate-100 bg-white">
+      <div className="flex border-b border-[#d1d7db] dark:border-[#2a3942] bg-white dark:bg-[#111b21]">
         {CHANNELS.map((ch) => {
           const isActive = channelTab === ch.key;
           const count = ch.key ? unread[ch.key] : totalUnread;
@@ -177,8 +163,8 @@ export default function ConversationList() {
                 flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1
                 text-xs font-semibold transition-all duration-150 relative
                 ${isActive
-                  ? 'text-indigo-600 bg-indigo-50/60'
-                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                  ? 'text-[#00a884] bg-[#f0fdf4] dark:bg-[#00a884]/10'
+                  : 'text-[#667781] dark:text-[#8696a0] hover:text-[#111b21] dark:hover:text-[#e9edef] hover:bg-[#f5f6f6] dark:hover:bg-white/5'
                 }
               `}
             >
@@ -211,7 +197,7 @@ export default function ConversationList() {
 
               {/* Línea indicadora activa */}
               {isActive && (
-                <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-indigo-500 rounded-full" />
+                <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-[#00a884] rounded-full" />
               )}
             </button>
           );
@@ -222,19 +208,19 @@ export default function ConversationList() {
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-32 gap-2">
-            <div className="animate-spin w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full" />
-            <span className="text-xs text-slate-400">Cargando...</span>
+            <div className="animate-spin w-5 h-5 border-2 border-[#00a884] border-t-transparent rounded-full" />
+            <span className="text-xs text-[#667781] dark:text-[#8696a0]">Cargando...</span>
           </div>
         ) : conversations.length === 0 ? (
           <div className="text-center py-16 px-4">
-            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <svg viewBox="0 0 24 24" className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor">
+            <div className="w-12 h-12 bg-[#dfe5e7] dark:bg-[#2a3942] rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg viewBox="0 0 24 24" className="w-6 h-6 text-[#54656f] dark:text-[#8696a0]" fill="none" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                   d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
               </svg>
             </div>
-            <p className="text-slate-500 text-sm font-medium">Sin conversaciones</p>
-            <p className="text-slate-400 text-xs mt-1">
+            <p className="text-[#41525d] dark:text-[#e9edef] text-sm font-medium">Sin conversaciones</p>
+            <p className="text-[#667781] dark:text-[#8696a0] text-xs mt-1">
               {user?.role === 'agent'
                 ? 'Tus conversaciones asignadas aparecerán aquí'
                 : 'Los mensajes aparecerán aquí'}
@@ -271,59 +257,52 @@ function ConversationItem({ conversation, isActive, onClick }) {
     <div
       onClick={onClick}
       className={`
-        flex items-start gap-3 px-4 py-3 cursor-pointer
-        border-b border-slate-50 transition-all duration-100
-        ${isActive
-          ? 'bg-indigo-50 border-l-2 border-l-indigo-500 pl-[14px]'
-          : 'hover:bg-slate-50/80 border-l-2 border-l-transparent'
-        }
+        flex items-start gap-3 px-3 py-3 cursor-pointer
+        border-b border-[#f0f2f5] dark:border-white/5 transition-colors duration-100
+        ${isActive ? 'bg-[#f0f2f5] dark:bg-[#2a3942]' : 'hover:bg-[#f5f6f6] dark:hover:bg-white/5'}
       `}
     >
       {/* Avatar con dot de canal */}
       <div className="relative flex-shrink-0 mt-0.5">
-        <div className={`
-          w-9 h-9 rounded-full flex items-center justify-center
-          font-semibold text-sm select-none
-          ${isActive
-            ? 'bg-indigo-100 text-indigo-700'
-            : 'bg-slate-100 text-slate-600'
-          }
-        `}>
+        <div className="w-12 h-12 rounded-full flex items-center justify-center
+                        font-semibold text-sm select-none bg-[#dfe5e7] dark:bg-[#2a3942] text-[#54656f] dark:text-[#8696a0]">
           {initials}
         </div>
         {/* Dot de canal */}
         <span className={`
           absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 ${dotColor}
-          rounded-full border-2 border-white
+          rounded-full border-2 border-white dark:border-[#111b21]
         `} />
       </div>
 
       {/* Contenido */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 border-b border-transparent">
         <div className="flex items-start justify-between gap-2">
-          <p className={`text-sm truncate ${isActive ? 'font-semibold text-indigo-700' : 'font-medium text-slate-900'}`}>
+          <p className="text-[15px] truncate text-[#111b21] dark:text-[#e9edef] font-medium">
             {name}
           </p>
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            {conversation.unread_count > 0 && (
-              <span className="bg-indigo-600 text-white text-xs rounded-full min-w-[1.1rem] h-[1.1rem] px-1 flex items-center justify-center font-bold">
-                {conversation.unread_count > 9 ? '9+' : conversation.unread_count}
-              </span>
-            )}
-            {timeAgo && (
-              <span className="text-xs text-slate-400 whitespace-nowrap">{timeAgo}</span>
-            )}
-          </div>
+          {timeAgo && (
+            <span className={`text-xs whitespace-nowrap flex-shrink-0 ${conversation.unread_count > 0 ? 'text-[#00a884] font-medium' : 'text-[#667781] dark:text-[#8696a0]'}`}>
+              {timeAgo}
+            </span>
+          )}
         </div>
 
-        <p className="text-xs text-slate-500 truncate mt-0.5 leading-relaxed">{preview}</p>
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <p className="text-sm text-[#667781] dark:text-[#8696a0] truncate leading-relaxed">{preview}</p>
+          {conversation.unread_count > 0 && (
+            <span className="bg-[#00a884] text-white text-xs rounded-full min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center font-bold flex-shrink-0">
+              {conversation.unread_count > 9 ? '9+' : conversation.unread_count}
+            </span>
+          )}
+        </div>
 
         <div className="flex items-center gap-1.5 mt-1.5">
           <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${status.className}`}>
             {status.label}
           </span>
           {conversation.assigned_agent?.name && (
-            <span className="text-xs text-slate-400 truncate">
+            <span className="text-xs text-[#667781] dark:text-[#8696a0] truncate">
               · {conversation.assigned_agent.name}
             </span>
           )}

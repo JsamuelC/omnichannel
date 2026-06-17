@@ -7,7 +7,8 @@ class BotConfigController {
 
   async getAll(req, res) {
     try {
-      const configs = await BotConfig.findAll({ order: [['created_at', 'DESC']] });
+      const companyFilter = req.companyFilter || (req.user?.role === 'superadmin' ? {} : { company_id: req.user?.company_id });
+      const configs = await BotConfig.findAll({ where: companyFilter, order: [['created_at', 'DESC']] });
       res.json({ success: true, data: configs });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
@@ -26,7 +27,8 @@ class BotConfigController {
 
   async create(req, res) {
     try {
-      const config = await BotConfig.create(req.body);
+      const company_id = req.user?.role === 'superadmin' ? (req.body.company_id || null) : req.user?.company_id;
+      const config = await BotConfig.create({ ...req.body, company_id });
       logger.info(`✅ BotConfig creado: ${config.id}`);
       res.status(201).json({ success: true, data: config });
     } catch (error) {
@@ -79,19 +81,25 @@ async test(req, res) {
         message: 'No hay integración de IA activa. Configúrala en Integraciones.'
       });
  
-    const response = await chatbotService.generateResponse(
-      systemPrompt,
-      testMessage,
+    const resolvedPrompt = await chatbotService.resolvePromptCatalogs(systemPrompt);
+    const rawResponse    = await chatbotService.callAI(
       integration.provider,
       integration.api_key,
-      req.body.model || null
+      resolvedPrompt,
+      [],
+      testMessage,
+      req.body.model || null,
+      0.7
     );
- 
+
+    const { text: response, catalogFile } = await chatbotService.extractFileCommand(rawResponse);
+
     // El panel espera { respuesta }, el frontend viejo esperaba { data: { response } }
     res.json({
       success:   true,
-      respuesta: response,           // para el nuevo panel JSX
-      data:      { response, provider: integration.provider }  // retrocompatibilidad
+      respuesta: response,
+      archivo:   catalogFile,
+      data:      { response, provider: integration.provider }
     });
   } catch (err) {
     logger.error('Error en test bot:', err);
@@ -102,8 +110,9 @@ async test(req, res) {
 // 2. AGREGA este método nuevo getActive() a la clase:
 async getActive(req, res) {
   try {
+    const companyFilter = req.user?.role === 'superadmin' ? {} : { company_id: req.user?.company_id };
     const config = await BotConfig.findOne({
-      where: { is_active: true, channel: 'all' },
+      where: { is_active: true, channel: 'all', ...companyFilter },
       order: [['created_at', 'DESC']]
     });
  

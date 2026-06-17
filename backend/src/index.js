@@ -27,9 +27,11 @@ const fs   = require('fs');
 const path = require('path');
 fs.mkdirSync(path.join(__dirname, '../logs'), { recursive: true });
 
-// Crear directorio de uploads de comprobantes al arrancar
-const VOUCHER_DIR = process.env.VOUCHER_UPLOAD_DIR || path.join(__dirname, '../uploads/vouchers');
-fs.mkdirSync(VOUCHER_DIR, { recursive: true });
+// Crear directorios de uploads al arrancar
+const VOUCHER_DIR  = process.env.VOUCHER_UPLOAD_DIR  || path.join(__dirname, '../uploads/vouchers');
+const CATALOG_DIR  = process.env.CATALOG_UPLOAD_DIR  || path.join(__dirname, '../uploads/catalogs');
+fs.mkdirSync(VOUCHER_DIR,  { recursive: true });
+fs.mkdirSync(CATALOG_DIR,  { recursive: true });
 
 const app        = express();
 app.set('trust proxy', 1);
@@ -55,7 +57,17 @@ io.on('connection', (socket) => {
   socket.on('join:agents', (userId) => {
     socket.join('agents');
     socket.join(`user:${userId}`);
-    logger.debug(`👤 Agente ${userId} en sala agents`);
+    logger.info(`👤 Agente ${userId} unido a sala agents (socket ${socket.id})`);
+    // Enviar estado actual de sesiones WA para evitar la race condition
+    // en la que el backend ya conectó antes de que el frontend uniera la sala
+    const waSessions = whatsappService.getAllSessions();
+    for (const s of waSessions) {
+      socket.emit('whatsapp:status', {
+        sessionId:   s.sessionId,
+        status:      s.status,
+        sessionType: s.sessionType || 'personal'
+      });
+    }
   });
 
   socket.on('join:conversation', (conversationId) => {
@@ -74,9 +86,26 @@ io.on('connection', (socket) => {
     logger.info(`🔌 Cliente desconectado: ${socket.id}`);
   });
 
-  socket.on("join:whatsapp",(sessionId) => {
+  socket.on("join:whatsapp", (sessionId) => {
     socket.join(`session:${sessionId}`);
     logger.debug(`Cliente unido a session whatsapp: ${sessionId}`);
+
+    // Re-emit cached QR/status so late-joining clients don't miss the event
+    const session = whatsappService.getSession(sessionId);
+    if (session) {
+      if (session.status === 'connecting' && session.qr) {
+        socket.emit('whatsapp:qr', {
+          sessionId,
+          qr: session.qr,
+          sessionType: session.sessionType
+        });
+      }
+      socket.emit('whatsapp:status', {
+        sessionId,
+        status: session.status,
+        sessionType: session.sessionType
+      });
+    }
   });
 });
 
@@ -132,13 +161,15 @@ app.get('/', (req, res) => {
   res.json({ success: true, service: 'tecnossync-backend', version: '2.0.0' });
 });
 
+// ─────────────────────────────────────
+// ARCHIVOS ESTATICOS DE UPLOADS
+// IMPORTANTE: debe ir ANTES de notFound para que no sea interceptado
+// ─────────────────────────────────────
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 app.use('/api', routes);
 app.use(notFound);
 app.use(errorHandler);
-// ─────────────────────────────────────
-// ARCHIVOS ESTATICOS DE UPLOADS
-// ─────────────────────────────────────
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // ─────────────────────────────────────
 // ARRANQUE

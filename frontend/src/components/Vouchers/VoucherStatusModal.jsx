@@ -12,31 +12,34 @@ const XIcon = () => (
   </svg>
 );
 
+const STATUS_ICON = {
+  verified:       <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+  rejected:       <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+  fraud_suspected:<svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>,
+  pending:        <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>,
+};
+
 const ACTION_CONFIG = {
   verified: {
     label: 'Verificar Comprobante',
-    emoji: '✅',
     btnColor: 'bg-green-600 hover:bg-green-700',
     needsReason: false,
     reasonPlaceholder: ''
   },
   rejected: {
     label: 'Rechazar Comprobante',
-    emoji: '❌',
     btnColor: 'bg-red-600 hover:bg-red-700',
     needsReason: true,
     reasonPlaceholder: 'Ej: El monto no corresponde con la factura emitida...'
   },
   fraud_suspected: {
     label: 'Marcar como Fraude Sospechoso',
-    emoji: '⚠️',
     btnColor: 'bg-orange-600 hover:bg-orange-700',
     needsReason: true,
     reasonPlaceholder: 'Ej: La firma no coincide con registros anteriores del cliente...'
   },
   pending: {
     label: 'Regresar a Pendiente',
-    emoji: '🔄',
     btnColor: 'bg-slate-600 hover:bg-slate-700',
     needsReason: false,
     reasonPlaceholder: ''
@@ -121,7 +124,7 @@ export default function VoucherStatusModal({ id, code, currentStatus, onClose, o
                     <input type="radio" name="status" value={s} checked={selectedStatus === s}
                       onChange={() => { setSelectedStatus(s); setReason(''); }}
                       className="text-indigo-600" />
-                    <span className="text-xl">{cfg.emoji}</span>
+                    <span className="text-slate-500">{STATUS_ICON[s]}</span>
                     <span className="text-sm font-medium text-slate-700">{cfg.label}</span>
                   </label>
                 );

@@ -9,10 +9,27 @@ const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
 class MetaService {
   constructor() {
-    this.whatsappToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    this.whatsappToken   = process.env.WHATSAPP_ACCESS_TOKEN;
     this.whatsappPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    this.messengerToken = process.env.MESSENGER_ACCESS_TOKEN;
-    this.instagramToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+    this.messengerToken  = process.env.MESSENGER_ACCESS_TOKEN;
+    this.instagramToken  = process.env.INSTAGRAM_ACCESS_TOKEN;
+  }
+
+  /**
+   * Obtiene las credenciales de WA Business desde la BD.
+   * Si no hay registro activo, cae a las variables de entorno.
+   */
+  async getWhatsAppCredentials(companyId = null) {
+    try {
+      const { WhatsappAccount } = require('../models');
+      const where = { is_active: true };
+      if (companyId) where.company_id = companyId;
+      const account = await WhatsappAccount.findOne({ where, order: [['created_at', 'DESC']] });
+      if (account) {
+        return { token: account.access_token, phoneId: account.phone_number_id };
+      }
+    } catch (_) {}
+    return { token: this.whatsappToken, phoneId: this.whatsappPhoneId };
   }
 
   // ============================================
@@ -24,25 +41,20 @@ class MetaService {
    * @param {string} to - Número de teléfono del destinatario (con código de país)
    * @param {string} text - Texto del mensaje
    */
-  async sendWhatsAppMessage(to, text) {
+  async sendWhatsAppMessage(to, text, companyId = null) {
     try {
+      const { token, phoneId } = await this.getWhatsAppCredentials(companyId);
       const response = await axios.post(
-        `${META_BASE_URL}/${this.whatsappPhoneId}/messages`,
+        `${META_BASE_URL}/${phoneId}/messages`,
         {
           messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: to,
-          type: 'text',
-          text: { preview_url: false, body: text }
+          recipient_type:    'individual',
+          to,
+          type:              'text',
+          text:              { preview_url: false, body: text }
         },
-        {
-          headers: {
-            'Authorization': `Bearer ${this.whatsappToken}`,
-            'Content-Type': 'application/json'
-          }
-        }
+        { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
-
       logger.info(`✅ WhatsApp enviado a ${to}: ${response.data.messages?.[0]?.id}`);
       return response.data;
     } catch (error) {
@@ -81,6 +93,36 @@ class MetaService {
     } catch (error) {
       logger.error('❌ Error enviando template WhatsApp:', error.response?.data);
       throw error;
+    }
+  }
+
+  /**
+   * Envía un documento o imagen por WhatsApp (PDF, JPG, PNG, etc.)
+   * @param {string} to - Número de teléfono del destinatario
+   * @param {object} fileInfo - { url, nombre, tipo } del catálogo
+   */
+  async sendWhatsAppDocument(to, fileInfo, companyId = null) {
+    try {
+      const { token, phoneId } = await this.getWhatsAppCredentials(companyId);
+      const baseUrl    = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3001}`;
+      const publicUrl  = `${baseUrl}${fileInfo.url}`;
+      const isImage    = fileInfo.tipo?.startsWith('image/');
+      const mediaType  = isImage ? 'image' : 'document';
+      const mediaPayload = isImage
+        ? { link: publicUrl, caption:  fileInfo.nombre || '' }
+        : { link: publicUrl, filename: fileInfo.nombre || 'archivo.pdf' };
+
+      const response = await axios.post(
+        `${META_BASE_URL}/${phoneId}/messages`,
+        { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: mediaType, [mediaType]: mediaPayload },
+        { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      );
+      logger.info(`✅ WhatsApp documento enviado a ${to}: ${fileInfo.nombre}`);
+      return response.data;
+    } catch (error) {
+      const errData = error.response?.data || error.message;
+      logger.error('❌ Error enviando documento WhatsApp:', JSON.stringify(errData));
+      throw new Error(`WhatsApp Document API error: ${JSON.stringify(errData)}`);
     }
   }
 

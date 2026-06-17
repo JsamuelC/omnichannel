@@ -4,6 +4,7 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Megaphone, Send as SendIcon, Trash2, CheckCircle, XCircle, Users, Upload, AlertCircle, Clock } from 'lucide-react';
 
 const STATUS_COLORS = {
   draft:     'bg-gray-100 text-gray-600',
@@ -42,7 +43,7 @@ export default function CampaignsPanel() {
     setSaving(true);
     try {
       await api.post('/campaigns', form);
-      toast.success('Campaña creada ✅');
+      toast.success('Campaña creada');
       setShowForm(false);
       setForm(EMPTY_FORM);
       fetchCampaigns();
@@ -56,7 +57,7 @@ export default function CampaignsPanel() {
     setLaunching(id);
     try {
       await api.post(`/campaigns/${id}/launch`);
-      toast.success('🚀 Campaña lanzada');
+      toast.success('Campaña lanzada');
       fetchCampaigns();
     } catch (e) {
       toast.error('Error: ' + e.message);
@@ -75,7 +76,10 @@ export default function CampaignsPanel() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-gray-900">📢 Campañas Masivas</h1>
+          <div className="flex items-center gap-2">
+            <Megaphone size={18} className="text-gray-700" />
+            <h1 className="text-lg font-bold text-gray-900">Campañas Masivas</h1>
+          </div>
           <p className="text-sm text-gray-500">Envía mensajes a múltiples contactos usando Bull Queue</p>
         </div>
         <button onClick={() => setShowForm(!showForm)} className="btn-primary">
@@ -97,9 +101,9 @@ export default function CampaignsPanel() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Canal</label>
                 <select value={form.channel} onChange={(e) => setForm({...form, channel: e.target.value})} className="input-field">
-                  <option value="whatsapp">WhatsApp 📱</option>
-                  <option value="messenger">Messenger 💬</option>
-                  <option value="instagram">Instagram 📸</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="messenger">Messenger</option>
+                  <option value="instagram">Instagram</option>
                 </select>
               </div>
             </div>
@@ -118,11 +122,11 @@ export default function CampaignsPanel() {
               <input type="range" min="5" max="100" step="5" value={form.messages_per_minute}
                 onChange={(e) => setForm({...form, messages_per_minute: +e.target.value})}
                 className="w-full accent-blue-600" />
-              <p className="text-xs text-gray-400 mt-1">⚠️ WhatsApp recomienda máximo 80 msg/min para evitar bloqueos</p>
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1"><AlertCircle size={11} /> WhatsApp recomienda máximo 80 msg/min para evitar bloqueos</p>
             </div>
             <div className="flex gap-3">
               <button onClick={handleCreate} disabled={saving} className="btn-primary">
-                {saving ? 'Creando...' : '✅ Crear campaña'}
+                {saving ? 'Creando...' : 'Crear campaña'}
               </button>
               <button onClick={() => setShowForm(false)} className="btn-secondary">Cancelar</button>
             </div>
@@ -132,7 +136,7 @@ export default function CampaignsPanel() {
         {/* Info de funcionamiento */}
         {campaigns.length === 0 && !showForm ? (
           <div className="text-center py-20">
-            <p className="text-5xl mb-4">📢</p>
+            <Megaphone size={48} className="mx-auto mb-4 text-gray-300" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Sin campañas aún</h3>
             <p className="text-gray-400 text-sm max-w-sm mx-auto">
               Crea tu primera campaña para enviar mensajes masivos a tus contactos usando Redis + Bull Queue
@@ -175,10 +179,10 @@ function CampaignCard({ campaign: c, onLaunch, onDelete, launching }) {
 
           {/* Stats */}
           <div className="flex gap-4 text-xs text-gray-500">
-            <span>📤 Enviados: <b className="text-gray-900">{c.sent_count}</b></span>
-            <span>✅ Entregados: <b className="text-green-600">{c.delivered_count}</b></span>
-            <span>❌ Fallidos: <b className="text-red-600">{c.failed_count}</b></span>
-            <span>👥 Total: <b>{c.total_recipients}</b></span>
+            <span className="flex items-center gap-1"><Upload size={11} /> Enviados: <b className="text-gray-900">{c.sent_count}</b></span>
+            <span className="flex items-center gap-1"><CheckCircle size={11} className="text-green-500" /> Entregados: <b className="text-green-600">{c.delivered_count}</b></span>
+            <span className="flex items-center gap-1"><XCircle size={11} className="text-red-500" /> Fallidos: <b className="text-red-600">{c.failed_count}</b></span>
+            <span className="flex items-center gap-1"><Users size={11} /> Total: <b>{c.total_recipients}</b></span>
           </div>
 
           {/* Barra de progreso */}
@@ -206,10 +210,10 @@ function CampaignCard({ campaign: c, onLaunch, onDelete, launching }) {
             <>
               <button onClick={() => onLaunch(c.id)} disabled={launching}
                 className="btn-primary text-xs px-4 py-2">
-                {launching ? '⏳ Lanzando...' : '🚀 Lanzar'}
+                {launching ? <span className="flex items-center gap-1"><Clock size={12} /> Lanzando...</span> : <span className="flex items-center gap-1"><SendIcon size={12} /> Lanzar</span>}
               </button>
               <button onClick={() => onDelete(c.id)} className="btn-secondary text-xs px-4 py-2 text-red-500 hover:bg-red-50">
-                🗑️ Eliminar
+                <span className="flex items-center gap-1"><Trash2 size={12} /> Eliminar</span>
               </button>
             </>
           )}

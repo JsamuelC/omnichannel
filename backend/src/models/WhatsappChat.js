@@ -31,6 +31,12 @@ const WhatsappChat = sequelize.define('whatsapp_chats', {
     type:         DataTypes.BOOLEAN,
     defaultValue: false
   },
+  bot_mode: {
+    type:         DataTypes.STRING(20),
+    defaultValue: 'generic',
+    allowNull:    false,
+    comment:      'generic = usa BotConfig global | custom = usa bot_prompt del chat'
+  },
   bot_prompt: {
     type:      DataTypes.TEXT,
     allowNull: true
@@ -46,6 +52,16 @@ const WhatsappChat = sequelize.define('whatsapp_chats', {
   last_message_at: {
     type:      DataTypes.BIGINT,
     allowNull: true
+  },
+  labels: {
+    type:         DataTypes.ARRAY(DataTypes.STRING),
+    defaultValue: [],
+    allowNull:    false
+  },
+  lid: {
+    type:      DataTypes.STRING(100),
+    allowNull: true,
+    comment:   'WhatsApp @lid JID → mapeo persistente LID→real JID'
   }
 }, {
   indexes: [

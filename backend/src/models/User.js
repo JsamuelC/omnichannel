@@ -26,7 +26,7 @@ const User = sequelize.define('users', {
     allowNull: false
   },
   role: {
-    type: DataTypes.ENUM('admin', 'agent', 'supervisor'),
+    type: DataTypes.ENUM('superadmin', 'admin', 'agent', 'supervisor'),
     defaultValue: 'agent'
   },
   avatar_url: {
@@ -39,11 +39,19 @@ const User = sequelize.define('users', {
   },
   company_id: {
     type: DataTypes.UUID,
-    allowNull: true
+    allowNull: true   // NULL solo para superadmin
   },
   is_active: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
+  },
+  reset_token: {
+    type: DataTypes.STRING(200),
+    allowNull: true
+  },
+  reset_token_expires: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 }, {
   hooks: {

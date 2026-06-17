@@ -1,9 +1,7 @@
 // frontend/src/components/Configuration/PerfilEmpresa.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import api from '../../services/api';
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -66,6 +64,26 @@ const Section = ({ title, children }) => (
   </div>
 );
 
+const DIAS = [
+  { key: 'lunes',     label: 'Lunes'     },
+  { key: 'martes',    label: 'Martes'    },
+  { key: 'miercoles', label: 'Miércoles' },
+  { key: 'jueves',    label: 'Jueves'    },
+  { key: 'viernes',   label: 'Viernes'   },
+  { key: 'sabado',    label: 'Sábado'    },
+  { key: 'domingo',   label: 'Domingo'   },
+];
+
+const DEFAULT_HORARIOS = {
+  lunes:     { abierto: true,  desde: '08:00', hasta: '18:00' },
+  martes:    { abierto: true,  desde: '08:00', hasta: '18:00' },
+  miercoles: { abierto: true,  desde: '08:00', hasta: '18:00' },
+  jueves:    { abierto: true,  desde: '08:00', hasta: '18:00' },
+  viernes:   { abierto: true,  desde: '08:00', hasta: '17:00' },
+  sabado:    { abierto: false, desde: '',       hasta: ''      },
+  domingo:   { abierto: false, desde: '',       hasta: ''      },
+};
+
 const EMPTY = {
   nombre:              '',
   sitio_web:           '',
@@ -77,6 +95,7 @@ const EMPTY = {
   ciudad:              '',
   pais:                '',
   descripcion:         '',
+  horarios:            null,
 };
 
 export default function PerfilEmpresa() {
@@ -94,9 +113,9 @@ export default function PerfilEmpresa() {
       try {
         setLoading(true);
         setError(null);
-        const { data } = await axios.get(`${API_URL}/api/company`);
-        if (data.success) {
-          const clean = { ...EMPTY, ...data.data };
+        const res = await api.get('/company');
+        if (res.success) {
+          const clean = { ...EMPTY, ...res.data };
           setForm(clean);
           setSaved(clean);
         }
@@ -123,8 +142,8 @@ export default function PerfilEmpresa() {
     }
     try {
       setSaving(true);
-      const { data } = await axios.put(`${API_URL}/api/company`, form);
-      if (data.success) {
+      const res = await api.put('/company', form);
+      if (res.success) {
         setSaved({ ...form });
         showToast('success', 'Cambios guardados correctamente.');
       }
@@ -194,7 +213,10 @@ export default function PerfilEmpresa() {
             color: toast.type === 'success' ? '#16a34a' : '#dc2626',
           }}
         >
-          <span>{toast.type === 'success' ? '✓' : '✕'}</span>
+          <span>{toast.type === 'success'
+            ? <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            : <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          }</span>
           <span>{toast.msg}</span>
         </div>
       )}
@@ -282,6 +304,119 @@ export default function PerfilEmpresa() {
                 onFocus={e => { e.target.style.borderColor = '#6366f1'; e.target.style.background = '#fff'; }}
                 onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
               />
+            </div>
+
+            {/* ── Horarios de atención ── */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#94a3b8' }}>
+                  Horarios de atención
+                </h3>
+                {!form.horarios && (
+                  <button
+                    type="button"
+                    onClick={() => handleChange('horarios', DEFAULT_HORARIOS)}
+                    className="text-xs px-3 py-1 rounded-lg transition-colors"
+                    style={{ background: '#eef2ff', color: '#6366f1', border: '0.5px solid #c7d2fe' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#e0e7ff'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#eef2ff'}
+                  >
+                    Configurar horarios
+                  </button>
+                )}
+                {form.horarios && (
+                  <button
+                    type="button"
+                    onClick={() => handleChange('horarios', null)}
+                    className="text-xs px-3 py-1 rounded-lg transition-colors"
+                    style={{ background: '#fef2f2', color: '#ef4444', border: '0.5px solid #fecaca' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
+                  >
+                    Quitar horarios
+                  </button>
+                )}
+              </div>
+
+              {!form.horarios ? (
+                <p className="text-sm" style={{ color: '#94a3b8' }}>
+                  Sin horarios configurados — el bot de IA no informará sobre disponibilidad horaria.
+                </p>
+              ) : (
+                <div className="rounded-xl overflow-hidden" style={{ border: '0.5px solid #e2e8f0', maxWidth: '560px' }}>
+                  {/* Header */}
+                  <div className="grid grid-cols-[120px_1fr_1fr_60px] gap-0 px-4 py-2"
+                       style={{ background: '#f8fafc', borderBottom: '0.5px solid #e2e8f0' }}>
+                    <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>Día</span>
+                    <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>Apertura</span>
+                    <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>Cierre</span>
+                    <span className="text-xs font-medium text-center" style={{ color: '#94a3b8' }}>Abierto</span>
+                  </div>
+                  {DIAS.map(({ key, label }) => {
+                    const h = form.horarios[key] || { abierto: false, desde: '', hasta: '' };
+                    const setH = (field, val) => handleChange('horarios', {
+                      ...form.horarios,
+                      [key]: { ...h, [field]: val }
+                    });
+                    return (
+                      <div key={key}
+                           className="grid grid-cols-[120px_1fr_1fr_60px] gap-0 px-4 py-2.5 items-center"
+                           style={{ borderBottom: '0.5px solid #f1f5f9' }}>
+                        <span className="text-sm font-medium" style={{ color: h.abierto ? '#0f172a' : '#94a3b8' }}>
+                          {label}
+                        </span>
+                        <input
+                          type="time"
+                          value={h.desde}
+                          disabled={!h.abierto}
+                          onChange={e => setH('desde', e.target.value)}
+                          className="w-28 rounded-lg px-2 py-1 text-sm outline-none transition-all"
+                          style={{
+                            background: h.abierto ? '#f8fafc' : '#f1f5f9',
+                            border: '0.5px solid #e2e8f0',
+                            color: h.abierto ? '#0f172a' : '#cbd5e1',
+                            cursor: h.abierto ? 'text' : 'not-allowed',
+                          }}
+                          onFocus={e => { if (h.abierto) { e.target.style.borderColor = '#6366f1'; e.target.style.background = '#fff'; } }}
+                          onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = h.abierto ? '#f8fafc' : '#f1f5f9'; }}
+                        />
+                        <input
+                          type="time"
+                          value={h.hasta}
+                          disabled={!h.abierto}
+                          onChange={e => setH('hasta', e.target.value)}
+                          className="w-28 rounded-lg px-2 py-1 text-sm outline-none transition-all"
+                          style={{
+                            background: h.abierto ? '#f8fafc' : '#f1f5f9',
+                            border: '0.5px solid #e2e8f0',
+                            color: h.abierto ? '#0f172a' : '#cbd5e1',
+                            cursor: h.abierto ? 'text' : 'not-allowed',
+                          }}
+                          onFocus={e => { if (h.abierto) { e.target.style.borderColor = '#6366f1'; e.target.style.background = '#fff'; } }}
+                          onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = h.abierto ? '#f8fafc' : '#f1f5f9'; }}
+                        />
+                        <div className="flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => setH('abierto', !h.abierto)}
+                            className="relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200"
+                            style={{ background: h.abierto ? '#6366f1' : '#e2e8f0' }}
+                          >
+                            <span
+                              className="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200"
+                              style={{ transform: h.abierto ? 'translateX(16px)' : 'translateX(0px)' }}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <p className="text-xs mt-3" style={{ color: '#94a3b8' }}>
+                El bot de IA usará esta información automáticamente al responder preguntas sobre disponibilidad.
+              </p>
             </div>
           </>
         )}

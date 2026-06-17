@@ -1,122 +1,108 @@
 // backend/src/middleware/auth.js
-// ─────────────────────────────────────────────────────────────
-// Autenticación JWT + Autorización RBAC para Tecnossync
-// Roles: admin | agent
-// ─────────────────────────────────────────────────────────────
-const jwt = require('jsonwebtoken');
+const jwt    = require('jsonwebtoken');
 const { User } = require('../models');
-const logger = require('../config/logger');
+const logger   = require('../config/logger');
 
-// ──────────────────────────────────────
-// 1. Verificar JWT y cargar req.user
-// ──────────────────────────────────────
+// ── 1. Verificar JWT y cargar req.user ───────────────────────────────────────
 const auth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith('Bearer '))
       return res.status(401).json({ success: false, message: 'Token de acceso requerido' });
-    }
 
     const token = authHeader.split(' ')[1];
-
-    // Verificación estricta: lanza si expirado o inválido
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET, {
-        algorithms: ['HS256'],
-        issuer: 'tecnossync'
-      });
+      decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'], issuer: 'tecnossync' });
     } catch (err) {
       const msg =
-        err.name === 'TokenExpiredError'  ? 'Sesión expirada. Vuelve a iniciar sesión.' :
-        err.name === 'JsonWebTokenError'  ? 'Token inválido.'                            :
-        err.name === 'NotBeforeError'     ? 'Token aún no válido.'                       :
-                                            'Error de autenticación.';
+        err.name === 'TokenExpiredError' ? 'Sesión expirada. Vuelve a iniciar sesión.' :
+        err.name === 'JsonWebTokenError' ? 'Token inválido.'                           :
+                                           'Error de autenticación.';
       return res.status(401).json({ success: false, message: msg });
     }
 
-    // Recargar usuario desde DB en cada petición → detecta cuentas desactivadas al vuelo
-    const user = await User.findByPk(decoded.id, {
-      attributes: { exclude: ['password_hash'] }
-    });
-
-    if (!user)            return res.status(401).json({ success: false, message: 'Usuario no encontrado.' });
-    if (!user.is_active)  return res.status(403).json({ success: false, message: 'Cuenta desactivada. Contacta al administrador.' });
+    const user = await User.findByPk(decoded.id, { attributes: { exclude: ['password_hash', 'reset_token', 'reset_token_expires'] } });
+    if (!user)           return res.status(401).json({ success: false, message: 'Usuario no encontrado.' });
+    if (!user.is_active) return res.status(403).json({ success: false, message: 'Cuenta desactivada. Contacta al administrador.' });
 
     req.user = user;
     next();
   } catch (error) {
-    logger.error('Error inesperado en middleware auth:', error);
+    logger.error('Error en middleware auth:', error);
     res.status(500).json({ success: false, message: 'Error interno de autenticación.' });
   }
 };
 
-// ──────────────────────────────────────
-// 2. Verificar rol (RBAC simple)
-//    Uso: requireRole('admin') | requireRole('admin', 'agent')
-// ──────────────────────────────────────
+// ── 2. Verificar rol ─────────────────────────────────────────────────────────
+// superadmin siempre pasa (es el único que está por encima de todos)
 const requireRole = (...roles) => (req, res, next) => {
-  if (!req.user) {
+  if (!req.user)
     return res.status(401).json({ success: false, message: 'Autenticación requerida.' });
-  }
+  if (req.user.role === 'superadmin') return next(); // superadmin bypasses all role checks
   if (!roles.includes(req.user.role)) {
-    logger.warn(`🚫 Acceso denegado: ${req.user.email} (${req.user.role}) intentó ${req.method} ${req.path}`);
-    return res.status(403).json({
-      success: false,
-      message: `Acción restringida. Se requiere rol: ${roles.join(' o ')}.`
-    });
+    logger.warn(`🚫 Acceso denegado: ${req.user.email} (${req.user.role}) → ${req.method} ${req.path}`);
+    return res.status(403).json({ success: false, message: `Acción restringida. Se requiere: ${roles.join(' o ')}.` });
   }
   next();
 };
 
-// ──────────────────────────────────────
-// 3. Filtro de conversaciones por agente
-//    Los agentes (role='agent') SOLO pueden acceder a conversaciones
-//    que les están asignadas. Los admins ven todo.
-//    Inyecta req.conversationFilter para usarlo en los queries.
-// ──────────────────────────────────────
+// ── 3. Solo superadmin ───────────────────────────────────────────────────────
+const requireSuperAdmin = (req, res, next) => {
+  if (!req.user)
+    return res.status(401).json({ success: false, message: 'Autenticación requerida.' });
+  if (req.user.role !== 'superadmin')
+    return res.status(403).json({ success: false, message: 'Acción reservada para superadmin.' });
+  next();
+};
+
+// ── 4. Filtro de empresa (multi-tenant) ──────────────────────────────────────
+// Inyecta req.companyFilter:
+//   superadmin → {} (ve todo)
+//   admin/agent → { company_id: req.user.company_id }
+const companyScope = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ success: false, message: 'Autenticación requerida.' });
+  req.companyFilter = req.user.role === 'superadmin'
+    ? {}
+    : { company_id: req.user.company_id };
+  next();
+};
+
+// ── 5. Filtro de conversaciones por agente + empresa ─────────────────────────
 const scopeConversations = (req, res, next) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Autenticación requerida.' });
 
+  const companyFilter = req.user.role === 'superadmin'
+    ? {}
+    : { company_id: req.user.company_id };
+
   if (req.user.role === 'agent') {
-    // El agente solo ve SUS conversaciones asignadas
-    req.conversationFilter = { assigned_agent_id: req.user.id };
+    req.conversationFilter = { ...companyFilter, assigned_agent_id: req.user.id };
   } else {
-    // admin ve todo
-    req.conversationFilter = {};
+    req.conversationFilter = companyFilter;
   }
   next();
 };
 
-// ──────────────────────────────────────
-// 4. Verificar que el agente tenga acceso a UNA conversación concreta
-//    Uso: en GET /conversations/:id y sus sub-rutas
-// ──────────────────────────────────────
+// ── 6. Acceso a una conversación concreta ────────────────────────────────────
 const requireConversationAccess = async (req, res, next) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Autenticación requerida.' });
+  if (req.user.role === 'admin' || req.user.role === 'superadmin') return next();
 
-  // Admin: acceso irrestricto
-  if (req.user.role === 'admin') return next();
-
-  // Agente: verificar que la conversación le esté asignada
   try {
     const { Conversation } = require('../models');
+    const companyFilter = { company_id: req.user.company_id };
+
     const conv = await Conversation.findOne({
-      where: {
-        id: req.params.id,
-        assigned_agent_id: req.user.id
-      }
+      where: { id: req.params.id, assigned_agent_id: req.user.id, ...companyFilter }
     });
 
     if (!conv) {
-      logger.warn(`🚫 Agente ${req.user.id} intentó acceder a conversación ${req.params.id} sin asignación`);
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes acceso a esta conversación.'
-      });
+      logger.warn(`🚫 Agente ${req.user.id} intentó acceder a conversación ${req.params.id}`);
+      return res.status(403).json({ success: false, message: 'No tienes acceso a esta conversación.' });
     }
 
-    req.conversation = conv; // cache para el controlador
+    req.conversation = conv;
     next();
   } catch (error) {
     logger.error('Error en requireConversationAccess:', error);
@@ -124,4 +110,4 @@ const requireConversationAccess = async (req, res, next) => {
   }
 };
 
-module.exports = { auth, requireRole, scopeConversations, requireConversationAccess };
+module.exports = { auth, requireRole, requireSuperAdmin, companyScope, scopeConversations, requireConversationAccess };

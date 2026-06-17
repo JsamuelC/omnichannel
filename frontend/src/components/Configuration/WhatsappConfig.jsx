@@ -136,7 +136,7 @@ export default function WhatsappConfig() {
               meta_user_id: response.authResponse?.userID
             });
             setAccount(res.data.data);
-            toast.success('✅ WhatsApp Business conectado exitosamente', { id: 'connecting' });
+            toast.success('WhatsApp Business conectado exitosamente', { id: 'connecting' });
           } catch (e) {
             toast.error(e.response?.data?.message || 'Error al guardar', { id: 'connecting' });
           }
@@ -144,7 +144,7 @@ export default function WhatsappConfig() {
       }
 
       if (data.event === 'CANCEL') {
-        toast('Proceso cancelado', { icon: '⚠️' });
+        toast('Proceso cancelado');
       }
 
       if (data.event === 'ERROR') {
@@ -166,9 +166,9 @@ export default function WhatsappConfig() {
       (response) => {
         if (response.authResponse) {
           // El mensaje llega por window.message desde el popup
-          toast('Completa el proceso en la ventana de Meta', { icon: '🔗' });
+          toast('Completa el proceso en la ventana de Meta');
         } else {
-          toast('Proceso cancelado', { icon: '⚠️' });
+          toast('Proceso cancelado');
         }
       },
       {
@@ -208,7 +208,7 @@ export default function WhatsappConfig() {
     try {
       const res = await api.post('/whatsapp-accounts/test');
       const { verified_name, display_phone_number, quality_rating } = res.data.data;
-      toast.success(`✅ ${verified_name} · ${display_phone_number} · Calidad: ${quality_rating}`);
+      toast.success(`${verified_name} · ${display_phone_number} · Calidad: ${quality_rating}`);
     } catch (e) {
       toast.error(e.response?.data?.message || 'Error al probar');
     } finally {
@@ -244,6 +244,21 @@ export default function WhatsappConfig() {
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
       <div className="max-w-2xl mx-auto px-6 py-10 flex flex-col gap-8">
+
+        {/* Banner: Meta App no configurada */}
+        {!account && (
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+            </svg>
+            <div>
+              <p className="text-sm font-semibold text-amber-800">WhatsApp API (Meta) — Pendiente de configuración</p>
+              <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                Esta integración requiere una cuenta verificada en Meta Business Manager y una app aprobada en el portal de desarrolladores de Meta. Configura tus credenciales abajo cuando tengas acceso.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Header */}
         <div className="flex items-center gap-4">
@@ -371,7 +386,7 @@ export default function WhatsappConfig() {
                 </div>
 
                 <div className="w-full bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <p className="text-xs font-semibold text-amber-700 mb-1">⚠️ Nota importante</p>
+                  <p className="text-xs font-semibold text-amber-700 mb-1">Nota importante</p>
                   <p className="text-xs text-amber-600">
                     Esta opción requiere que tu cuenta de Facebook esté agregada como administrador o tester en la app de Tecnossync en Meta Developers. Si no puedes completar el proceso, usa la configuración manual.
                   </p>

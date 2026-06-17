@@ -271,7 +271,7 @@ export default function TeamPanel() {
   const handleCreate = async (form) => {
     try {
       await createUser({ name: form.name, email: form.email, password: form.password, role: form.role });
-      toast.success(`✅ ${form.name} creado correctamente.`);
+      toast.success(`${form.name} creado correctamente.`);
       setModalCreate(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al crear usuario.');

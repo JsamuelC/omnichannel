@@ -194,7 +194,7 @@ export default function VoucherUploadModal({ onClose, onSuccess }) {
 
             {selectedContact && (
               <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm text-indigo-800">
-                <span>✓</span>
+                <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                 <span className="font-medium">{selectedContact.name || selectedContact.phone}</span>
                 {selectedContact.email && <span className="text-indigo-500">· {selectedContact.email}</span>}
               </div>

@@ -119,14 +119,36 @@ class MessageService {
   // ──────────────────────────────────────────────────────────
   async triggerChatbot(conversation, incomingMessage, contact) {
     try {
-      const botResponse = await chatbotService.handleMessage(conversation, incomingMessage, this.io);
-      if (botResponse) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      const result = await chatbotService.handleMessage(conversation, incomingMessage, this.io);
+      if (!result) return;
+
+      // Compatibilidad: handleMessage puede devolver string o { text, catalogFile }
+      const botText    = typeof result === 'string' ? result : result.text;
+      const catalogFile = typeof result === 'object'  ? result.catalogFile : null;
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      if (botText) {
         await this.sendOutgoingMessage({
           conversationId: conversation.id,
-          text:           botResponse,
+          text:           botText,
           senderType:     'bot'
         });
+      }
+
+      // Enviar archivo adjunto por Meta si el catálogo lo tiene
+      if (catalogFile && conversation.channel === 'whatsapp') {
+        try {
+          const metaService = require('./metaService');
+          const recipientId = contact?.whatsapp_id || contact?.phone;
+          if (recipientId) {
+            await new Promise(resolve => setTimeout(resolve, 600));
+            await metaService.sendWhatsAppDocument(recipientId, catalogFile);
+            logger.info(`📎 Archivo de catálogo enviado a ${recipientId}: ${catalogFile.nombre}`);
+          }
+        } catch (fileErr) {
+          logger.warn('⚠️  No se pudo enviar archivo de catálogo por Meta:', fileErr.message);
+        }
       }
     } catch (error) {
       logger.error('❌ Error en chatbot trigger:', error);

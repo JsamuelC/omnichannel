@@ -250,16 +250,23 @@ export default function VouchersPanel() {
                       {v.reference_number && <span className="text-slate-400 text-xs">Ref: {v.reference_number}</span>}
                     </div>
                     {v.contact && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        👤 {v.contact.name || v.contact.phone || v.contact.whatsapp_id}
+                      <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                        <svg viewBox="0 0 24 24" className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+                        {v.contact.name || v.contact.phone || v.contact.whatsapp_id}
                         {v.contact.email ? ` · ${v.contact.email}` : ''}
                       </p>
                     )}
                     {v.rejection_reason && (
-                      <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1 mt-1.5">⚠ {v.rejection_reason}</p>
+                      <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1 mt-1.5 flex items-center gap-1">
+                        <svg viewBox="0 0 24 24" className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                        {v.rejection_reason}
+                      </p>
                     )}
                     {v.attachments?.length > 0 && (
-                      <p className="text-xs text-slate-400 mt-1">📎 {v.attachments.length} archivo{v.attachments.length > 1 ? 's' : ''}</p>
+                      <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                        <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"/></svg>
+                        {v.attachments.length} archivo{v.attachments.length > 1 ? 's' : ''}
+                      </p>
                     )}
                   </div>
 
