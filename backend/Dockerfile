@@ -19,7 +19,7 @@ RUN npm ci --omit=dev
 COPY . .
 
 # Crear directorio de logs
-RUN mkdir -p logs
+RUN mkdir -p logs uploads/vouchers uploads/catalogs sessions
 
 # El puerto que expone la app (debe coincidir con PORT en .env)
 EXPOSE 3001

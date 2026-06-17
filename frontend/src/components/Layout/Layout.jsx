@@ -105,27 +105,22 @@ const MoonIcon = () => (
   </svg>
 );
 // ─── Configuración de nav por rol ───────────────────────────
-const NAV_ITEMS = {
-  admin: [
-    { to: '/inbox',      icon: <InboxIcon />,     label: 'Bandeja',        id: 'inbox'      },
-    { to: '/calendar',   icon: <CalendarIcon />,  label: 'Calendario',     id: 'calendar'   },
-    { to: '/templates',  icon: <TemplateIcon />,  label: 'Documentos',     id: 'templates'  },
-    { to: '/campaigns',  icon: <CampaignIcon />,  label: 'Campañas',       id: 'campaigns'  },
-    { to: '/vouchers',   icon: <VoucherIcon />,   label: 'Comprobantes',   id: 'vouchers'   },
-    { to: '/config',     icon: <SettingsIcon />,  label: 'Configuración',  id: 'config'     },
-    { to: '/dashboard',  icon: <DashboardIcon />, label: 'Dashboard',      id: 'dashboard'  },
-  ],
-  agent: [
-    { to: '/inbox',      icon: <InboxIcon />,    label: 'Bandeja',      id: 'inbox'    },
-    { to: '/calendar',   icon: <CalendarIcon />, label: 'Calendario',   id: 'calendar' },
-    { to: '/vouchers',   icon: <VoucherIcon />,  label: 'Comprobantes', id: 'vouchers' },
-  ]
-};
+// Todos los posibles nav items con su feature flag asociado (null = siempre visible)
+const ALL_NAV_ITEMS = [
+  { to: '/inbox',      icon: <InboxIcon />,     label: 'Bandeja',        id: 'inbox',      feature: null,               roles: ['admin','agent','supervisor','superadmin'] },
+  { to: '/calendar',   icon: <CalendarIcon />,  label: 'Calendario',     id: 'calendar',   feature: 'appointments',     roles: ['admin','agent','supervisor','superadmin'] },
+  { to: '/templates',  icon: <TemplateIcon />,  label: 'Documentos',     id: 'templates',  feature: 'document_templates', roles: ['admin','superadmin'] },
+  { to: '/campaigns',  icon: <CampaignIcon />,  label: 'Campañas',       id: 'campaigns',  feature: 'campaigns',        roles: ['admin','superadmin'] },
+  { to: '/vouchers',   icon: <VoucherIcon />,   label: 'Comprobantes',   id: 'vouchers',   feature: 'vouchers',         roles: ['admin','agent','supervisor','superadmin'] },
+  { to: '/config',     icon: <SettingsIcon />,  label: 'Configuración',  id: 'config',     feature: null,               roles: ['admin','superadmin'] },
+  { to: '/dashboard',  icon: <DashboardIcon />, label: 'Dashboard',      id: 'dashboard',  feature: 'dashboard',        roles: ['admin','superadmin'] },
+  { to: '/superadmin', icon: <TeamIcon />,       label: 'SuperAdmin',     id: 'superadmin', feature: null,               roles: ['superadmin'] },
+];
 
 const CHANNEL_LABEL = { whatsapp: 'WhatsApp', messenger: 'Messenger', instagram: 'Instagram' };
 
 export default function Layout() {
-  const { user, logout, isAdmin }        = useAuthStore();
+  const { user, logout, isAdmin, hasFeature } = useAuthStore();
   const { addIncomingMessage, fetchConversations } = useConversationStore();
   const { theme, toggleTheme }           = useThemeStore();
   const { modules, fetchModules }        = useModuleStore();
@@ -133,7 +128,13 @@ export default function Layout() {
   const navigate = useNavigate();
 
   const role = user?.role || 'agent';
-  const navItems = NAV_ITEMS[role] || NAV_ITEMS.agent;
+
+  // Filtrar nav items según rol y features activas de la empresa
+  const navItems = ALL_NAV_ITEMS.filter(item => {
+    if (!item.roles.includes(role)) return false;
+    if (item.feature && !hasFeature(item.feature)) return false;
+    return true;
+  });
 
   useEffect(() => { fetchModules(); }, []);
 
@@ -343,11 +344,13 @@ export default function Layout() {
         <div className={`px-3 pb-2 border-t border-white/5 pt-2 mt-1 ts-sidebar-label ${sidebarOpen ? '' : 'hidden md:block'}`}>
           <div className="flex items-center gap-2 px-1">
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-              role === 'admin'
-                ? 'bg-amber-500/20 text-amber-400'
-                : 'bg-slate-600/40 text-slate-400'
+              role === 'superadmin'
+                ? 'bg-violet-500/30 text-violet-300'
+                : role === 'admin'
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'bg-slate-600/40 text-slate-400'
             }`}>
-              {role === 'admin' ? 'Admin' : 'Agente'}
+              {role === 'superadmin' ? 'SuperAdmin' : role === 'admin' ? 'Admin' : 'Agente'}
             </span>
           </div>
         </div>

@@ -161,4 +161,48 @@ const deleteCompany = async (req, res) => {
   }
 };
 
-module.exports = { getCompany, updateCompany, updateLogo, listCompanies, createCompany, deleteCompany };
+// ── SUPERADMIN: leer/actualizar active_features de una empresa ───────────────
+const ALLOWED_FEATURES = [
+  'inbox', 'whatsapp_personal', 'whatsapp_business', 'campaigns',
+  'vouchers', 'appointments', 'document_templates', 'bot_ai',
+  'flow_rules', 'quick_messages', 'labels', 'custom_modules',
+  'bot_catalogs', 'dashboard', 'team_management',
+];
+
+const getFeatures = async (req, res) => {
+  try {
+    const company = await Company.findByPk(req.params.id, { attributes: ['id', 'nombre', 'active_features'] });
+    if (!company) return res.status(404).json({ success: false, message: 'Empresa no encontrada.' });
+    res.json({ success: true, data: { id: company.id, nombre: company.nombre, active_features: company.active_features || {} } });
+  } catch (error) {
+    logger.error('Error getFeatures:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const updateFeatures = async (req, res) => {
+  try {
+    const company = await Company.findByPk(req.params.id);
+    if (!company) return res.status(404).json({ success: false, message: 'Empresa no encontrada.' });
+
+    const { features } = req.body;
+    if (!features || typeof features !== 'object')
+      return res.status(400).json({ success: false, message: 'El campo "features" debe ser un objeto.' });
+
+    // Sólo se permiten keys del catálogo definido
+    const sanitized = {};
+    for (const key of ALLOWED_FEATURES) {
+      if (key in features) sanitized[key] = Boolean(features[key]);
+      else sanitized[key] = (company.active_features?.[key] ?? true);
+    }
+
+    await company.update({ active_features: sanitized });
+    logger.info(`✅ Features actualizadas para ${company.nombre} por ${req.user.email}`);
+    res.json({ success: true, data: { id: company.id, nombre: company.nombre, active_features: sanitized }, message: 'Features actualizadas.' });
+  } catch (error) {
+    logger.error('Error updateFeatures:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getCompany, updateCompany, updateLogo, listCompanies, createCompany, deleteCompany, getFeatures, updateFeatures, ALLOWED_FEATURES };

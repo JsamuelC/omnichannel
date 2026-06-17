@@ -24,6 +24,7 @@ import ModulosConfig          from './components/Modules/ModulosConfig';
 import ModuleView             from './components/Modules/ModuleView';
 import CalendarPanel          from './components/Calendar/CalendarPanel';
 import TemplatesPanel         from './components/Templates/TemplatesPanel';
+import SuperAdminPanel        from './components/SuperAdmin/SuperAdminPanel';
 
 
 const Placeholder = ({ name }) => (
@@ -41,7 +42,14 @@ const PrivateRoute = ({ children }) => {
 const RoleRoute = ({ role, children }) => {
   const { user } = useAuthStore();
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== role) return <Navigate to="/inbox" replace />;
+  if (user.role !== role && user.role !== 'superadmin') return <Navigate to="/inbox" replace />;
+  return children;
+};
+
+const SuperAdminRoute = ({ children }) => {
+  const { user } = useAuthStore();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'superadmin') return <Navigate to="/inbox" replace />;
   return children;
 };
 
@@ -104,6 +112,9 @@ export default function App() {
         <Route path="config/complementos"  element={<Placeholder name="Complementos" />} />
         {/* ── Módulos personalizados ── */}
         <Route path="modules/:slug" element={<ModuleView />} />
+
+        {/* ── Panel SuperAdministrador ── */}
+        <Route path="superadmin" element={<SuperAdminRoute><SuperAdminPanel /></SuperAdminRoute>} />
 
         {/* ── Config módulos (solo admin) ── */}
         <Route path="config/modulos" element={<RoleRoute role="admin"><ModulosConfig /></RoleRoute>} />

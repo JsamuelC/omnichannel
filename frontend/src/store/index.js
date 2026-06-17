@@ -10,10 +10,11 @@ import { initSocket, disconnectSocket } from '../services/socket';
 // AUTH STORE
 // ══════════════════════════════════════════════════════════════
 export const useAuthStore = create((set, get) => ({
-  user:        null,
-  token:       localStorage.getItem('token'),
-  permissions: null,
-  isLoading:   false,
+  user:           null,
+  token:          localStorage.getItem('token'),
+  permissions:    null,
+  activeFeatures: null,  // active_features de la empresa del usuario
+  isLoading:      false,
 
   login: async (email, password) => {
     set({ isLoading: true });
@@ -22,7 +23,7 @@ export const useAuthStore = create((set, get) => ({
       const { token, user } = res.data;
       localStorage.setItem('token', token);
       initSocket(user.id);
-      set({ user, token, permissions: user.permissions, isLoading: false });
+      set({ user, token, permissions: user.permissions, activeFeatures: user.active_features ?? null, isLoading: false });
       return { success: true };
     } catch (error) {
       set({ isLoading: false });
@@ -34,7 +35,7 @@ export const useAuthStore = create((set, get) => ({
     try { await api.post('/auth/logout'); } catch (_) {}
     localStorage.removeItem('token');
     disconnectSocket();
-    set({ user: null, token: null, permissions: null });
+    set({ user: null, token: null, permissions: null, activeFeatures: null });
   },
 
   fetchMe: async () => {
@@ -42,11 +43,20 @@ export const useAuthStore = create((set, get) => ({
       const res = await api.get('/auth/me');
       const user = res.data;
       initSocket(user.id);
-      set({ user, permissions: user.permissions });
+      set({ user, permissions: user.permissions, activeFeatures: user.active_features ?? null });
     } catch {
       localStorage.removeItem('token');
-      set({ user: null, token: null, permissions: null });
+      set({ user: null, token: null, permissions: null, activeFeatures: null });
     }
+  },
+
+  // Recarga las features llamando /auth/me (útil cuando el superadmin actualiza una empresa)
+  refreshFeatures: async () => {
+    try {
+      const res = await api.get('/auth/me');
+      const user = res.data;
+      set({ user, permissions: user.permissions, activeFeatures: user.active_features ?? null });
+    } catch { /* silencioso */ }
   },
 
   forgotPassword: async (email) => {
@@ -73,6 +83,17 @@ export const useAuthStore = create((set, get) => ({
   },
 
   isAdmin: () => get().user?.role === 'admin',
+
+  isSuperAdmin: () => get().user?.role === 'superadmin',
+
+  // Verifica si un feature está habilitado para la empresa actual
+  // superadmin siempre tiene acceso; si no hay datos cargados, por defecto true
+  hasFeature: (featureName) => {
+    const { user, activeFeatures } = get();
+    if (user?.role === 'superadmin') return true;
+    if (!activeFeatures) return true;  // cargando o sin empresa → optimista
+    return activeFeatures[featureName] === true;
+  },
 }));
 
 // ══════════════════════════════════════════════════════════════

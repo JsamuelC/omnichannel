@@ -7,8 +7,16 @@ const path = require('path');
 const { combine, timestamp, printf, colorize, errors } = winston.format;
 
 // Formato personalizado para los logs
-const logFormat = printf(({ level, message, timestamp, stack }) => {
-  return `${timestamp} [${level}]: ${stack || message}`;
+const logFormat = printf((info) => {
+  const { level, message, timestamp, stack, ...rest } = info;
+  let line = `${timestamp} [${level}]: ${message || '(sin mensaje)'}`;
+  if (stack) line += `\n${stack}`;
+
+  const original = rest.original || rest.parent;
+  if (original?.message && original.message !== message) {
+    line += `\n  ↳ original: ${original.message}`;
+  }
+  return line;
 });
 
 const logger = winston.createLogger({

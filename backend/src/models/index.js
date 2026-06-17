@@ -142,6 +142,27 @@ const migrate = async () => {
     // ── LID mapping para WhatsApp multi-device ───────────────────────────
     await safeAdd('whatsapp_chats', 'lid', { type: DT.STRING(100), allowNull: true });
 
+    // ── active_features en company (multi-tenant feature flags) ─────────
+    const Company = require('./Company');
+    await safeAdd('company', 'active_features', {
+      type: DT.JSONB,
+      allowNull: false,
+      defaultValue: {
+        inbox: true, whatsapp_personal: true, whatsapp_business: true,
+        campaigns: true, vouchers: true, appointments: true,
+        document_templates: true, bot_ai: true, flow_rules: true,
+        quick_messages: true, labels: true, custom_modules: true,
+        bot_catalogs: true, dashboard: true, team_management: true,
+      },
+    });
+    // Poblar active_features en empresas existentes que lo tengan NULL
+    try {
+      await sequelize.query(`
+        UPDATE company SET active_features = '{"inbox":true,"whatsapp_personal":true,"whatsapp_business":true,"campaigns":true,"vouchers":true,"appointments":true,"document_templates":true,"bot_ai":true,"flow_rules":true,"quick_messages":true,"labels":true,"custom_modules":true,"bot_catalogs":true,"dashboard":true,"team_management":true}'::jsonb
+        WHERE active_features IS NULL
+      `);
+    } catch (_) {}
+
     // ── Migración multi-tenant y recuperación de contraseña ──────────────
     // Nuevas columnas en users
     await safeAdd('users', 'reset_token',         { type: DT.STRING(200), allowNull: true });
@@ -199,10 +220,13 @@ const migrate = async () => {
   }
 };
 WhatsappChat.hasMany(WhatsappMessage, {
-  foreignKey: 'session_id',
-  sourceKey:  'session_id',
-  as:         'messages',
-  scope:      { } // sin scope, relación por session_id + jid se maneja en queries
+  foreignKey:  'session_id',
+  sourceKey:   'session_id',
+  as:          'messages',
+  constraints: false, // session_id no es única en whatsapp_chats (la única lo es junto con jid);
+                       // esta relación es lógica, se filtra por session_id + jid en las queries,
+                       // así que no debe crear una FK real a nivel de Postgres
+  scope:       { }
 });
 
 DocumentTemplate.hasMany(DocumentRequest, { foreignKey: 'template_id', as: 'requests' });

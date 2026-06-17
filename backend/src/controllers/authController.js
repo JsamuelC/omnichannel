@@ -1,9 +1,19 @@
 // backend/src/controllers/authController.js
-const jwt    = require('jsonwebtoken');
-const crypto = require('crypto');
+const jwt     = require('jsonwebtoken');
+const crypto  = require('crypto');
 const { User } = require('../models');
+const Company  = require('../models/Company');
 const logger   = require('../config/logger');
 const { Op }   = require('sequelize');
+
+// Carga active_features de la empresa del usuario (null para superadmin)
+const loadActiveFeatures = async (user) => {
+  if (user.role === 'superadmin' || !user.company_id) return null;
+  try {
+    const company = await Company.findByPk(user.company_id, { attributes: ['active_features'] });
+    return company?.active_features || null;
+  } catch { return null; }
+};
 
 const generateToken = (user) =>
   jwt.sign(
@@ -36,13 +46,14 @@ class AuthController {
 
       await user.update({ is_online: true });
       const token = generateToken(user);
+      const activeFeatures = await loadActiveFeatures(user);
       logger.info(`✅ Login: ${email} (${user.role}) empresa: ${user.company_id || 'superadmin'}`);
 
       res.json({
         success: true,
         data: {
           token,
-          user: { ...user.toJSON(), permissions: buildPermissions(user.role) }
+          user: { ...user.toJSON(), permissions: buildPermissions(user.role), active_features: activeFeatures }
         }
       });
     } catch (error) {
@@ -63,9 +74,10 @@ class AuthController {
 
   // GET /auth/me
   async me(req, res) {
+    const activeFeatures = await loadActiveFeatures(req.user);
     res.json({
       success: true,
-      data: { ...req.user.toJSON(), permissions: buildPermissions(req.user.role) }
+      data: { ...req.user.toJSON(), permissions: buildPermissions(req.user.role), active_features: activeFeatures }
     });
   }
 

@@ -3,25 +3,26 @@ const express  = require('express');
 const router   = express.Router();
 const {
   getCompany, updateCompany, updateLogo,
-  listCompanies, createCompany, deleteCompany
+  listCompanies, createCompany, deleteCompany,
+  getFeatures, updateFeatures
 } = require('../controllers/companyController');
 const { auth, requireRole, requireSuperAdmin } = require('../middleware/auth');
 
 // GET  /api/company          → admin/agent ve su empresa
-// GET  /api/company?company_id=X → superadmin puede ver cualquiera
 router.get('/', auth, requireRole('admin', 'agent', 'supervisor'), getCompany);
 
 // PUT  /api/company          → admin actualiza su empresa
 router.put('/', auth, requireRole('admin'), updateCompany);
 
 // ── Superadmin: gestión de todas las empresas ─────────────────────────────
-// GET  /api/company/all      → listar todas
 router.get('/all',         auth, requireSuperAdmin, listCompanies);
-
-// POST /api/company/create   → crear empresa + admin inicial
 router.post('/create',     auth, requireSuperAdmin, createCompany);
-
-// DELETE /api/company/:id    → eliminar empresa
 router.delete('/:id',      auth, requireSuperAdmin, deleteCompany);
+
+// ── Superadmin: feature flags por empresa ────────────────────────────────
+// GET  /api/company/:id/features   → leer active_features de una empresa
+// PUT  /api/company/:id/features   → actualizar active_features de una empresa
+router.get   ('/:id/features', auth, requireSuperAdmin, getFeatures);
+router.put   ('/:id/features', auth, requireSuperAdmin, updateFeatures);
 
 module.exports = router;

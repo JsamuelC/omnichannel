@@ -110,4 +110,41 @@ const requireConversationAccess = async (req, res, next) => {
   }
 };
 
-module.exports = { auth, requireRole, requireSuperAdmin, companyScope, scopeConversations, requireConversationAccess };
+// ── 7. Feature Flag: bloquea si la empresa no tiene el módulo activo ────────────
+// superadmin siempre pasa (gestiona el sistema completo)
+const requireFeature = (featureName) => async (req, res, next) => {
+  if (!req.user)
+    return res.status(401).json({ success: false, message: 'Autenticación requerida.' });
+
+  // El superadmin nunca es bloqueado por features
+  if (req.user.role === 'superadmin') return next();
+
+  if (!req.user.company_id)
+    return res.status(403).json({ success: false, message: 'Usuario sin empresa asignada.' });
+
+  try {
+    const Company = require('../models/Company');
+    const company = await Company.findByPk(req.user.company_id, {
+      attributes: ['id', 'active_features'],
+    });
+
+    if (!company)
+      return res.status(403).json({ success: false, message: 'Empresa no encontrada.' });
+
+    const features = company.active_features || {};
+    if (features[featureName] !== true) {
+      logger.warn(`🚫 Feature bloqueada: "${featureName}" para empresa ${req.user.company_id} (${req.user.email})`);
+      return res.status(403).json({
+        success: false,
+        message: `El módulo "${featureName}" no está habilitado para tu empresa.`,
+        feature: featureName,
+      });
+    }
+    next();
+  } catch (error) {
+    logger.error('Error en requireFeature:', error);
+    res.status(500).json({ success: false, message: 'Error verificando permisos del módulo.' });
+  }
+};
+
+module.exports = { auth, requireRole, requireSuperAdmin, companyScope, scopeConversations, requireConversationAccess, requireFeature };

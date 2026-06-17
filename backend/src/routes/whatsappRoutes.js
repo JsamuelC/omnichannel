@@ -4,7 +4,7 @@ const router   = express.Router();
 const path     = require('path');
 const fs       = require('fs');
 const multer   = require('multer');
-const { auth, requireRole } = require('../middleware/auth');
+const { auth, requireRole, requireFeature } = require('../middleware/auth');
 const whatsappService = require('../services/whatsappService');
 const { WhatsappChat, WhatsappMessage } = require('../models');
 const { Op } = require('sequelize');
@@ -18,7 +18,7 @@ const upload = multer({
 // ═══════════════════════════════════════════════════════
 
 // ── Iniciar sesión personal ───────────────────────────
-router.post('/session/start', auth, async (req, res) => {
+router.post('/session/start', auth, requireFeature('whatsapp_personal'), async (req, res) => {
   try {
     const { sessionId } = req.body;
     if (!sessionId) return res.status(400).json({ success: false, message: 'sessionId requerido' });
