@@ -460,4 +460,20 @@ export const useMergeTemplateStore = create((set, get) => ({
     const res = await api.post('/merge-templates/preview', { contenido, datos });
     return res.data;
   },
+
+  detectAndMap: async (contenido) => {
+    const res = await api.post('/merge-templates/detect-map', { contenido });
+    return res.data;
+  },
+
+  updateMapping: async (id, variable_mapping) => {
+    const res = await api.put(`/merge-templates/${id}/mapping`, { variable_mapping });
+    set((s) => ({ templates: s.templates.map((t) => t.id === id ? res.data : t) }));
+    return res.data;
+  },
+
+  autoMergeForConversation: async (conversationId) => {
+    const res = await api.post(`/merge-templates/auto-merge/${conversationId}`);
+    return res.data;
+  },
 }));

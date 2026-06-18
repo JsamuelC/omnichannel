@@ -511,14 +511,17 @@ router.use('/uploads/generated', require('express').static(
 // ─────────────────────────────────────
 router.post  ('/merge-templates/variables',    auth, requireFeature('merge_templates'), mergeTemplateCtrl.getVariables.bind(mergeTemplateCtrl));
 router.post  ('/merge-templates/preview',      auth, requireFeature('merge_templates'), mergeTemplateCtrl.preview.bind(mergeTemplateCtrl));
+router.post  ('/merge-templates/detect-map',   auth, requireFeature('merge_templates'), mergeTemplateCtrl.detectAndMap.bind(mergeTemplateCtrl));
 router.get   ('/merge-templates',              auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.list.bind(mergeTemplateCtrl));
 router.post  ('/merge-templates',              auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.create.bind(mergeTemplateCtrl));
 router.get   ('/merge-templates/:id',          auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.getOne.bind(mergeTemplateCtrl));
 router.put   ('/merge-templates/:id',          auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.update.bind(mergeTemplateCtrl));
 router.delete('/merge-templates/:id',          auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.remove.bind(mergeTemplateCtrl));
 router.patch ('/merge-templates/:id/toggle',   auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.toggleActive.bind(mergeTemplateCtrl));
+router.put   ('/merge-templates/:id/mapping',  auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.updateMapping.bind(mergeTemplateCtrl));
 router.post  ('/merge-templates/:id/merge',    auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.merge.bind(mergeTemplateCtrl));
 router.post  ('/merge-templates/:id/use/:conversationId', auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.useInConversation.bind(mergeTemplateCtrl));
+router.post  ('/merge-templates/auto-merge/:conversationId', auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.autoMergeForConversation.bind(mergeTemplateCtrl));
 
 // ─────────────────────────────────────
 // COMPROBANTES DE PAGO

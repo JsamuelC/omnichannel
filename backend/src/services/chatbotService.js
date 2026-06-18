@@ -589,6 +589,56 @@ class ChatbotService {
               companyId:    chatRecord?.company_id,
             });
 
+            // Auto-merge: buscar plantillas merge vinculadas y generar mensajes automáticamente
+            try {
+              const mergeService = require('./mergeService');
+              const { MergeTemplate, Conversation } = require('../models');
+              const { Op } = require('sequelize');
+
+              const autoTemplates = await MergeTemplate.findAll({
+                where: {
+                  auto_merge: true,
+                  activo: true,
+                  ...(chatRecord?.company_id ? { company_id: { [Op.in]: [chatRecord.company_id, null] } } : {}),
+                },
+              });
+
+              if (autoTemplates.length > 0) {
+                const contactPhone = jid.replace(/@.+/, '');
+                let contact = null;
+                try { contact = await Contact.findOne({ where: { phone: contactPhone } }); } catch (_) {}
+
+                let conversation = null;
+                if (contact) {
+                  try { conversation = await Conversation.findOne({ where: { contact_id: contact.id }, order: [['updated_at', 'DESC']] }); } catch (_) {}
+                }
+
+                const allCollected = { ...(activeReq.collected_fields || {}), ...collected };
+
+                for (const mt of autoTemplates) {
+                  const result = await mergeService.autoMerge(mt, {
+                    contact,
+                    conversation,
+                    collectedFields: allCollected,
+                  });
+
+                  io?.to('agents').emit('merge:auto-complete', {
+                    requestId: activeReq.id,
+                    templateId: mt.id,
+                    templateNombre: mt.nombre,
+                    resultado: result.resultado,
+                    variablesSinValor: result.variablesSinValor,
+                    jid,
+                    sessionId,
+                    companyId: chatRecord?.company_id,
+                  });
+                }
+                logger.info(`Auto-merge completado para ${jid}: ${autoTemplates.length} plantilla(s)`);
+              }
+            } catch (mergeErr) {
+              logger.warn(`Auto-merge falló para ${jid}: ${mergeErr.message}`);
+            }
+
             // Responder al cliente — whatsappService envía este texto
             return {
               handled: true,

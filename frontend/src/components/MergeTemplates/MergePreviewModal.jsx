@@ -11,18 +11,26 @@ function extractVariables(text) {
   return Array.from(m);
 }
 
-const VAR_LABELS = {
-  nombre_cliente: 'Nombre del cliente',
-  telefono: 'Teléfono',
-  email: 'Email',
-  numero_ticket: 'N° Ticket',
-  numero_pedido: 'N° Pedido',
-  fecha: 'Fecha',
+const SOURCE_LABELS = {
+  contact:      'Contacto',
+  chatbot:      'Chatbot',
+  system:       'Sistema',
+  conversation: 'Conversacion',
+  static:       'Fijo',
+};
+
+const SOURCE_COLORS = {
+  contact:      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  chatbot:      'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  system:       'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  conversation: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+  static:       'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
 };
 
 export default function MergePreviewModal({ template, onClose }) {
   const { mergeTemplate } = useMergeTemplateStore();
   const variables = useMemo(() => extractVariables(template.contenido), [template.contenido]);
+  const mapping = template.variable_mapping || {};
 
   const [datos, setDatos] = useState(() => Object.fromEntries(variables.map((v) => [v, ''])));
   const [resultado, setResultado] = useState(null);
@@ -38,7 +46,7 @@ export default function MergePreviewModal({ template, onClose }) {
       const res = await mergeTemplate(template.id, datos);
       setResultado(res.resultado);
       setValidacion(res.validacion);
-      if (res.variablesSinValor?.length > 0) toast(`${res.variablesSinValor.length} variable(s) sin valor`, { icon: '⚠️' });
+      if (res.variablesSinValor?.length > 0) toast(`${res.variablesSinValor.length} variable(s) sin valor`, { icon: 'i' });
     } catch (e) { toast.error(e.message); } finally { setMerging(false); }
   };
 
@@ -51,29 +59,49 @@ export default function MergePreviewModal({ template, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-lg font-bold text-slate-800 dark:text-white">Vista previa: {template.nombre}</h2>
+          <div>
+            <h2 className="text-lg font-bold text-slate-800 dark:text-white">Vista previa: {template.nombre}</h2>
+            {template.auto_merge && (
+              <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                Auto-merge activo
+              </span>
+            )}
+          </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
           <div className="lg:w-2/5 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-700 overflow-y-auto p-5">
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Variables</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Variables y fuentes de datos</h3>
             {variables.length === 0 ? (
               <p className="text-sm text-slate-400">Sin variables</p>
             ) : (
               <div className="space-y-3">
-                {variables.map((v) => (
-                  <div key={v}>
-                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{VAR_LABELS[v] || v}</label>
-                    <input value={datos[v] || ''} onChange={(e) => handleChange(v, e.target.value)} placeholder={`{${v}}`}
-                      className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                ))}
+                {variables.map((v) => {
+                  const m = mapping[v];
+                  const source = m?.source || 'chatbot';
+                  return (
+                    <div key={v}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">{v}</label>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${SOURCE_COLORS[source]}`}>
+                          {SOURCE_LABELS[source]}
+                        </span>
+                      </div>
+                      <input value={datos[v] || ''} onChange={(e) => handleChange(v, e.target.value)} placeholder={`{${v}}`}
+                        className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500" />
+                      {source !== 'chatbot' && (
+                        <p className="text-[10px] text-slate-400 mt-0.5">Auto-resuelto desde {SOURCE_LABELS[source]?.toLowerCase()}: {m?.field}</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
             <button onClick={handleMerge} disabled={merging}
               className="mt-5 w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-sm">
-              {merging ? 'Generando...' : 'Generar vista previa'}
+              {merging ? 'Generando...' : 'Simular merge'}
             </button>
             {validacion && (
               <div className={`mt-3 rounded-lg p-3 text-xs ${validacion.valid ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400'}`}>

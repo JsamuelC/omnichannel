@@ -2,6 +2,19 @@ const logger = require('../config/logger');
 
 const VARIABLE_REGEX = /\{([a-z0-9_]+)\}/g;
 
+const KNOWN_SOURCES = {
+  nombre_cliente: { source: 'contact', field: 'name' },
+  cliente_nombre: { source: 'contact', field: 'name' },
+  telefono:       { source: 'contact', field: 'phone' },
+  cliente_telefono: { source: 'contact', field: 'phone' },
+  email:          { source: 'contact', field: 'email' },
+  cliente_email:  { source: 'contact', field: 'email' },
+  fecha:          { source: 'system',  field: 'date' },
+  fecha_actual:   { source: 'system',  field: 'date' },
+  hora:           { source: 'system',  field: 'time' },
+  hora_actual:    { source: 'system',  field: 'time' },
+};
+
 class MergeService {
 
   extractVariables(contenido) {
@@ -55,6 +68,75 @@ class MergeService {
       telefono:       contact?.phone || contact?.whatsapp_id || '',
       email:          contact?.email || '',
       fecha:          new Date().toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' }),
+    };
+  }
+
+  resolveSystemData() {
+    const now = new Date();
+    return {
+      date: now.toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' }),
+      time: now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' }),
+    };
+  }
+
+  suggestMapping(variables) {
+    const mapping = {};
+    for (const v of variables) {
+      const known = KNOWN_SOURCES[v];
+      if (known) {
+        mapping[v] = { source: known.source, field: known.field };
+      } else {
+        mapping[v] = { source: 'chatbot', field: v };
+      }
+    }
+    return mapping;
+  }
+
+  resolveAllData({ contact, conversation, collectedFields, mapping }) {
+    const systemData = this.resolveSystemData();
+    const datos = {};
+
+    const contactFields = {
+      name:  contact?.name || '',
+      phone: contact?.phone || contact?.whatsapp_id || '',
+      email: contact?.email || '',
+    };
+    const contactMeta = contact?.metadata || {};
+    const convMeta = conversation?.metadata || {};
+    const chatbotData = collectedFields || {};
+
+    for (const [variable, config] of Object.entries(mapping || {})) {
+      const src = config.source;
+      const field = config.field;
+
+      if (src === 'contact') {
+        datos[variable] = contactFields[field] || contactMeta[field] || '';
+      } else if (src === 'system') {
+        datos[variable] = systemData[field] || '';
+      } else if (src === 'conversation') {
+        datos[variable] = convMeta[field] || '';
+      } else if (src === 'chatbot') {
+        datos[variable] = chatbotData[field] || '';
+      } else if (src === 'static') {
+        datos[variable] = config.value || '';
+      }
+    }
+
+    return datos;
+  }
+
+  async autoMerge(template, { contact, conversation, collectedFields }) {
+    const mapping = template.variable_mapping || this.suggestMapping(template.variables || []);
+    const datos = this.resolveAllData({ contact, conversation, collectedFields, mapping });
+    const { resultado, variablesSinValor } = this.merge(template.contenido, datos);
+    const validacion = this.validate(template.contenido, datos);
+
+    return {
+      resultado,
+      variablesSinValor,
+      validacion,
+      datosResueltos: datos,
+      mapping,
     };
   }
 }
