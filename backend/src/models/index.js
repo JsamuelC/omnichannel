@@ -1,4 +1,4 @@
-// backend/src/models/index.js
+﻿// backend/src/models/index.js
 // Punto central de todos los modelos y sus asociaciones
 
 const { sequelize }    = require('../config/database');
@@ -26,6 +26,7 @@ const Appointment        = require('./Appointment');
 const BusinessSchedule   = require('./BusinessSchedule');
 const DocumentTemplate   = require('./DocumentTemplate');
 const DocumentRequest    = require('./DocumentRequest');
+const MergeTemplate      = require('./MergeTemplate');
 
 // ============================
 // ASOCIACIONES ORIGINALES
@@ -94,6 +95,8 @@ const migrate = async () => {
     await safeSync(BusinessSchedule);
     await safeSync(DocumentTemplate);
     await safeSync(DocumentRequest);
+    await safeSync(MergeTemplate);
+    await safeAdd('merge_templates', 'canal', { type: DT.STRING(30), allowNull: false, defaultValue: 'all' });
 
     // Agregar trigger_keywords a document_templates si no existe
     await safeAdd('document_templates', 'trigger_keywords', { type: DT.JSONB, defaultValue: [] });
@@ -152,14 +155,22 @@ const migrate = async () => {
         campaigns: true, vouchers: true, appointments: true,
         document_templates: true, bot_ai: true, flow_rules: true,
         quick_messages: true, labels: true, custom_modules: true,
-        bot_catalogs: true, dashboard: true, team_management: true,
+        bot_catalogs: true, dashboard: true, team_management: true, merge_templates: true,
       },
     });
     // Poblar active_features en empresas existentes que lo tengan NULL
     try {
       await sequelize.query(`
-        UPDATE company SET active_features = '{"inbox":true,"whatsapp_personal":true,"whatsapp_business":true,"campaigns":true,"vouchers":true,"appointments":true,"document_templates":true,"bot_ai":true,"flow_rules":true,"quick_messages":true,"labels":true,"custom_modules":true,"bot_catalogs":true,"dashboard":true,"team_management":true}'::jsonb
+        UPDATE company SET active_features = '{"inbox":true,"whatsapp_personal":true,"whatsapp_business":true,"campaigns":true,"vouchers":true,"appointments":true,"document_templates":true,"bot_ai":true,"flow_rules":true,"quick_messages":true,"labels":true,"custom_modules":true,"bot_catalogs":true,"dashboard":true,"team_management":true,"merge_templates":true}'::jsonb
         WHERE active_features IS NULL
+      `);
+    } catch (_) {}
+
+    // Agregar merge_templates a empresas existentes que no lo tengan
+    try {
+      await sequelize.query(`
+        UPDATE company SET active_features = active_features || '{"merge_templates":true}'::jsonb
+        WHERE active_features IS NOT NULL AND NOT (active_features ? 'merge_templates')
       `);
     } catch (_) {}
 
@@ -258,5 +269,6 @@ module.exports = {
   BusinessSchedule,
   DocumentTemplate,
   DocumentRequest,
+  MergeTemplate,
   migrate
 };

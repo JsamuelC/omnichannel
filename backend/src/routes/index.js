@@ -1,4 +1,4 @@
-// backend/src/routes/index.js
+﻿// backend/src/routes/index.js
 // ─────────────────────────────────────────────────────────────
 // Todas las rutas de Tecnossync con RBAC aplicado
 // ─────────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ const moduleRecordController  = require('../controllers/moduleRecordController')
 const appointmentCtrl         = require('../controllers/appointmentController');
 const templateCtrl            = require('../controllers/documentTemplateController');
 const docRequestCtrl          = require('../controllers/documentRequestController');
+const mergeTemplateCtrl       = require('../controllers/mergeTemplateController');
 const { upload: tplUpload }   = require('../middleware/uploadTemplate');
 const { handleCatalogUpload, CATALOG_DIR } = require('../middleware/uploadCatalog');
 
@@ -504,6 +505,20 @@ router.post  ('/document-requests/:id/reject',     auth, requireFeature('documen
 router.use('/uploads/generated', require('express').static(
   require('path').join(__dirname, '../../uploads/generated')
 ));
+
+// ─────────────────────────────────────
+// PLANTILLAS MERGE
+// ─────────────────────────────────────
+router.post  ('/merge-templates/variables',    auth, requireFeature('merge_templates'), mergeTemplateCtrl.getVariables.bind(mergeTemplateCtrl));
+router.post  ('/merge-templates/preview',      auth, requireFeature('merge_templates'), mergeTemplateCtrl.preview.bind(mergeTemplateCtrl));
+router.get   ('/merge-templates',              auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.list.bind(mergeTemplateCtrl));
+router.post  ('/merge-templates',              auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.create.bind(mergeTemplateCtrl));
+router.get   ('/merge-templates/:id',          auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.getOne.bind(mergeTemplateCtrl));
+router.put   ('/merge-templates/:id',          auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.update.bind(mergeTemplateCtrl));
+router.delete('/merge-templates/:id',          auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.remove.bind(mergeTemplateCtrl));
+router.patch ('/merge-templates/:id/toggle',   auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.toggleActive.bind(mergeTemplateCtrl));
+router.post  ('/merge-templates/:id/merge',    auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.merge.bind(mergeTemplateCtrl));
+router.post  ('/merge-templates/:id/use/:conversationId', auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.useInConversation.bind(mergeTemplateCtrl));
 
 // ─────────────────────────────────────
 // COMPROBANTES DE PAGO

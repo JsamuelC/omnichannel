@@ -1,4 +1,4 @@
-// backend/src/index.js
+﻿// backend/src/index.js
 // ─────────────────────────────────────────────────────────────
 // Servidor principal Tecnossync
 // Modificación: crea equipo de 5 empleados en primer arranque
@@ -202,53 +202,77 @@ const startServer = async () => {
 // ─────────────────────────────────────
 const seedDefaultTeam = async () => {
   const { User } = require('./models');
-  const count = await User.count();
-  if (count > 0) return; // Ya hay usuarios → no tocar
+  const Company  = require('./models/Company');
+  const bcrypt   = require('bcryptjs');
+  const { Op }   = require('sequelize');
 
-  const team = [
-    // ── Admin ──────────────────────────────────────────────
-    {
-      name:          'Administrador',
-      email:         'admin@tecnossync.com',
-      password_hash: 'Tecnossync2025!',
-      role:          'admin'
-    },
-    // ── Agentes ────────────────────────────────────────────
-    {
-      name:          'Ana García',
-      email:         'ana.garcia@tecnossync.com',
-      password_hash: 'Agente2025!',
-      role:          'agent'
-    },
-    {
-      name:          'Carlos López',
-      email:         'carlos.lopez@tecnossync.com',
-      password_hash: 'Agente2025!',
-      role:          'agent'
-    },
-    {
-      name:          'María Rodríguez',
-      email:         'maria.rodriguez@tecnossync.com',
-      password_hash: 'Agente2025!',
-      role:          'agent'
-    },
-    {
-      name:          'Luis Martínez',
-      email:         'luis.martinez@tecnossync.com',
-      password_hash: 'Agente2025!',
-      role:          'agent'
+  // ── 1. Garantizar empresa por defecto ──────────────────────
+  let company = await Company.findOne({ order: [['created_at', 'ASC']] });
+  if (!company) {
+    company = await Company.create({
+      nombre:      'Tecnossync',
+      email:       'contacto@tecnossync.com',
+      descripcion: 'Empresa por defecto',
+    });
+    logger.info(`🏢 Empresa creada: ${company.nombre} (${company.id})`);
+  }
+  const companyId = company.id;
+
+  // ── 2. Cuentas obligatorias (idempotente — nunca duplica) ──
+  const ensureUser = async ({ name, email, password, role, company_id }) => {
+    const existing = await User.findOne({ where: { email } });
+    if (existing) {
+      const valid = await bcrypt.compare(password, existing.password_hash);
+      if (!valid) {
+        const hash = await bcrypt.hash(password, 12);
+        await User.update({ password_hash: hash }, { where: { id: existing.id }, hooks: false });
+        logger.info(`🔧 Contraseña reparada: ${email}`);
+      }
+      if (role !== 'superadmin' && !existing.company_id) {
+        await User.update({ company_id }, { where: { id: existing.id }, hooks: false });
+      }
+      return existing;
     }
-  ];
+    const user = await User.create({ name, email, password_hash: password, role, company_id });
+    logger.info(`👤 Usuario creado: ${email} (${role})`);
+    return user;
+  };
 
-  for (const member of team) {
-    await User.create(member);
-    logger.info(`👤 Usuario creado: ${member.email} (${member.role})`);
+  await ensureUser({
+    name: 'Super Administrador', email: 'superadmin@tecnossync.com',
+    password: 'TuPassword123', role: 'superadmin', company_id: null
+  });
+
+  await ensureUser({
+    name: 'Administrador', email: 'admin@tecnossync.com',
+    password: 'Tecnossync2025!', role: 'admin', company_id: companyId
+  });
+
+  // ── 3. Agentes de ejemplo (solo si no hay más usuarios) ────
+  const totalUsers = await User.count();
+  if (totalUsers <= 2) {
+    const agents = [
+      { name: 'Ana García',       email: 'ana.garcia@tecnossync.com'       },
+      { name: 'Carlos López',     email: 'carlos.lopez@tecnossync.com'     },
+      { name: 'María Rodríguez',  email: 'maria.rodriguez@tecnossync.com'  },
+      { name: 'Luis Martínez',    email: 'luis.martinez@tecnossync.com'     },
+    ];
+    for (const a of agents) {
+      await ensureUser({ ...a, password: 'Agente2025!', role: 'agent', company_id: companyId });
+    }
   }
 
+  // ── 4. Vincular usuarios huérfanos a la empresa ────────────
+  const [fixed] = await User.update(
+    { company_id: companyId },
+    { where: { company_id: null, role: { [Op.ne]: 'superadmin' } }, hooks: false }
+  );
+  if (fixed > 0) logger.info(`🔗 ${fixed} usuario(s) vinculado(s) a empresa ${company.nombre}`);
+
   logger.info('─────────────────────────────────────────────');
-  logger.info('✅ Equipo Tecnossync creado (5 usuarios)');
-  logger.info('   Admin: admin@tecnossync.com / Tecnossync2025!');
-  logger.info('   Agentes: ana, carlos, maria, luis @tecnossync.com / Agente2025!');
+  logger.info('✅ Cuentas del sistema:');
+  logger.info('   SuperAdmin: superadmin@tecnossync.com / TuPassword123');
+  logger.info('   Admin:      admin@tecnossync.com / Tecnossync2025!');
   logger.warn('⚠️  CAMBIA LAS CONTRASEÑAS EN PRODUCCIÓN');
   logger.info('─────────────────────────────────────────────');
 };

@@ -1,4 +1,4 @@
-// frontend/src/store/index.js
+﻿// frontend/src/store/index.js
 // NOTA: api.js interceptor hace (response) => response.data
 // Por eso res ya ES el body JSON { success, data: {...} }
 // Usar res.data para acceder al contenido, NO res.data.data
@@ -401,4 +401,63 @@ export const useModuleStore = create((set) => ({
   },
 
   setModules: (modules) => set({ modules }),
+}));
+
+// ══════════════════════════════════════════════════════════════
+// MERGE TEMPLATE STORE — Plantillas de Mensajes Omnicanal
+// ══════════════════════════════════════════════════════════════
+export const useMergeTemplateStore = create((set, get) => ({
+  templates:  [],
+  isLoading:  false,
+
+  fetchTemplates: async (filters = {}) => {
+    set({ isLoading: true });
+    try {
+      const params = new URLSearchParams();
+      if (filters.activo !== undefined) params.set('activo', filters.activo);
+      if (filters.canal) params.set('canal', filters.canal);
+      const q = params.toString();
+      const res = await api.get(`/merge-templates${q ? `?${q}` : ''}`);
+      set({ templates: res.data, isLoading: false });
+    } catch {
+      set({ isLoading: false });
+    }
+  },
+
+  createTemplate: async (data) => {
+    const res = await api.post('/merge-templates', data);
+    set((s) => ({ templates: [res.data, ...s.templates] }));
+    return res.data;
+  },
+
+  updateTemplate: async (id, data) => {
+    const res = await api.put(`/merge-templates/${id}`, data);
+    set((s) => ({ templates: s.templates.map((t) => t.id === id ? res.data : t) }));
+    return res.data;
+  },
+
+  removeTemplate: async (id) => {
+    await api.delete(`/merge-templates/${id}`);
+    set((s) => ({ templates: s.templates.filter((t) => t.id !== id) }));
+  },
+
+  toggleActive: async (id) => {
+    const res = await api.patch(`/merge-templates/${id}/toggle`);
+    set((s) => ({ templates: s.templates.map((t) => t.id === id ? res.data : t) }));
+  },
+
+  mergeTemplate: async (id, datos) => {
+    const res = await api.post(`/merge-templates/${id}/merge`, { datos });
+    return res.data;
+  },
+
+  useInConversation: async (templateId, conversationId, datos) => {
+    const res = await api.post(`/merge-templates/${templateId}/use/${conversationId}`, { datos });
+    return res.data;
+  },
+
+  preview: async (contenido, datos) => {
+    const res = await api.post('/merge-templates/preview', { contenido, datos });
+    return res.data;
+  },
 }));

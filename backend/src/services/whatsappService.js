@@ -1,4 +1,4 @@
-// backend/src/services/whatsappService.js
+﻿// backend/src/services/whatsappService.js
 const { default: makeWASocket, DisconnectReason,
         useMultiFileAuthState, downloadMediaMessage,
         Browsers, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys')
@@ -630,6 +630,23 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
 
       } catch (e) {
         logger.error('Bot Baileys error:', e.message)
+      }
+    } else if (!fromMe && contentType === 'text' && body.trim() && !isOldMessage && isRealtime) {
+      // Bot desactivado: evaluar reglas de flujo igualmente (triggers como user_keyword funcionan sin bot)
+      try {
+        const chatbotService = require('./chatbotService')
+        await chatbotService.evaluateFlowRules({
+          sessionId,
+          jid,
+          userMessage: body,
+          botText:     null,
+          catalogFile: null,
+          handoff:     false,
+          chatRecord,
+          sock: sessions[sessionId]?.sock || sock
+        }, _io)
+      } catch (e) {
+        logger.error('FlowRules (bot off) error:', e.message)
       }
     }
   } catch (e) {

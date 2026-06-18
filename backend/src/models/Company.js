@@ -1,4 +1,4 @@
-// backend/src/models/Company.js
+﻿// backend/src/models/Company.js
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
@@ -78,6 +78,7 @@ const Company = sequelize.define('company', {
       bot_catalogs:       true,
       dashboard:          true,
       team_management:    true,
+      merge_templates:    true,
     },
   },
 }, {

@@ -1,63 +1,72 @@
-// backend/src/models/Company.js
-const { DataTypes } = require('sequelize');
+﻿const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
-const Company = sequelize.define('company', {
+const Campaign = sequelize.define('campaign', {
   id: {
     type: DataTypes.UUID,
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
-  nombre: {
-    type: DataTypes.STRING(150),
+  name: {
+    type: DataTypes.STRING(200),
+    allowNull: false,
+  },
+  status: {
+    type: DataTypes.STRING(20),
+    allowNull: false,
+    defaultValue: 'draft',
+  },
+  channel: {
+    type: DataTypes.STRING(30),
+    allowNull: false,
+    defaultValue: 'whatsapp',
+  },
+  message_template: {
+    type: DataTypes.TEXT,
     allowNull: false,
     defaultValue: '',
   },
-  sitio_web: {
-    type: DataTypes.STRING(255),
+  audience_filter: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: {},
+  },
+  messages_per_minute: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 30,
+  },
+  total_recipients: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  },
+  sent_count: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  },
+  failed_count: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  },
+  started_at: {
+    type: DataTypes.DATE,
     allowNull: true,
   },
-  telefono: {
-    type: DataTypes.STRING(30),
+  created_by: {
+    type: DataTypes.UUID,
     allowNull: true,
   },
-  telefono_secundario: {
-    type: DataTypes.STRING(30),
-    allowNull: true,
-  },
-  email: {
-    type: DataTypes.STRING(150),
-    allowNull: true,
-    validate: { isEmail: true },
-  },
-  fax: {
-    type: DataTypes.STRING(30),
-    allowNull: true,
-  },
-  direccion: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-  },
-  ciudad: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-  },
-  pais: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-  },
-  descripcion: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-  },
-  logo_url: {
-    type: DataTypes.STRING(500),
+  company_id: {
+    type: DataTypes.UUID,
     allowNull: true,
   },
 }, {
-  tableName: 'company',
+  tableName: 'campaigns',
   timestamps: true,
   underscored: true,
 });
 
-module.exports = Company;
+module.exports = Campaign;

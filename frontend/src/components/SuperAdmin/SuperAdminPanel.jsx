@@ -1,4 +1,4 @@
-// frontend/src/components/SuperAdmin/SuperAdminPanel.jsx
+﻿// frontend/src/components/SuperAdmin/SuperAdminPanel.jsx
 // Panel exclusivo del SuperAdministrador para gestionar empresas y sus feature flags
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '../../services/api';
@@ -21,6 +21,7 @@ const FEATURE_CATALOG = [
   { key: 'bot_catalogs',       label: 'Catálogos del Bot',          desc: 'Base de conocimiento para el chatbot' },
   { key: 'dashboard',          label: 'Dashboard Analítico',        desc: 'Estadísticas y métricas del sistema' },
   { key: 'team_management',    label: 'Gestión de Equipo',          desc: 'Crear y administrar usuarios del equipo' },
+  { key: 'merge_templates',    label: 'Plantillas de Mensajes',     desc: 'Mensajes reutilizables con variables para WhatsApp, Email, SMS' },
 ];
 
 const DEFAULT_FEATURES = Object.fromEntries(FEATURE_CATALOG.map(f => [f.key, true]));

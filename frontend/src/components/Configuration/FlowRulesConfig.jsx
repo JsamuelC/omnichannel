@@ -1,4 +1,4 @@
-// frontend/src/components/Configuration/FlowRulesConfig.jsx
+﻿// frontend/src/components/Configuration/FlowRulesConfig.jsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
@@ -148,9 +148,9 @@ export default function FlowRulesConfig() {
         api.get('/bot-catalogs'),
         api.get('/labels'),
       ]);
-      setRules(rulesRes.data.data  || []);
-      setCatalogs(catRes.data.data || []);
-      setLabels(labRes.data.data   || []);
+      setRules(rulesRes.data    || []);
+      setCatalogs(catRes.data  || []);
+      setLabels(labRes.data    || []);
     } catch (e) {
       toast.error('Error cargando datos: ' + e.message);
     } finally {
@@ -191,11 +191,11 @@ export default function FlowRulesConfig() {
     try {
       if (editing) {
         const res = await api.put(`/flow-rules/${editing.id}`, form);
-        setRules(prev => prev.map(r => r.id === editing.id ? res.data.data : r));
+        setRules(prev => prev.map(r => r.id === editing.id ? res.data : r));
         toast.success('Regla actualizada');
       } else {
         const res = await api.post('/flow-rules', form);
-        setRules(prev => [res.data.data, ...prev]);
+        setRules(prev => [res.data, ...prev]);
         toast.success('Regla creada');
       }
       closeModal();
@@ -209,7 +209,7 @@ export default function FlowRulesConfig() {
   const handleToggle = async (rule) => {
     try {
       const res = await api.patch(`/flow-rules/${rule.id}/toggle`);
-      setRules(prev => prev.map(r => r.id === rule.id ? res.data.data : r));
+      setRules(prev => prev.map(r => r.id === rule.id ? res.data : r));
     } catch (e) { toast.error(e.message); }
   };
 

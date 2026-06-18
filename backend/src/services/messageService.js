@@ -1,4 +1,4 @@
-// backend/src/services/messageService.js
+﻿// backend/src/services/messageService.js
 // ─────────────────────────────────────────────────────────────
 // Servicio central de mensajes para Tecnossync
 // CAMBIO RBAC: getConversations acepta `extraFilter` para que
@@ -120,15 +120,13 @@ class MessageService {
   async triggerChatbot(conversation, incomingMessage, contact) {
     try {
       const result = await chatbotService.handleMessage(conversation, incomingMessage, this.io);
-      if (!result) return;
 
-      // Compatibilidad: handleMessage puede devolver string o { text, catalogFile }
-      const botText    = typeof result === 'string' ? result : result.text;
-      const catalogFile = typeof result === 'object'  ? result.catalogFile : null;
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const botText     = result ? (typeof result === 'string' ? result : result.text)         : null;
+      const catalogFile = result && typeof result === 'object'  ? result.catalogFile            : null;
+      const handoff     = result && typeof result === 'object'  ? result.handoff || false       : false;
 
       if (botText) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await this.sendOutgoingMessage({
           conversationId: conversation.id,
           text:           botText,
@@ -149,6 +147,22 @@ class MessageService {
         } catch (fileErr) {
           logger.warn('⚠️  No se pudo enviar archivo de catálogo por Meta:', fileErr.message);
         }
+      }
+
+      // Evaluar reglas de flujo para el pipeline omnichannel
+      try {
+        await chatbotService.evaluateFlowRules({
+          sessionId:   null,
+          jid:         contact?.whatsapp_id || contact?.phone || `contact_${contact?.id}`,
+          userMessage: incomingMessage.content,
+          botText,
+          catalogFile,
+          handoff,
+          chatRecord:  null,
+          sock:        null
+        }, this.io);
+      } catch (ruleErr) {
+        logger.warn('⚠️  Error evaluando reglas de flujo (omnichannel):', ruleErr.message);
       }
     } catch (error) {
       logger.error('❌ Error en chatbot trigger:', error);

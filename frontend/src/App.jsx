@@ -25,6 +25,7 @@ import ModuleView             from './components/Modules/ModuleView';
 import CalendarPanel          from './components/Calendar/CalendarPanel';
 import TemplatesPanel         from './components/Templates/TemplatesPanel';
 import SuperAdminPanel        from './components/SuperAdmin/SuperAdminPanel';
+import MergeTemplatesPanel    from './components/MergeTemplates/MergeTemplatesPanel';
 
 
 const Placeholder = ({ name }) => (
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="vouchers"   element={<VouchersPanel />} />
         <Route path="calendar"   element={<CalendarPanel />} />
         <Route path="templates"  element={<RoleRoute role="admin"><TemplatesPanel /></RoleRoute>} />
+        <Route path="merge-templates" element={<MergeTemplatesPanel />} />
 
          {/* ── Configuraciónn ── */}
 

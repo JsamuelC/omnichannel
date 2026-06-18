@@ -1,4 +1,4 @@
-// backend/src/services/chatbotService.js
+﻿// backend/src/services/chatbotService.js
 const logger = require('../config/logger');
 const { Message, BotConfig } = require('../models');
 
@@ -258,7 +258,7 @@ class ChatbotService {
             const labelName = rule.action_value?.trim();
             if (!labelName) break;
             try {
-              const chat = chatRecord || await WhatsappChat.findOne({ where: { session_id: sessionId, jid } });
+              const chat = chatRecord || (sessionId && jid ? await WhatsappChat.findOne({ where: { session_id: sessionId, jid } }) : null);
               if (chat) {
                 const current = Array.isArray(chat.labels) ? chat.labels : [];
                 if (!current.includes(labelName)) {
@@ -266,6 +266,9 @@ class ChatbotService {
                   io?.to('agents').emit('whatsapp:chat_updated', { sessionId, jid, labels: [...current, labelName] });
                   logger.info(`🏷️  Etiqueta "${labelName}" aplicada a ${jid}`);
                 }
+              } else {
+                io?.to('agents').emit('flowrule:action', { rule: rule.name, action: 'apply_label', label: labelName, jid });
+                logger.info(`🏷️  Regla "${rule.name}" disparada: aplicar "${labelName}" a ${jid} (sin chat WA)`);
               }
             } catch (e) { logger.warn('FlowRule apply_label error:', e.message); }
             break;
@@ -286,7 +289,7 @@ class ChatbotService {
 
           case 'disable_bot': {
             try {
-              const chat = chatRecord || await WhatsappChat.findOne({ where: { session_id: sessionId, jid } });
+              const chat = chatRecord || (sessionId && jid ? await WhatsappChat.findOne({ where: { session_id: sessionId, jid } }) : null);
               if (chat && chat.bot_enabled) {
                 await chat.update({ bot_enabled: false });
                 io?.to('agents').emit('whatsapp:chat_updated', { sessionId, jid, bot_enabled: false });

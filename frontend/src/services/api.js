@@ -1,4 +1,4 @@
-// frontend/src/services/api.js
+﻿// frontend/src/services/api.js
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -24,8 +24,11 @@ api.interceptors.response.use(
     const msg = error.response?.data?.message || 'Error de conexión';
 
     if (error.response?.status === 401) {
+      const hadToken = localStorage.getItem('token');
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      if (hadToken && !window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
     } else if (error.response?.status >= 500) {
       toast.error('Error del servidor. Intenta de nuevo.');
     }

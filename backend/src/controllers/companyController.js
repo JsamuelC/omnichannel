@@ -1,4 +1,4 @@
-// backend/src/controllers/companyController.js
+﻿// backend/src/controllers/companyController.js
 const Company = require('../models/Company');
 const { User } = require('../models');
 const logger   = require('../config/logger');
@@ -166,7 +166,7 @@ const ALLOWED_FEATURES = [
   'inbox', 'whatsapp_personal', 'whatsapp_business', 'campaigns',
   'vouchers', 'appointments', 'document_templates', 'bot_ai',
   'flow_rules', 'quick_messages', 'labels', 'custom_modules',
-  'bot_catalogs', 'dashboard', 'team_management',
+  'bot_catalogs', 'dashboard', 'team_management', 'merge_templates',
 ];
 
 const getFeatures = async (req, res) => {
