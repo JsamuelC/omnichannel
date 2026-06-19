@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xargs grep -l \"useMergeTemplateStore\\\\|MergeTemplate\")"
+      "Bash(xargs grep -l \"useMergeTemplateStore\\\\|MergeTemplate\")",
+      "Bash(xargs grep -l -i \"MergeTemplate\\\\|merge-template\\\\|merge_template\\\\|DocumentTemplate\\\\|document-template\\\\|document_template\")",
+      "Bash(npx vite *)",
+      "Bash(node -e \"require\\('./backend/src/services/chatbotService'\\)\")",
+      "Bash(node -e \"require\\('./src/services/chatbotService'\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(curl -s http://localhost:3001/api/health)",
+      "Bash(npm install *)",
+      "Bash(docker compose *)",
+      "Bash(xargs grep -l \"contact\\\\|label\\\\|whatsapp\" -i)",
+      "Bash(xargs grep -l \"Contact.find\\\\|Contact.create\\\\|Contact.update\\\\|Label\\\\|WhatsappAccount\")",
+      "Bash(docker exec *)"
     ]
   }
 }

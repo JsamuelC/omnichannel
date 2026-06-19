@@ -83,12 +83,17 @@ jobs:
             export ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}
             export IMAGE_TAG=prod-${{ github.sha }}
 
-            # Pull nuevas imágenes
-            docker compose -f docker-compose.prod.yml pull
+            # Login a ECR desde el servidor
+            /usr/local/bin/aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
 
-            # Restart con zero-downtime (backend primero, luego frontend)
+            # Pull nuevas imágenes
+            docker compose -f docker-compose.prod.yml pull backend frontend
+
+            # Restart con zero-downtime (BD primero si no está, luego app)
+            docker compose -f docker-compose.prod.yml up -d postgres redis
+            sleep 10
             docker compose -f docker-compose.prod.yml up -d --no-deps backend
-            sleep 15
+            sleep 20
             docker compose -f docker-compose.prod.yml up -d --no-deps frontend
             docker system prune -f
 
