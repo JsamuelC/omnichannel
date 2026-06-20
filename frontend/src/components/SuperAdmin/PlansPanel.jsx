@@ -21,6 +21,11 @@ const colorMap = {
 };
 const getColors = (color) => colorMap[color] || colorMap.slate;
 
+const fmt = (n) => {
+  const num = Number(n) || 0;
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 const ALERT_STYLES = {
   overdue:  { wrap: 'bg-red-900/20 border-red-700/40',     icon: <XCircle size={14} className="text-red-400 flex-shrink-0" />,   label: 'Vencido' },
   due_soon: { wrap: 'bg-amber-900/20 border-amber-700/40', icon: <Clock   size={14} className="text-amber-400 flex-shrink-0" />, label: 'Próximo' },
@@ -183,7 +188,7 @@ function CompanyPayments({ companyId, companyName }) {
           <Receipt size={14} className="text-emerald-400" />
           <span className="text-sm font-semibold text-white">Historial de pagos</span>
           <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{payments.length}</span>
-          {totalPaid > 0 && <span className="text-xs text-emerald-400 ml-2">${totalPaid.toFixed(2)} total</span>}
+          {totalPaid > 0 && <span className="text-xs text-emerald-400 ml-2">${fmt(totalPaid)} total</span>}
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(!showForm); }}
@@ -313,7 +318,7 @@ function CompanyPayments({ companyId, companyName }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white">${Number(p.amount).toFixed(2)}</span>
+                      <span className="text-sm font-bold text-white">${fmt(p.amount)}</span>
                       <span className="text-xs text-slate-500">{p.currency}</span>
                       <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${st.color}`}>{st.label}</span>
                     </div>
@@ -749,9 +754,9 @@ export default function PlansPanel({ companies }) {
                           <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${pc3.badge}`}>{key}</span>
                         </div>
                         <div className="flex gap-3 mt-2">
-                          <span className="text-xs text-slate-400">Mensual: <strong className="text-white">${preset.price}</strong></span>
-                          <span className="text-xs text-slate-400">Trimestral: <strong className="text-white">${preset.price_quarterly ?? preset.price}</strong></span>
-                          <span className="text-xs text-slate-400">Anual: <strong className="text-white">${preset.price_annual ?? preset.price}</strong></span>
+                          <span className="text-xs text-slate-400">Mensual: <strong className="text-white">${fmt(preset.price)}</strong></span>
+                          <span className="text-xs text-slate-400">Trimestral: <strong className="text-white">${fmt(preset.price_quarterly ?? preset.price)}</strong></span>
+                          <span className="text-xs text-slate-400">Anual: <strong className="text-white">${fmt(preset.price_annual ?? preset.price)}</strong></span>
                         </div>
                       </div>
                       <div className="flex gap-1 flex-shrink-0">
@@ -803,9 +808,9 @@ export default function PlansPanel({ companies }) {
             {/* KPIs financieros */}
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
               <StatCard icon={<Users size={13} />}      label="Total empresas"  value={overview.total}           color="text-white" />
-              <StatCard icon={<DollarSign size={13} />} label="MRR"             value={`$${overview.mrr}`}       sub="ingresos / mes"        color="text-emerald-400" />
-              <StatCard icon={<DollarSign size={13} />} label="QRR"             value={`$${overview.qrr}`}       sub="ingresos / trimestre"  color="text-sky-400" />
-              <StatCard icon={<DollarSign size={13} />} label="ARR"             value={`$${overview.arr}`}       sub="ingresos / año"        color="text-violet-400" />
+              <StatCard icon={<DollarSign size={13} />} label="MRR"             value={`$${fmt(overview.mrr)}`}       sub="ingresos / mes"        color="text-emerald-400" />
+              <StatCard icon={<DollarSign size={13} />} label="QRR"             value={`$${fmt(overview.qrr)}`}       sub="ingresos / trimestre"  color="text-sky-400" />
+              <StatCard icon={<DollarSign size={13} />} label="ARR"             value={`$${fmt(overview.arr)}`}       sub="ingresos / año"        color="text-violet-400" />
             </div>
 
             {/* Distribución por plan */}
@@ -824,7 +829,7 @@ export default function PlansPanel({ companies }) {
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-bold text-white">{m.pct}%</p>
-                          {m.price > 0 && <p className="text-xs text-slate-400">${m.price}/mes base</p>}
+                          {m.price > 0 && <p className="text-xs text-slate-400">${fmt(m.price)}/mes base</p>}
                         </div>
                       </div>
                       <div className="w-full bg-slate-700/40 rounded-full h-1.5">
@@ -887,7 +892,7 @@ export default function PlansPanel({ companies }) {
                             {a.days_until < 0 ? `${Math.abs(a.days_until)} días vencido` : `Vence en ${a.days_until} días`}
                           </p>
                         </div>
-                        <p className="text-sm font-bold text-white flex-shrink-0">${a.price} {a.currency}</p>
+                        <p className="text-sm font-bold text-white flex-shrink-0">${fmt(a.price)} {a.currency}</p>
                         <button
                           onClick={() => selectCompany({ id: a.id, nombre: a.nombre })}
                           className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex-shrink-0"
@@ -908,7 +913,7 @@ export default function PlansPanel({ companies }) {
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
               <StatCard icon={<Users size={13} />}      label="Total empresas" value={overview.total}     color="text-white" />
-              <StatCard icon={<DollarSign size={13} />} label="MRR estimado"   value={`$${overview.mrr}`} sub="USD/mes activos" color="text-emerald-400" />
+              <StatCard icon={<DollarSign size={13} />} label="MRR estimado"   value={`$${fmt(overview.mrr)}`} sub="USD/mes activos" color="text-emerald-400" />
               {Object.entries(overview.by_plan || {}).map(([plan, count]) => {
                 const preset = presets[plan];
                 return (
@@ -942,7 +947,7 @@ export default function PlansPanel({ companies }) {
                           </p>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <p className="text-sm font-bold text-white">${a.price} {a.currency}</p>
+                          <p className="text-sm font-bold text-white">${fmt(a.price)} {a.currency}</p>
                           <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${getColors(preset?.color || 'slate').badge}`}>
                             {preset?.label || a.plan}
                           </span>
@@ -1014,7 +1019,7 @@ export default function PlansPanel({ companies }) {
                             <p className={`text-sm font-bold ${active ? pc5.text : 'text-white'}`}>{preset.icon} {preset.label}</p>
                             {active && <CheckCircle size={13} className={pc5.text} />}
                           </div>
-                          <p className="text-xs text-slate-400">{preset.price === 0 ? 'Gratis' : `$${preset.price}/mes`}</p>
+                          <p className="text-xs text-slate-400">{preset.price === 0 ? 'Gratis' : `$${fmt(preset.price)}/mes`}</p>
                           <p className="text-xs text-slate-500 mt-1">
                             {preset.limits.max_operators === -1 ? '∞' : preset.limits.max_operators} op ·{' '}
                             {preset.limits.max_storage_mb === -1 ? '∞' : `${preset.limits.max_storage_mb}MB`}
