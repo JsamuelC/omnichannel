@@ -131,21 +131,18 @@ app.get('/widget.js', (req, res) => {
 // ─────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
 
-// CORS abierto para rutas del widget + quitar headers restrictivos
-app.use('/api/widget', (req, res, next) => {
-  res.removeHeader('Cross-Origin-Resource-Policy');
-  res.removeHeader('Cross-Origin-Opener-Policy');
-  res.removeHeader('Cross-Origin-Embedder-Policy');
-  res.removeHeader('Origin-Agent-Cluster');
-  next();
-}, cors({ origin: '*', methods: ['GET', 'POST'] }));
-
-app.use(cors({
-  origin:         process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials:    true,
-  methods:        ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/widget')) {
+    cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'] })(req, res, next);
+  } else {
+    cors({
+      origin:         process.env.FRONTEND_URL || 'http://localhost:3000',
+      credentials:    true,
+      methods:        ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+      allowedHeaders: ['Content-Type', 'Authorization']
+    })(req, res, next);
+  }
+});
 
 
 // Rate limiting: más restrictivo en auth, general en el resto
