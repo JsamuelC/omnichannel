@@ -2,6 +2,7 @@
   if (window.__tecnossync_widget) return;
   window.__tecnossync_widget = true;
 
+  function boot() {
   var cfg = window.TecnoSyncWidget || {};
   var API = cfg.server || 'https://app.tecnossync.com.do/api';
   var COMPANY = cfg.companyId || '';
@@ -234,4 +235,11 @@
       else showPreForm();
     }
   };
+  } // end boot()
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
 })();
