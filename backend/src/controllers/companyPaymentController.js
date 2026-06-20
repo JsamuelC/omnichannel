@@ -2,11 +2,20 @@ const CompanyPayment = require('../models/CompanyPayment');
 const Company        = require('../models/Company');
 const { User }       = require('../models');
 const logger         = require('../config/logger');
+const { sendPaymentConfirmation } = require('../services/emailService');
 const path           = require('path');
 const fs             = require('fs');
 const multer         = require('multer');
 
 const UPLOAD_DIR = process.env.PAYMENT_UPLOAD_DIR || path.join(__dirname, '../../uploads/payments');
+
+function calcNextPaymentDate(fromDate, cycle) {
+  const d = new Date(fromDate);
+  if (cycle === 'annual')    d.setFullYear(d.getFullYear() + 1);
+  else if (cycle === 'quarterly') d.setMonth(d.getMonth() + 3);
+  else                        d.setMonth(d.getMonth() + 1);
+  return d.toISOString().split('T')[0];
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -89,6 +98,35 @@ exports.create = async (req, res) => {
     });
 
     logger.info(`💰 Pago registrado: $${amount} ${currency || 'USD'} para ${company.nombre} por ${req.user.email}`);
+
+    // Enviar email de confirmación al correo de la empresa
+    const companyEmail = company.email;
+    if (companyEmail && (status || 'confirmed') === 'confirmed') {
+      const billing = company.billing || {};
+      const cycle   = billing.cycle || 'monthly';
+      const nextDate = calcNextPaymentDate(payment_date, cycle);
+
+      // Actualizar próximo pago en billing
+      try {
+        await company.update({
+          billing: { ...billing, next_payment: nextDate, status: 'active', updated_at: new Date().toISOString() }
+        });
+      } catch (_) {}
+
+      sendPaymentConfirmation({
+        toEmail:          companyEmail,
+        companyName:      company.nombre,
+        amount,
+        currency:         currency || 'USD',
+        paymentMethod:    payment_method,
+        referenceNumber:  reference_number,
+        paymentDate:      payment_date,
+        periodCovered:    period_covered,
+        nextPaymentDate:  nextDate,
+        nextAmount:       billing.price || amount,
+      }).catch(() => {});
+    }
+
     res.status(201).json({ success: true, data: payment });
   } catch (err) {
     logger.error('Error creando pago:', err);

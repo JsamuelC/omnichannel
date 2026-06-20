@@ -231,4 +231,61 @@ async function sendWelcomeEmail({ toEmail, userName, companyName, password, veri
   return ok;
 }
 
-module.exports = { sendPasswordReset, sendWelcomeEmail, sendLoginOTP };
+const METHOD_LABELS = {
+  bank_transfer: 'Transferencia bancaria', cash: 'Efectivo', card: 'Tarjeta',
+  mobile_payment: 'Pago móvil', check: 'Cheque', paypal: 'PayPal', other: 'Otro',
+};
+
+async function sendPaymentConfirmation({ toEmail, companyName, amount, currency, paymentMethod, referenceNumber, paymentDate, periodCovered, nextPaymentDate, nextAmount }) {
+  const rows = [
+    ['Empresa', companyName],
+    ['Monto pagado', `$${Number(amount).toFixed(2)} ${currency || 'USD'}`],
+    ['Método de pago', METHOD_LABELS[paymentMethod] || paymentMethod],
+    referenceNumber ? ['Referencia / ID', referenceNumber] : null,
+    ['Fecha de pago', paymentDate],
+    periodCovered ? ['Período cubierto', periodCovered] : null,
+    nextPaymentDate ? ['Próximo pago', nextPaymentDate] : null,
+    nextAmount ? ['Monto próximo', `$${Number(nextAmount).toFixed(2)} ${currency || 'USD'}`] : null,
+  ].filter(Boolean);
+
+  const tableRows = rows.map(([label, value]) => `
+    <tr>
+      <td style="padding:10px 16px;color:#64748b;font-size:13px;border-bottom:1px solid #1e293b;width:160px">${label}</td>
+      <td style="padding:10px 16px;color:#e2e8f0;font-size:13px;font-weight:600;border-bottom:1px solid #1e293b">${value}</td>
+    </tr>`).join('');
+
+  const content = `
+    <tr><td style="padding:44px 36px">
+      <div style="text-align:center;margin-bottom:28px">
+        <div style="display:inline-block;width:56px;height:56px;line-height:56px;text-align:center;font-size:28px;background:linear-gradient(135deg,#059669,#10b981);border-radius:16px;margin-bottom:16px">✓</div>
+        <h2 style="color:#f1f5f9;font-size:22px;margin:0 0 6px;font-weight:800">Pago confirmado</h2>
+        <p style="color:#94a3b8;font-size:14px;margin:0">Hemos recibido tu pago correctamente.</p>
+      </div>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;border-radius:12px;overflow:hidden;border:1px solid #334155;margin-bottom:24px">
+        ${tableRows}
+      </table>
+
+      ${nextPaymentDate ? `
+      <div style="background:#1e293b;border:1px solid #334155;border-left:4px solid #6366f1;border-radius:10px;padding:16px 18px;margin-bottom:20px">
+        <p style="color:#a5b4fc;font-size:12px;font-weight:700;margin:0 0 6px">📅 Próxima fecha de pago</p>
+        <p style="color:#e2e8f0;font-size:14px;font-weight:800;margin:0">${nextPaymentDate}${nextAmount ? ` — $${Number(nextAmount).toFixed(2)} ${currency || 'USD'}` : ''}</p>
+      </div>` : ''}
+
+      <p style="color:#475569;font-size:12px;margin:0;text-align:center">
+        Este es un comprobante automático generado por Tecnossync.<br>
+        Si tienes alguna duda, contacta a tu administrador.
+      </p>
+    </td></tr>`;
+
+  const ok = await zohoSend({
+    to: toEmail,
+    subject: `✅ Pago confirmado — $${Number(amount).toFixed(2)} ${currency || 'USD'} — Tecnossync`,
+    html: baseLayout(content),
+  });
+  if (ok) logger.info(`💰 Email confirmación de pago enviado a: ${toEmail}`);
+  else logger.error(`❌ Error enviando confirmación de pago a: ${toEmail}`);
+  return ok;
+}
+
+module.exports = { sendPasswordReset, sendWelcomeEmail, sendLoginOTP, sendPaymentConfirmation };
