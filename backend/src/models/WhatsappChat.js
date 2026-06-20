@@ -29,7 +29,7 @@ const WhatsappChat = sequelize.define('whatsapp_chats', {
   },
   bot_enabled: {
     type:         DataTypes.BOOLEAN,
-    defaultValue: false
+    defaultValue: true
   },
   bot_mode: {
     type:         DataTypes.STRING(20),
@@ -62,6 +62,10 @@ const WhatsappChat = sequelize.define('whatsapp_chats', {
     type:      DataTypes.STRING(100),
     allowNull: true,
     comment:   'WhatsApp @lid JID → mapeo persistente LID→real JID'
+  },
+  company_id: {
+    type:      DataTypes.UUID,
+    allowNull: true
   }
 }, {
   indexes: [

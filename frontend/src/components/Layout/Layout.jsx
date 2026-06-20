@@ -11,6 +11,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore, useConversationStore, useThemeStore, useModuleStore } from '../../store';
 import { getSocket } from '../../services/socket';
 import { ModuleIcon } from '../Modules/ModulosConfig';
+import UserProfileModal from './UserProfileModal';
 import toast from 'react-hot-toast';
 
 // ─── Icono SVG inline para cada canal ───────────────────────
@@ -117,12 +118,12 @@ const ALL_NAV_ITEMS = [
   { to: '/inbox',      icon: <InboxIcon />,     label: 'Bandeja',        id: 'inbox',      feature: null,               roles: ['admin','agent','supervisor','superadmin'] },
   { to: '/calendar',   icon: <CalendarIcon />,  label: 'Calendario',     id: 'calendar',   feature: 'appointments',     roles: ['admin','agent','supervisor','superadmin'] },
   { to: '/templates',  icon: <TemplateIcon />,  label: 'Documentos',     id: 'templates',  feature: 'document_templates', roles: ['admin','superadmin'] },
-  { to: '/merge-templates', icon: <MergeIcon />, label: 'Plantillas Msg',  id: 'merge',      feature: 'merge_templates',  roles: ['admin','agent','supervisor','superadmin'] },
-  { to: '/campaigns',  icon: <CampaignIcon />,  label: 'Campañas',       id: 'campaigns',  feature: 'campaigns',        roles: ['admin','superadmin'] },
+{ to: '/campaigns',  icon: <CampaignIcon />,  label: 'Campañas',       id: 'campaigns',  feature: 'campaigns',        roles: ['admin','superadmin'] },
   { to: '/vouchers',   icon: <VoucherIcon />,   label: 'Comprobantes',   id: 'vouchers',   feature: 'vouchers',         roles: ['admin','agent','supervisor','superadmin'] },
   { to: '/config',     icon: <SettingsIcon />,  label: 'Configuración',  id: 'config',     feature: null,               roles: ['admin','superadmin'] },
   { to: '/dashboard',  icon: <DashboardIcon />, label: 'Dashboard',      id: 'dashboard',  feature: 'dashboard',        roles: ['admin','superadmin'] },
   { to: '/superadmin', icon: <TeamIcon />,       label: 'SuperAdmin',     id: 'superadmin', feature: null,               roles: ['superadmin'] },
+  { to: '/gestion-funcionalidades', icon: <SettingsIcon />, label: 'Funcionalidades', id: 'gestion-func', feature: null, roles: ['superadmin'] },
 ];
 
 const CHANNEL_LABEL = { whatsapp: 'WhatsApp', messenger: 'Messenger', instagram: 'Instagram' };
@@ -133,6 +134,7 @@ export default function Layout() {
   const { theme, toggleTheme }           = useThemeStore();
   const { modules, fetchModules }        = useModuleStore();
   const [sidebarOpen, setSidebarOpen]    = useState(false); // móvil
+  const [showProfile, setShowProfile]    = useState(false);
   const navigate = useNavigate();
 
   const role = user?.role || 'agent';
@@ -254,76 +256,78 @@ export default function Layout() {
           ))}
         </div>
 
-        {/* ── Navegación ──────────────────────────────── */}
-<nav className="flex-1 flex flex-col gap-1 p-2 pt-3">
-  {navItems.map((item) =>
-    item.action === 'settings' ? (
-      <button
-        key={item.id}
-        onClick={() => setSettingsOpen(true)}
-        className="flex items-center gap-3 px-2.5 py-2.5 rounded-xl transition-all duration-150 text-slate-400 hover:bg-white/5 hover:text-white w-full"
-        title={item.label}
-      >
-        <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
-          {item.icon}
-        </span>
-        <span className={`ts-sidebar-label text-sm font-medium truncate ${sidebarOpen ? '' : 'hidden md:block'}`}>
-          {item.label}
-        </span>
-      </button>
-    ) : (
-      <NavLink
-        key={item.id}
-        to={item.to}
-        onClick={() => setSidebarOpen(false)}
-        className={({ isActive }) =>
-          `flex items-center gap-3 px-2.5 py-2.5 rounded-xl transition-all duration-150 group
-           ${isActive
-             ? 'bg-indigo-600/80 text-white shadow-lg shadow-indigo-500/20'
-             : 'text-slate-400 hover:bg-white/5 hover:text-white'}`
-        }
-        title={item.label}
-      >
-        <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
-          {item.icon}
-        </span>
-        <span className={`ts-sidebar-label text-sm font-medium truncate ${sidebarOpen ? '' : 'hidden md:block'}`}>
-          {item.label}
-        </span>
-      </NavLink>
-    )
-  )}
-</nav>
+        {/* ── Zona scrollable: navegación + módulos ── */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <nav className="flex flex-col gap-1 p-2 pt-3">
+            {navItems.map((item) =>
+              item.action === 'settings' ? (
+                <button
+                  key={item.id}
+                  onClick={() => setSettingsOpen(true)}
+                  className="flex items-center gap-3 px-2.5 py-2.5 rounded-xl transition-all duration-150 text-slate-400 hover:bg-white/5 hover:text-white w-full"
+                  title={item.label}
+                >
+                  <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
+                    {item.icon}
+                  </span>
+                  <span className={`ts-sidebar-label text-sm font-medium truncate ${sidebarOpen ? '' : 'hidden md:block'}`}>
+                    {item.label}
+                  </span>
+                </button>
+              ) : (
+                <NavLink
+                  key={item.id}
+                  to={item.to}
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-2.5 py-2.5 rounded-xl transition-all duration-150 group
+                     ${isActive
+                       ? 'bg-indigo-600/80 text-white shadow-lg shadow-indigo-500/20'
+                       : 'text-slate-400 hover:bg-white/5 hover:text-white'}`
+                  }
+                  title={item.label}
+                >
+                  <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
+                    {item.icon}
+                  </span>
+                  <span className={`ts-sidebar-label text-sm font-medium truncate ${sidebarOpen ? '' : 'hidden md:block'}`}>
+                    {item.label}
+                  </span>
+                </NavLink>
+              )
+            )}
+          </nav>
 
-        {/* ── Módulos personalizados ──────────────────── */}
-        {modules.length > 0 && (
-          <div className="px-2 pb-1">
-            <p className={`ts-sidebar-label text-[10px] font-semibold uppercase tracking-widest text-slate-600 px-2.5 mb-1 ${sidebarOpen ? '' : 'hidden md:block'}`}>
-              Módulos
-            </p>
-            {modules.map(mod => (
-              <NavLink
-                key={mod.id}
-                to={`/modules/${mod.slug}`}
-                onClick={() => setSidebarOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-2.5 py-2 rounded-xl transition-all duration-150 group
-                   ${isActive
-                     ? 'bg-white/10 text-white'
-                     : 'text-slate-400 hover:bg-white/5 hover:text-white'}`
-                }
-                title={mod.name}
-              >
-                <span className="flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center" style={{ background: mod.color }}>
-                  <ModuleIcon name={mod.icon} size={11} className="text-white" />
-                </span>
-                <span className={`ts-sidebar-label text-sm font-medium truncate ${sidebarOpen ? '' : 'hidden md:block'}`}>
-                  {mod.name}
-                </span>
-              </NavLink>
-            ))}
-          </div>
-        )}
+          {/* ── Módulos personalizados ──────────────────── */}
+          {modules.length > 0 && (
+            <div className="px-2 pb-1">
+              <p className={`ts-sidebar-label text-[10px] font-semibold uppercase tracking-widest text-slate-600 px-2.5 mb-1 ${sidebarOpen ? '' : 'hidden md:block'}`}>
+                Módulos
+              </p>
+              {modules.map(mod => (
+                <NavLink
+                  key={mod.id}
+                  to={`/modules/${mod.slug}`}
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-2.5 py-2 rounded-xl transition-all duration-150 group
+                     ${isActive
+                       ? 'bg-white/10 text-white'
+                       : 'text-slate-400 hover:bg-white/5 hover:text-white'}`
+                  }
+                  title={mod.name}
+                >
+                  <span className="flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center" style={{ background: mod.color }}>
+                    <ModuleIcon name={mod.icon} size={11} className="text-white" />
+                  </span>
+                  <span className={`ts-sidebar-label text-sm font-medium truncate ${sidebarOpen ? '' : 'hidden md:block'}`}>
+                    {mod.name}
+                  </span>
+                </NavLink>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* ── Modo claro / oscuro ─────────────────────── */}
         <div className={`px-2 pt-2 ${sidebarOpen ? '' : 'hidden md:block'}`}>
@@ -365,10 +369,14 @@ export default function Layout() {
 
         {/* ── Usuario + Logout ────────────────────────── */}
         <div className="flex items-center gap-2 p-2 border-t border-white/5">
-          {/* Avatar */}
-          <div className="ts-online-dot flex-shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center text-white text-xs font-bold shadow shadow-indigo-500/30">
+          {/* Avatar — click abre perfil */}
+          <button
+            onClick={() => setShowProfile(true)}
+            className="ts-online-dot flex-shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center text-white text-xs font-bold shadow shadow-indigo-500/30 hover:ring-2 hover:ring-violet-400 transition-all"
+            title="Mi perfil"
+          >
             {initials}
-          </div>
+          </button>
           {/* Info usuario */}
           <div className={`ts-sidebar-label flex-1 overflow-hidden ${sidebarOpen ? '' : 'hidden md:block'}`}>
             <p className="text-white text-xs font-semibold truncate">{user?.name || 'Usuario'}</p>
@@ -383,6 +391,7 @@ export default function Layout() {
             <LogoutIcon />
           </button>
         </div>
+        <UserProfileModal open={showProfile} onClose={() => setShowProfile(false)} user={user} />
       </aside>
 
       {/* ══════════════════════════════════════════════════

@@ -121,11 +121,41 @@ class ChatbotService {
     }
   }
 
+  // ─── Construye bloque con plantillas de documentos disponibles ──────────────
+  async buildDocumentTemplatesContext(companyId) {
+    try {
+      const { DocumentTemplate } = require('../models');
+      const where = companyId ? { company_id: companyId } : {};
+      const templates = await DocumentTemplate.findAll({ where, attributes: ['name', 'description', 'fields'] });
+      if (!templates.length) return '';
+
+      const lines = ['=== PLANTILLAS DE DOCUMENTOS DISPONIBLES ==='];
+      for (const tpl of templates) {
+        const manualFields = (tpl.fields || []).filter(f => f.source === 'manual');
+        const desc = tpl.description ? ` — ${tpl.description}` : '';
+        lines.push(`- "${tpl.name}"${desc}`);
+        if (manualFields.length) {
+          lines.push(`  Datos que se solicitan al cliente: ${manualFields.map(f => f.label).join(', ')}`);
+        }
+      }
+      lines.push('');
+      lines.push('Cuando el cliente solicite un documento, contrato, acuerdo o formulario formal, responde confirmando que procederás y agrega al final de tu mensaje EXACTAMENTE (sin comillas ni espacios extra):');
+      lines.push('[START_DOC:Nombre exacto de la plantilla]');
+      lines.push('Solo usa [START_DOC:...] cuando el cliente lo pida explícitamente, no en respuestas informativas.');
+      lines.push('===========================================');
+      return lines.join('\n');
+    } catch (err) {
+      logger.warn('buildDocumentTemplatesContext error:', err.message);
+      return '';
+    }
+  }
+
   // ─── Resuelve tokens {{catalogo:identificador}} en el system prompt ──
-  async resolvePromptCatalogs(systemPrompt) {
+  async resolvePromptCatalogs(systemPrompt, companyId) {
     // Prepend company context automatically
     const companyCtx = await this.buildCompanyContext();
-    const base = companyCtx ? `${companyCtx}\n\n` : '';
+    const docCtx     = await this.buildDocumentTemplatesContext(companyId);
+    const base = [companyCtx, docCtx].filter(Boolean).join('\n\n') + (companyCtx || docCtx ? '\n\n' : '');
 
     if (!systemPrompt || !systemPrompt.includes('{{catalogo:')) return base + (systemPrompt || '');
     try {
@@ -338,7 +368,7 @@ class ChatbotService {
       }
 
       const history        = await this.buildConversationHistory(conversation.id, config.max_history_messages);
-      const resolvedPrompt = await this.resolvePromptCatalogs(config.system_prompt);
+      const resolvedPrompt = await this.resolvePromptCatalogs(config.system_prompt, conversation.company_id);
       const rawResponse    = await this.callAI(
         integration.provider,
         integration.api_key,
@@ -416,9 +446,9 @@ class ChatbotService {
   async buildCalendarContext(sessionId) {
     try {
       const { BusinessSchedule, Appointment } = require('../models');
+      const Company = require('../models/Company');
       const { Op } = require('sequelize');
 
-      // Determinar company_id desde sesión
       const { WhatsappChat } = require('../models');
       const anyChat = await WhatsappChat.findOne({ where: { session_id: sessionId }, attributes: ['company_id'] });
       const companyId = anyChat?.company_id;
@@ -430,6 +460,43 @@ class ChatbotService {
 
       function timeToMin(t) { const [h,m] = t.split(':').map(Number); return h*60+m; }
       function minToTime(min) { return `${String(Math.floor(min/60)).padStart(2,'0')}:${String(min%60).padStart(2,'0')}`; }
+
+      // Cargar eventos externos (Outlook / Google Calendar) para los próximos 14 días
+      let externalBusy = [];
+      if (companyId) {
+        try {
+          const company = await Company.findByPk(companyId, { attributes: ['id', 'outlook_tokens', 'google_calendar_tokens'] });
+          const today = new Date();
+          const endRange = new Date(today);
+          endRange.setDate(today.getDate() + 14);
+          const startStr = today.toISOString().slice(0, 10);
+          const endStr   = endRange.toISOString().slice(0, 10);
+
+          if (company?.outlook_tokens?.access_token) {
+            try {
+              const outlook = require('./outlookService');
+              const events = await outlook.getCalendarEvents(company, startStr, endStr);
+              for (const ev of (events || [])) {
+                const s = new Date(ev.start?.dateTime || ev.start);
+                const e = new Date(ev.end?.dateTime || ev.end);
+                externalBusy.push({ date: s.toISOString().slice(0,10), start: s.getHours()*60+s.getMinutes(), end: e.getHours()*60+e.getMinutes() });
+              }
+            } catch (_) {}
+          }
+
+          if (company?.google_calendar_tokens?.access_token) {
+            try {
+              const gcal = require('./googleCalendarService');
+              const events = await gcal.getCalendarEvents(company, startStr, endStr);
+              for (const ev of (events || [])) {
+                const s = new Date(ev.start?.dateTime || ev.start?.date || ev.start);
+                const e = new Date(ev.end?.dateTime || ev.end?.date || ev.end);
+                externalBusy.push({ date: s.toISOString().slice(0,10), start: s.getHours()*60+s.getMinutes(), end: e.getHours()*60+e.getMinutes() });
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
 
       const DIAS_ES = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
       const results = [];
@@ -448,12 +515,17 @@ class ChatbotService {
           attributes: ['start_time', 'duration_minutes'],
         });
         const occupied = existing.map(a => ({ start: timeToMin(a.start_time), end: timeToMin(a.start_time) + (a.duration_minutes||30) }));
+
+        // Agregar bloques ocupados del calendario externo
+        const extForDay = externalBusy.filter(b => b.date === dateStr);
+        occupied.push(...extForDay);
+
         const dur = sched.slot_duration || 30;
         const slots = [];
         for (let t = timeToMin(sched.start_time); t + dur <= timeToMin(sched.end_time); t += dur) {
           if (!occupied.some(o => t < o.end && (t+dur) > o.start)) slots.push(minToTime(t));
         }
-        if (slots.length) results.push({ date: dateStr, day: DIAS_ES[dow], slots: slots.slice(0,4) });
+        if (slots.length) results.push({ date: dateStr, day: DIAS_ES[dow], slots: slots.slice(0,6) });
       }
 
       if (!results.length) return null;
@@ -462,11 +534,68 @@ class ChatbotService {
       for (const r of results) {
         lines.push(`${r.day} ${r.date}: ${r.slots.join(', ')}`);
       }
-      lines.push(`Si el cliente desea agendar, sugiere estas opciones y confirma su nombre completo y teléfono.`);
+      lines.push(`Cuando el cliente confirme una cita, responde con el token: [SCHEDULE:nombre_completo|teléfono|YYYY-MM-DD|HH:MM]`);
+      lines.push(`Ejemplo: [SCHEDULE:María García|809-555-0001|2026-06-25|10:00]`);
+      lines.push(`IMPORTANTE: solo usa [SCHEDULE:...] cuando el cliente confirme nombre, teléfono, fecha y hora. Antes de eso, pregunta y sugiere opciones.`);
       lines.push(`=================================`);
       return lines.join('\n');
     } catch (err) {
       logger.warn('buildCalendarContext error:', err.message);
+      return null;
+    }
+  }
+
+  extractScheduleCommand(text) {
+    const match = text.match(/\[SCHEDULE:([^\]]+)\]/i);
+    if (!match) return { text, schedule: null };
+    const parts = match[1].split('|').map(s => s.trim());
+    const cleaned = text.replace(/\[SCHEDULE:[^\]]+\]/gi, '').trim();
+    if (parts.length < 4) return { text: cleaned, schedule: null };
+    return {
+      text: cleaned,
+      schedule: { name: parts[0], phone: parts[1], date: parts[2], time: parts[3] },
+    };
+  }
+
+  async createAppointmentFromBot(schedule, sessionId, companyId) {
+    try {
+      const { Appointment } = require('../models');
+      const Company = require('../models/Company');
+      const outlook = require('./outlookService');
+      const gcal    = require('./googleCalendarService');
+
+      const appointment = await Appointment.create({
+        company_id:       companyId || null,
+        title:            `Cita agendada por WhatsApp`,
+        contact_name:     schedule.name,
+        contact_phone:    schedule.phone,
+        date:             schedule.date,
+        start_time:       schedule.time,
+        duration_minutes: 30,
+        status:           'confirmed',
+      });
+
+      // Sincronizar con calendario externo
+      if (companyId) {
+        const company = await Company.findByPk(companyId, { attributes: ['id', 'outlook_tokens', 'google_calendar_tokens'] });
+        if (company?.outlook_tokens?.access_token) {
+          try {
+            const eventId = await outlook.createCalendarEvent(company, appointment);
+            if (eventId) await appointment.update({ outlook_event_id: eventId });
+          } catch (_) {}
+        }
+        if (company?.google_calendar_tokens?.access_token) {
+          try {
+            const eventId = await gcal.createCalendarEvent(company, appointment);
+            if (eventId) await appointment.update({ google_event_id: eventId });
+          } catch (_) {}
+        }
+      }
+
+      logger.info(`📅 Cita creada por bot: ${schedule.name} — ${schedule.date} ${schedule.time}`);
+      return appointment;
+    } catch (err) {
+      logger.error('Error creando cita desde bot:', err.message);
       return null;
     }
   }
@@ -487,9 +616,6 @@ class ChatbotService {
     }
 
     try {
-      const path = require('path');
-      const fs   = require('fs');
-
       // 1. ¿Hay una recolección activa para este jid?
       let activeReq = null;
       try {
@@ -505,10 +631,10 @@ class ChatbotService {
 
       if (activeReq) {
         // Palabras de escape: el cliente puede cancelar la recolección en cualquier momento
-        const CANCEL_WORDS = ['cancelar', 'salir', 'parar', 'detener', 'cancel', 'stop', 'exit'];
+        const CANCEL_WORDS = ['cancelar', 'salir', 'parar', 'detener', 'cancel', 'stop', 'exit', 'no'];
         if (CANCEL_WORDS.includes(body.trim().toLowerCase())) {
           await activeReq.update({ status: 'rejected' });
-          return { handled: false }; // devolver control al bot de IA
+          return { handled: true, reply: 'Solicitud cancelada. Si necesitas el documento en otro momento, solo escríbeme.' };
         }
 
         const tpl          = activeReq.template;
@@ -517,83 +643,45 @@ class ChatbotService {
             .reduce((acc, f) => { if (!acc[f.key]) acc[f.key] = f; return acc; }, {})
         );
         const idx          = activeReq.current_field_index;
+        const collectedSoFar = activeReq.collected_fields || {};
 
+        // ── Fase de confirmación ─────────────────────────────────────────────
+        if (collectedSoFar.__awaiting_confirmation) {
+          const CONFIRM_WORDS = ['si', 'sí', 'yes', 'correcto', 'confirmar', 'confirmo', 'ok', 'listo', 'exacto'];
+          const bodyLow = body.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+          const confirmed = CONFIRM_WORDS.some(w => bodyLow === w || bodyLow.startsWith(w + ' '));
+
+          if (!confirmed) {
+            await activeReq.update({ status: 'rejected' });
+            return { handled: true, reply: 'Solicitud cancelada. Si deseas volver a intentarlo, escríbeme cuando gustes.' };
+          }
+
+          // Cliente confirmó → generar documento
+          const generated = await this._generateDocument(activeReq, tpl, collectedSoFar, jid, chatRecord, io);
+          return generated;
+        }
+
+        // ── Recolección de campos ────────────────────────────────────────────
         if (idx < manualFields.length) {
           const field     = manualFields[idx];
-          const collected = { ...(activeReq.collected_fields || {}), [field.key]: body.trim() };
+          const collected = { ...collectedSoFar, [field.key]: body.trim() };
           const nextIdx   = idx + 1;
 
           if (nextIdx < manualFields.length) {
-            // Pedir siguiente campo — devolver texto para que whatsappService lo envíe
             await activeReq.update({ collected_fields: collected, current_field_index: nextIdx });
             const nextField = manualFields[nextIdx];
             return { handled: true, reply: `${nextField.label}:` };
           } else {
-            // Todos los campos recogidos → generar documento
-            await activeReq.update({ collected_fields: collected, current_field_index: nextIdx });
-            try {
-              const { TEMPLATE_DIR, GENERATED_DIR } = require('../middleware/uploadTemplate');
-              const PizZip        = require('pizzip');
-              const Docxtemplater = require('docxtemplater');
+            // Todos los campos recogidos → pedir confirmación al cliente
+            await activeReq.update({ collected_fields: { ...collected, __awaiting_confirmation: true }, current_field_index: nextIdx });
 
-              const today = new Date();
-              const dateStr = `${today.getDate()}/${today.getMonth()+1}/${today.getFullYear()}`;
-              let contactName  = chatRecord?.contact_name || '';
-              let contactPhone = jid.replace(/@.+/, '');
-              try {
-                const contact = await Contact.findOne({ where: { phone: contactPhone } });
-                if (contact) contactName = contact.name || contactName;
-              } catch (_) {}
-
-              const AUTO_RESOLVE = {
-                'contact.name':  contactName,
-                'contact.phone': contactPhone,
-                'date.today':    dateStr,
-              };
-
-              const values = {};
-              for (const f of (tpl.fields || [])) {
-                if (f.source === 'manual') {
-                  values[f.key] = collected[f.key] ?? f.default_value ?? '';
-                } else if (f.source && AUTO_RESOLVE[f.source] !== undefined) {
-                  values[f.key] = AUTO_RESOLVE[f.source];
-                } else {
-                  values[f.key] = f.default_value ?? '';
-                }
-              }
-
-              const tplPath = path.join(TEMPLATE_DIR, tpl.filename_stored);
-              const content = fs.readFileSync(tplPath, 'binary');
-              const zip     = new PizZip(content);
-              const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-              doc.render(values);
-              const buf     = doc.getZip().generate({ type: 'nodebuffer' });
-              const outName = `${Date.now()}_${tpl.filename_stored}`;
-              if (!fs.existsSync(GENERATED_DIR)) fs.mkdirSync(GENERATED_DIR, { recursive: true });
-              fs.writeFileSync(path.join(GENERATED_DIR, outName), buf);
-
-              await activeReq.update({ status: 'ready', generated_file_path: outName });
-              logger.info(`📄 Documento generado para ${jid}: ${outName}`);
-            } catch (genErr) {
-              logger.error('Error generando documento:', genErr.message);
-              await activeReq.update({ status: 'ready' });
+            const lines = ['Estos son los datos que registré para tu documento:'];
+            for (const f of manualFields) {
+              lines.push(`• *${f.label}:* ${collected[f.key] || '—'}`);
             }
-
-            // Notificar a agentes por socket
-            logger.info(`📡 Emitiendo document:ready para ${jid} — io=${!!io} requestId=${activeReq.id}`);
-            io?.to('agents').emit('document:ready', {
-              requestId:    activeReq.id,
-              jid,
-              sessionId,
-              templateName: tpl.name,
-              companyId:    chatRecord?.company_id,
-            });
-
-            // Responder al cliente — whatsappService envía este texto
-            return {
-              handled: true,
-              reply: 'Gracias, ya tenemos todos los datos. Un asesor lo revisará y te enviará el documento en breve.',
-            };
+            lines.push('');
+            lines.push('¿Todo está correcto? Responde *sí* para confirmar o *cancelar* para empezar de nuevo.');
+            return { handled: true, reply: lines.join('\n') };
           }
         }
         // idx fuera de rango (no debería pasar)
@@ -654,6 +742,88 @@ class ChatbotService {
     }
   }
 
+  // ─── Genera el DOCX a partir de los campos recopilados ────────────────────
+  async _generateDocument(activeReq, tpl, collected, jid, chatRecord, io) {
+    try {
+      const path = require('path');
+      const fs   = require('fs');
+      const { TEMPLATE_DIR, GENERATED_DIR } = require('../middleware/uploadTemplate');
+      const PizZip        = require('pizzip');
+      const Docxtemplater = require('docxtemplater');
+      const models        = require('../models');
+      const Contact       = models.Contact;
+
+      const today = new Date();
+      const dateStr = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
+      const contactPhone = jid.replace(/@.+/, '');
+      let contactName = chatRecord?.contact_name || '';
+      try {
+        const contact = await Contact.findOne({ where: { phone: contactPhone } });
+        if (contact) contactName = contact.name || contactName;
+      } catch (_) {}
+
+      const AUTO_RESOLVE = {
+        'contact.name':  contactName,
+        'contact.phone': contactPhone,
+        'date.today':    dateStr,
+      };
+
+      const values = {};
+      for (const f of (tpl.fields || [])) {
+        if (f.source === 'manual') {
+          values[f.key] = collected[f.key] ?? f.default_value ?? '';
+        } else if (f.source && AUTO_RESOLVE[f.source] !== undefined) {
+          values[f.key] = AUTO_RESOLVE[f.source];
+        } else {
+          values[f.key] = f.default_value ?? '';
+        }
+      }
+
+      const tplPath = path.join(TEMPLATE_DIR, tpl.filename_stored);
+      if (!fs.existsSync(tplPath)) {
+        logger.error(`Archivo de plantilla no encontrado: ${tplPath}`);
+        await activeReq.update({ status: 'rejected' });
+        return { handled: true, reply: 'Hubo un error al preparar tu documento. Por favor contacta a un asesor.' };
+      }
+
+      const content = fs.readFileSync(tplPath);
+      const zip     = new PizZip(content);
+      const doc     = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks:    true,
+        nullGetter:    () => '',
+      });
+      doc.render(values);
+      const buf     = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+      const outName = `${Date.now()}_${tpl.filename_stored}`;
+      if (!fs.existsSync(GENERATED_DIR)) fs.mkdirSync(GENERATED_DIR, { recursive: true });
+      fs.writeFileSync(path.join(GENERATED_DIR, outName), buf);
+
+      await activeReq.update({ status: 'ready', generated_file_path: outName });
+      logger.info(`📄 Documento generado para ${jid}: ${outName}`);
+
+      io?.to('agents').emit('document:ready', {
+        requestId:    activeReq.id,
+        jid,
+        sessionId:    activeReq.session_id,
+        templateName: tpl.name,
+        companyId:    chatRecord?.company_id,
+      });
+
+      return {
+        handled: true,
+        reply: '✅ ¡Perfecto! Tu documento está listo. Un asesor lo revisará y te lo enviará en breve.',
+      };
+    } catch (genErr) {
+      logger.error('Error generando documento:', genErr.message, genErr.stack);
+      await activeReq.update({ status: 'rejected' });
+      return {
+        handled: true,
+        reply: 'Ocurrió un error al generar tu documento. Por favor contacta a un asesor para continuar.',
+      };
+    }
+  }
+
   // ─── Bot para WhatsApp (Baileys): con memoria y modo genérico/personalizado ──
   async handleWhatsappMessage(sessionId, jid, body, chatRecord) {
     try {
@@ -704,7 +874,7 @@ class ChatbotService {
       const history = this.normalizeHistory(rawHistory);
 
       // 4. Resolver tokens de catálogos + contexto de calendario
-      let resolvedPrompt = await this.resolvePromptCatalogs(systemPrompt);
+      let resolvedPrompt = await this.resolvePromptCatalogs(systemPrompt, chatRecord?.company_id);
       const calendarCtx = await this.buildCalendarContext(sessionId);
       if (calendarCtx) resolvedPrompt += '\n\n' + calendarCtx;
 
@@ -726,8 +896,15 @@ class ChatbotService {
       } else {
         logger.warn(`⚠️  Bot WA [${jid}]: IA devolvió respuesta vacía`);
       }
-      // Extraer comandos: [HUMAN_NEEDED] → [START_DOC:nombre] → [SEND_FILE:id]
-      const { text: afterHandoff, handoff } = this.extractHandoff(rawResponse);
+      // Extraer comandos: [SCHEDULE:...] → [HUMAN_NEEDED] → [START_DOC:nombre] → [SEND_FILE:id]
+      const { text: afterSchedule, schedule } = this.extractScheduleCommand(rawResponse);
+      if (schedule) {
+        const anyChat2 = await WhatsappChat.findOne({ where: { session_id: sessionId, jid }, attributes: ['company_id'] });
+        await this.createAppointmentFromBot(schedule, sessionId, anyChat2?.company_id);
+        logger.info(`📅 Bot WA [${jid}] agendó cita: ${schedule.name} ${schedule.date} ${schedule.time}`);
+      }
+
+      const { text: afterHandoff, handoff } = this.extractHandoff(afterSchedule);
       const { text: afterDoc, docName }     = this.extractDocCommand(afterHandoff);
       const result = await this.extractFileCommand(afterDoc);
       if (result?.catalogFile) {
@@ -736,7 +913,7 @@ class ChatbotService {
       if (docName) {
         logger.info(`📄 Bot WA [${jid}] solicita recolección de doc: "${docName}"`);
       }
-      return { ...result, handoff, startDoc: docName || null };
+      return { ...result, handoff, startDoc: docName || null, schedule: schedule || null };
 
     } catch (err) {
       logger.error(`❌ ChatbotService.handleWhatsappMessage [${jid}]:`, err.message);

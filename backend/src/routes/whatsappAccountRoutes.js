@@ -4,10 +4,21 @@ const router  = express.Router();
 const { auth, requireRole } = require('../middleware/auth');
 const { WhatsappAccount, Company } = require('../models');
 
+// Resuelve el company_id para el usuario actual.
+// Superadmin sin company_id propio → usa la primera empresa del sistema.
+const resolveCompanyId = async (req) => {
+  if (req.user.company_id) return req.user.company_id;
+  if (req.user.role === 'superadmin') {
+    const first = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['id'] });
+    return first?.id || null;
+  }
+  return null;
+};
+
 // ── Obtener cuenta WA de la empresa ──────────────────────────
 router.get('/', auth, async (req, res) => {
   try {
-    const companyId = req.user.company_id;
+    const companyId = await resolveCompanyId(req);
     if (!companyId)
       return res.status(400).json({ success: false, message: 'Sin empresa asociada' });
 
@@ -27,12 +38,12 @@ router.get('/', auth, async (req, res) => {
 // ── Guardar desde Embedded Signup ────────────────────────────
 router.post('/embedded-signup', auth, requireRole('admin'), async (req, res) => {
   try {
-    const companyId = req.user.company_id;
+    const companyId = await resolveCompanyId(req);
     if (!companyId)
       return res.status(400).json({ success: false, message: 'Sin empresa asociada' });
 
     const {
-      code,           // código de autorización que devuelve Meta
+      code,
       phone_number_id,
       waba_id,
       access_token,
@@ -44,13 +55,11 @@ router.post('/embedded-signup', auth, requireRole('admin'), async (req, res) => 
     if (!phone_number_id || !access_token)
       return res.status(400).json({ success: false, message: 'phone_number_id y access_token son requeridos' });
 
-    // Desactivar cuenta anterior si existe
     await WhatsappAccount.update(
       { is_active: false },
       { where: { company_id: companyId } }
     );
 
-    // Crear nueva cuenta
     const account = await WhatsappAccount.create({
       company_id:      companyId,
       waba_id,
@@ -82,7 +91,7 @@ router.post('/embedded-signup', auth, requireRole('admin'), async (req, res) => 
 // ── Guardar configuración manual ─────────────────────────────
 router.post('/manual', auth, requireRole('admin'), async (req, res) => {
   try {
-    const companyId = req.user.company_id;
+    const companyId = await resolveCompanyId(req);
     if (!companyId)
       return res.status(400).json({ success: false, message: 'Sin empresa asociada' });
 
@@ -91,7 +100,6 @@ router.post('/manual', auth, requireRole('admin'), async (req, res) => {
     if (!phone_number_id || !access_token || !verify_token)
       return res.status(400).json({ success: false, message: 'phone_number_id, access_token y verify_token son requeridos' });
 
-    // Desactivar cuenta anterior
     await WhatsappAccount.update(
       { is_active: false },
       { where: { company_id: companyId } }
@@ -125,7 +133,9 @@ router.post('/manual', auth, requireRole('admin'), async (req, res) => {
 // ── Desconectar cuenta ────────────────────────────────────────
 router.delete('/', auth, requireRole('admin'), async (req, res) => {
   try {
-    const companyId = req.user.company_id;
+    const companyId = await resolveCompanyId(req);
+    if (!companyId)
+      return res.status(400).json({ success: false, message: 'Sin empresa asociada' });
     await WhatsappAccount.update(
       { is_active: false },
       { where: { company_id: companyId } }
@@ -139,7 +149,7 @@ router.delete('/', auth, requireRole('admin'), async (req, res) => {
 // ── Probar conexión con Meta ──────────────────────────────────
 router.post('/test', auth, requireRole('admin'), async (req, res) => {
   try {
-    const companyId = req.user.company_id;
+    const companyId = await resolveCompanyId(req);
     const account   = await WhatsappAccount.findOne({
       where: { company_id: companyId, is_active: true }
     });

@@ -30,6 +30,12 @@ const Contact = sequelize.define('contacts', {
     allowNull: true,
     comment: 'IG-SCOPED ID de Instagram'
   },
+  web_id: {
+    type: DataTypes.STRING,
+    unique: true,
+    allowNull: true,
+    comment: 'Session ID del widget de chat web'
+  },
 
   // Datos del contacto
   name: {

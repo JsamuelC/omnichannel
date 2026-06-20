@@ -6,14 +6,19 @@ const logger   = require('../config/logger');
 // ── Admin/Agent: obtiene SU empresa ──────────────────────────────────────────
 const getCompany = async (req, res) => {
   try {
-    const where = req.user.role === 'superadmin'
-      ? { id: req.query.company_id }    // superadmin puede consultar cualquiera
-      : { id: req.user.company_id };
+    let company;
 
-    if (!where.id)
-      return res.status(400).json({ success: false, message: 'company_id requerido.' });
+    if (req.user.role === 'superadmin') {
+      // Superadmin: si pasa company_id busca esa empresa, si no devuelve la primera
+      if (req.query.company_id) {
+        company = await Company.findByPk(req.query.company_id);
+      } else {
+        company = await Company.findOne({ order: [['created_at', 'ASC']] });
+      }
+    } else {
+      company = await Company.findByPk(req.user.company_id);
+    }
 
-    let company = await Company.findOne({ where });
     if (!company)
       return res.status(404).json({ success: false, message: 'Empresa no encontrada.' });
 
@@ -27,14 +32,20 @@ const getCompany = async (req, res) => {
 // ── Admin: actualiza SU empresa ───────────────────────────────────────────────
 const updateCompany = async (req, res) => {
   try {
-    const companyId = req.user.role === 'superadmin'
-      ? (req.body.id || req.query.company_id)
-      : req.user.company_id;
+    let companyId;
+    if (req.user.role === 'superadmin') {
+      companyId = req.body.id || req.query.company_id;
+    } else {
+      companyId = req.user.company_id;
+    }
 
-    if (!companyId)
-      return res.status(400).json({ success: false, message: 'company_id requerido.' });
+    let company;
+    if (companyId) {
+      company = await Company.findByPk(companyId);
+    } else if (req.user.role === 'superadmin') {
+      company = await Company.findOne({ order: [['created_at', 'ASC']] });
+    }
 
-    const company = await Company.findByPk(companyId);
     if (!company)
       return res.status(404).json({ success: false, message: 'Empresa no encontrada.' });
 
@@ -167,6 +178,10 @@ const ALLOWED_FEATURES = [
   'vouchers', 'appointments', 'document_templates', 'bot_ai',
   'flow_rules', 'quick_messages', 'labels', 'custom_modules',
   'bot_catalogs', 'dashboard', 'team_management', 'merge_templates',
+  'config_company_profile', 'config_info_panel', 'config_import_contacts',
+  'config_messenger', 'config_instagram', 'config_tiktok', 'config_telegram',
+  'config_bot_response', 'config_chat_routing', 'config_reports',
+  'config_integrations', 'config_widgets', 'config_plugins',
 ];
 
 const getFeatures = async (req, res) => {

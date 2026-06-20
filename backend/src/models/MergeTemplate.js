@@ -30,6 +30,21 @@ const MergeTemplate = sequelize.define('merge_templates', {
     allowNull: false,
     defaultValue: [],
   },
+  variable_mapping: {
+    type: DataTypes.JSONB,
+    allowNull: false,
+    defaultValue: {},
+  },
+  source_type: {
+    type: DataTypes.STRING(30),
+    allowNull: false,
+    defaultValue: 'manual',
+  },
+  auto_merge: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
   activo: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
@@ -51,6 +66,7 @@ const MergeTemplate = sequelize.define('merge_templates', {
     { fields: ['company_id'] },
     { fields: ['activo'] },
     { fields: ['canal'] },
+    { fields: ['auto_merge'] },
   ],
 });
 

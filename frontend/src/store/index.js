@@ -16,10 +16,23 @@ export const useAuthStore = create((set, get) => ({
   activeFeatures: null,  // active_features de la empresa del usuario
   isLoading:      false,
 
+  // Usado tras verificación de email para iniciar sesión directamente
+  _setSession: (token, user) => {
+    localStorage.setItem('token', token);
+    initSocket(user.id);
+    set({ user, token, permissions: user.permissions, activeFeatures: user.active_features ?? null });
+  },
+
   login: async (email, password) => {
     set({ isLoading: true });
     try {
       const res = await api.post('/auth/login', { email, password });
+      // Paso 1: backend envió OTP → necesita segundo factor
+      if (res.needs_otp) {
+        set({ isLoading: false });
+        return { success: true, needs_otp: true, debug_otp: res.debug_otp };
+      }
+      // Flujo directo (no debería ocurrir con OTP activo)
       const { token, user } = res.data;
       localStorage.setItem('token', token);
       initSocket(user.id);
@@ -27,7 +40,7 @@ export const useAuthStore = create((set, get) => ({
       return { success: true };
     } catch (error) {
       set({ isLoading: false });
-      return { success: false, message: error.message || 'Error de conexión.' };
+      return { success: false, message: error.message || 'Error de conexión.', code: error.code };
     }
   },
 
@@ -458,6 +471,22 @@ export const useMergeTemplateStore = create((set, get) => ({
 
   preview: async (contenido, datos) => {
     const res = await api.post('/merge-templates/preview', { contenido, datos });
+    return res.data;
+  },
+
+  detectAndMap: async (contenido) => {
+    const res = await api.post('/merge-templates/detect-map', { contenido });
+    return res.data;
+  },
+
+  updateMapping: async (id, variable_mapping) => {
+    const res = await api.put(`/merge-templates/${id}/mapping`, { variable_mapping });
+    set((s) => ({ templates: s.templates.map((t) => t.id === id ? res.data : t) }));
+    return res.data;
+  },
+
+  autoMergeForConversation: async (conversationId) => {
+    const res = await api.post(`/merge-templates/auto-merge/${conversationId}`);
     return res.data;
   },
 }));

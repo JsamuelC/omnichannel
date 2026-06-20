@@ -27,6 +27,13 @@ const appointmentCtrl         = require('../controllers/appointmentController');
 const templateCtrl            = require('../controllers/documentTemplateController');
 const docRequestCtrl          = require('../controllers/documentRequestController');
 const mergeTemplateCtrl       = require('../controllers/mergeTemplateController');
+const deployController        = require('../controllers/deployController');
+const widgetController        = require('../controllers/widgetController');
+const outlookController       = require('../controllers/outlookController');
+const googleCalendarController = require('../controllers/googleCalendarController');
+const planController          = require('../controllers/planController');
+const revenueController       = require('../controllers/revenueController');
+const companyPaymentController = require('../controllers/companyPaymentController');
 const { upload: tplUpload }   = require('../middleware/uploadTemplate');
 const { handleCatalogUpload, CATALOG_DIR } = require('../middleware/uploadCatalog');
 
@@ -54,8 +61,15 @@ router.get('/stats', auth, requireRole('admin'), requireFeature('dashboard'), st
 router.post('/auth/login',           authController.login.bind(authController));
 router.post('/auth/logout',          auth, authController.logout.bind(authController));
 router.get ('/auth/me',              auth, authController.me.bind(authController));
-router.post('/auth/forgot-password', authController.forgotPassword.bind(authController));
-router.post('/auth/reset-password',  authController.resetPassword.bind(authController));
+router.post('/auth/forgot-password',         authController.forgotPassword.bind(authController));
+router.post('/auth/reset-password',          authController.resetPassword.bind(authController));
+router.post('/auth/request-email-change',    auth, authController.requestEmailChange.bind(authController));
+router.get ('/auth/confirm-email-change/:token', authController.confirmEmailChange.bind(authController));
+router.put ('/auth/change-password',             auth, authController.changeOwnPassword.bind(authController));
+router.post('/auth/verify-login-otp',                 authController.verifyLoginOTP.bind(authController));
+router.post('/auth/resend-login-otp',                 authController.resendLoginOTP.bind(authController));
+router.post('/auth/verify-email',                     authController.verifyEmail.bind(authController));
+router.post('/auth/resend-verification',              authController.resendVerification.bind(authController));
 
 // Registro: admin crea cuentas para su empresa; superadmin puede crear en cualquier empresa
 router.post('/auth/register', auth, requireRole('admin'), authController.register.bind(authController));
@@ -69,6 +83,14 @@ router.put   ('/users/:id',          auth, requireRole('admin'), requireFeature(
 router.patch ('/users/:id/toggle',   auth, requireRole('admin'), requireFeature('team_management'), companyScope, userController.toggleActive.bind(userController));
 router.delete('/users/:id',          auth, requireRole('admin'), requireFeature('team_management'), companyScope, userController.remove.bind(userController));
 router.patch ('/users/:id/password', auth,                       companyScope, userController.changePassword.bind(userController));
+
+// ─────────────────────────────────────
+// WIDGET DE CHAT WEB (sin auth — público)
+// ─────────────────────────────────────
+router.post('/widget/init',                    widgetController.init);
+router.post('/widget/message',                 widgetController.sendMessage);
+router.get ('/widget/messages/:conversationId', widgetController.getMessages);
+router.get ('/widget/config/:companyId',        widgetController.getConfig);
 
 // ─────────────────────────────────────
 // WEBHOOKS META (sin auth — validados por HMAC)
@@ -99,11 +121,11 @@ router.delete('/transfer-criteria/:id',  auth, requireRole('admin'), transferCri
 // ─────────────────────────────────────
 // REGLAS DE FLUJO DEL BOT
 // ─────────────────────────────────────
-router.get   ('/flow-rules',          auth, requireFeature('flow_rules'), flowRuleController.getAll);
-router.post  ('/flow-rules',          auth, requireRole('admin'), requireFeature('flow_rules'), flowRuleController.create);
-router.put   ('/flow-rules/:id',      auth, requireRole('admin'), requireFeature('flow_rules'), flowRuleController.update);
-router.patch ('/flow-rules/:id/toggle', auth, requireRole('admin'), requireFeature('flow_rules'), flowRuleController.toggle);
-router.delete('/flow-rules/:id',      auth, requireRole('admin'), requireFeature('flow_rules'), flowRuleController.remove);
+router.get   ('/flow-rules',          auth, requireFeature('flow_rules'), companyScope, flowRuleController.getAll);
+router.post  ('/flow-rules',          auth, requireRole('admin'), requireFeature('flow_rules'), companyScope, flowRuleController.create);
+router.put   ('/flow-rules/:id',      auth, requireRole('admin'), requireFeature('flow_rules'), companyScope, flowRuleController.update);
+router.patch ('/flow-rules/:id/toggle', auth, requireRole('admin'), requireFeature('flow_rules'), companyScope, flowRuleController.toggle);
+router.delete('/flow-rules/:id',      auth, requireRole('admin'), requireFeature('flow_rules'), companyScope, flowRuleController.remove);
 
 // ─────────────────────────────────────
 // MÓDULOS PERSONALIZADOS
@@ -124,11 +146,11 @@ router.delete('/module-records/:id',          auth, requireRole('admin'), requir
 // ─────────────────────────────────────
 // MENSAJES RÁPIDOS
 // ─────────────────────────────────────
-router.get   ('/quick-messages',        auth, requireFeature('quick_messages'), quickMessageController.getAll);
-router.get   ('/quick-messages/admin',  auth, requireRole('admin'), requireFeature('quick_messages'), quickMessageController.getAllAdmin);
-router.post  ('/quick-messages',        auth, requireRole('admin'), requireFeature('quick_messages'), quickMessageController.create);
-router.put   ('/quick-messages/:id',    auth, requireRole('admin'), requireFeature('quick_messages'), quickMessageController.update);
-router.delete('/quick-messages/:id',    auth, requireRole('admin'), requireFeature('quick_messages'), quickMessageController.remove);
+router.get   ('/quick-messages',        auth, requireFeature('quick_messages'), companyScope, quickMessageController.getAll);
+router.get   ('/quick-messages/admin',  auth, requireRole('admin'), requireFeature('quick_messages'), companyScope, quickMessageController.getAllAdmin);
+router.post  ('/quick-messages',        auth, requireRole('admin'), requireFeature('quick_messages'), companyScope, quickMessageController.create);
+router.put   ('/quick-messages/:id',    auth, requireRole('admin'), requireFeature('quick_messages'), companyScope, quickMessageController.update);
+router.delete('/quick-messages/:id',    auth, requireRole('admin'), requireFeature('quick_messages'), companyScope, quickMessageController.remove);
 
 // ─────────────────────────────────────
 // CONVERSACIONES
@@ -170,12 +192,12 @@ router.post  ('/bot-configs/test', auth, botConfigController.test.bind(botConfig
 // ─────────────────────────────────────
 // CAMPAÑAS MASIVAS — solo admin
 // ─────────────────────────────────────
-router.get   ('/campaigns',             auth, requireRole('admin'), requireFeature('campaigns'), campaignController.getAll.bind(campaignController));
-router.get   ('/campaigns/:id',         auth, requireRole('admin'), requireFeature('campaigns'), campaignController.getOne.bind(campaignController));
-router.post  ('/campaigns',             auth, requireRole('admin'), requireFeature('campaigns'), campaignController.create.bind(campaignController));
-router.post  ('/campaigns/:id/launch',  auth, requireRole('admin'), requireFeature('campaigns'), campaignController.launch.bind(campaignController));
-router.post  ('/campaigns/:id/pause',   auth, requireRole('admin'), requireFeature('campaigns'), campaignController.pause.bind(campaignController));
-router.delete('/campaigns/:id',         auth, requireRole('admin'), requireFeature('campaigns'), campaignController.delete.bind(campaignController));
+router.get   ('/campaigns',             auth, requireRole('admin'), requireFeature('campaigns'), companyScope, campaignController.getAll.bind(campaignController));
+router.get   ('/campaigns/:id',         auth, requireRole('admin'), requireFeature('campaigns'), companyScope, campaignController.getOne.bind(campaignController));
+router.post  ('/campaigns',             auth, requireRole('admin'), requireFeature('campaigns'), companyScope, campaignController.create.bind(campaignController));
+router.post  ('/campaigns/:id/launch',  auth, requireRole('admin'), requireFeature('campaigns'), companyScope, campaignController.launch.bind(campaignController));
+router.post  ('/campaigns/:id/pause',   auth, requireRole('admin'), requireFeature('campaigns'), companyScope, campaignController.pause.bind(campaignController));
+router.delete('/campaigns/:id',         auth, requireRole('admin'), requireFeature('campaigns'), companyScope, campaignController.delete.bind(campaignController));
 
 // ─────────────────────────────────────
 // INTEGRACIONES CON PLATAFORMAS EXTERNAS
@@ -246,27 +268,32 @@ router.patch('/contacts/:id', auth, companyScope, async (req, res) => {
 // ─────────────────────────────────────
 // CATÁLOGOS DEL BOT
 // ─────────────────────────────────────
-router.get('/bot-catalogs', auth, requireFeature('bot_catalogs'), async (req, res) => {
+router.get('/bot-catalogs', auth, companyScope, requireFeature('bot_catalogs'), async (req, res) => {
   try {
-    const catalogs = await BotCatalog.findAll({ order: [['created_at', 'DESC']] });
+    const catalogs = await BotCatalog.findAll({
+      where: req.companyFilter || {},
+      order: [['created_at', 'DESC']],
+    });
     res.json({ success: true, data: catalogs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-router.post('/bot-catalogs', auth, requireRole('admin'), requireFeature('bot_catalogs'), async (req, res) => {
+router.post('/bot-catalogs', auth, companyScope, requireRole('admin'), requireFeature('bot_catalogs'), async (req, res) => {
   try {
     const { nombre, identificador, tipo, descripcion, contenido } = req.body;
     if (!nombre?.trim())        return res.status(400).json({ success: false, message: 'El nombre es obligatorio' });
     if (!identificador?.trim()) return res.status(400).json({ success: false, message: 'El identificador es obligatorio' });
-    const slug = identificador.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    const slug       = identificador.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    const company_id = req.user?.role === 'superadmin' ? null : req.user?.company_id;
     const catalog = await BotCatalog.create({
       nombre: nombre.trim(),
       identificador: slug,
       tipo:          tipo || 'general',
       descripcion:   descripcion?.trim() || null,
-      contenido:     contenido || ''
+      contenido:     contenido || '',
+      company_id,
     });
     res.json({ success: true, data: catalog });
   } catch (error) {
@@ -277,9 +304,9 @@ router.post('/bot-catalogs', auth, requireRole('admin'), requireFeature('bot_cat
   }
 });
 
-router.put('/bot-catalogs/:id', auth, requireRole('admin'), requireFeature('bot_catalogs'), async (req, res) => {
+router.put('/bot-catalogs/:id', auth, companyScope, requireRole('admin'), requireFeature('bot_catalogs'), async (req, res) => {
   try {
-    const catalog = await BotCatalog.findByPk(req.params.id);
+    const catalog = await BotCatalog.findOne({ where: { id: req.params.id, ...(req.companyFilter || {}) } });
     if (!catalog) return res.status(404).json({ success: false, message: 'Catálogo no encontrado' });
     const updates = {};
     const { nombre, identificador, tipo, descripcion, contenido, activo } = req.body;
@@ -301,14 +328,14 @@ router.put('/bot-catalogs/:id', auth, requireRole('admin'), requireFeature('bot_
 
 // Subir archivo a un catálogo (POST crea/reemplaza, DELETE quita el archivo)
 router.post('/bot-catalogs/:id/file',
-  auth, requireRole('admin'), requireFeature('bot_catalogs'),
+  auth, companyScope, requireRole('admin'), requireFeature('bot_catalogs'),
   handleCatalogUpload,
   async (req, res) => {
     const pathMod = require('path');
     const fs      = require('fs');
     const logger  = require('../config/logger');
     try {
-      const catalog = await BotCatalog.findByPk(req.params.id);
+      const catalog = await BotCatalog.findOne({ where: { id: req.params.id, ...(req.companyFilter || {}) } });
       if (!catalog) return res.status(404).json({ success: false, message: 'Catálogo no encontrado' });
       if (!req.file)  return res.status(400).json({ success: false, message: 'Archivo requerido' });
 
@@ -350,11 +377,11 @@ router.post('/bot-catalogs/:id/file',
   }
 );
 
-router.delete('/bot-catalogs/:id/file', auth, requireRole('admin'), requireFeature('bot_catalogs'), async (req, res) => {
+router.delete('/bot-catalogs/:id/file', auth, companyScope, requireRole('admin'), requireFeature('bot_catalogs'), async (req, res) => {
   try {
     const pathMod = require('path');
     const fs      = require('fs');
-    const catalog = await BotCatalog.findByPk(req.params.id);
+    const catalog = await BotCatalog.findOne({ where: { id: req.params.id, ...(req.companyFilter || {}) } });
     if (!catalog) return res.status(404).json({ success: false, message: 'Catálogo no encontrado' });
     if (catalog.archivo_url) {
       const filePath = pathMod.join(__dirname, '../..', catalog.archivo_url);
@@ -367,11 +394,11 @@ router.delete('/bot-catalogs/:id/file', auth, requireRole('admin'), requireFeatu
   }
 });
 
-router.delete('/bot-catalogs/:id', auth, requireRole('admin'), requireFeature('bot_catalogs'), async (req, res) => {
+router.delete('/bot-catalogs/:id', auth, companyScope, requireRole('admin'), requireFeature('bot_catalogs'), async (req, res) => {
   try {
     const pathMod = require('path');
     const fs      = require('fs');
-    const catalog = await BotCatalog.findByPk(req.params.id);
+    const catalog = await BotCatalog.findOne({ where: { id: req.params.id, ...(req.companyFilter || {}) } });
     if (!catalog) return res.status(404).json({ success: false, message: 'Catálogo no encontrado' });
     // Eliminar archivo físico asociado
     if (catalog.archivo_url) {
@@ -511,14 +538,17 @@ router.use('/uploads/generated', require('express').static(
 // ─────────────────────────────────────
 router.post  ('/merge-templates/variables',    auth, requireFeature('merge_templates'), mergeTemplateCtrl.getVariables.bind(mergeTemplateCtrl));
 router.post  ('/merge-templates/preview',      auth, requireFeature('merge_templates'), mergeTemplateCtrl.preview.bind(mergeTemplateCtrl));
+router.post  ('/merge-templates/detect-map',   auth, requireFeature('merge_templates'), mergeTemplateCtrl.detectAndMap.bind(mergeTemplateCtrl));
 router.get   ('/merge-templates',              auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.list.bind(mergeTemplateCtrl));
 router.post  ('/merge-templates',              auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.create.bind(mergeTemplateCtrl));
 router.get   ('/merge-templates/:id',          auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.getOne.bind(mergeTemplateCtrl));
 router.put   ('/merge-templates/:id',          auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.update.bind(mergeTemplateCtrl));
 router.delete('/merge-templates/:id',          auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.remove.bind(mergeTemplateCtrl));
 router.patch ('/merge-templates/:id/toggle',   auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.toggleActive.bind(mergeTemplateCtrl));
+router.put   ('/merge-templates/:id/mapping',  auth, requireRole('admin'), requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.updateMapping.bind(mergeTemplateCtrl));
 router.post  ('/merge-templates/:id/merge',    auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.merge.bind(mergeTemplateCtrl));
 router.post  ('/merge-templates/:id/use/:conversationId', auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.useInConversation.bind(mergeTemplateCtrl));
+router.post  ('/merge-templates/auto-merge/:conversationId', auth, requireFeature('merge_templates'), companyScope, mergeTemplateCtrl.autoMergeForConversation.bind(mergeTemplateCtrl));
 
 // ─────────────────────────────────────
 // COMPROBANTES DE PAGO
@@ -526,6 +556,61 @@ router.post  ('/merge-templates/:id/use/:conversationId', auth, requireFeature('
 router.use('/vouchers', auth, requireFeature('vouchers'), voucherRoutes);
 console.log('✅ WhatsApp routes cargadas');
 router.use('/whatsapp', whatsappRoutes);
+// ─────────────────────────────────────
+// OUTLOOK CALENDAR
+// ─────────────────────────────────────
+router.get ('/outlook/status',     auth, requireFeature('appointments'), outlookController.status);
+router.get ('/outlook/connect',    auth, requireRole('admin'), requireFeature('appointments'), outlookController.connect);
+router.get ('/outlook/callback',   outlookController.callback);   // sin auth — viene de Microsoft
+router.delete('/outlook/disconnect', auth, requireRole('admin'), requireFeature('appointments'), outlookController.disconnect);
+router.get ('/outlook/events',     auth, requireFeature('appointments'), outlookController.getEvents);
+
+// ─────────────────────────────────────
+// GOOGLE CALENDAR
+// ─────────────────────────────────────
+router.get   ('/gcal/status',     auth, requireFeature('appointments'), googleCalendarController.status);
+router.get   ('/gcal/connect',    auth, requireRole('admin'), requireFeature('appointments'), googleCalendarController.connect);
+router.get   ('/gcal/callback',   googleCalendarController.callback);  // sin auth — viene de Google
+router.delete('/gcal/disconnect', auth, requireRole('admin'), requireFeature('appointments'), googleCalendarController.disconnect);
+router.get   ('/gcal/events',     auth, requireFeature('appointments'), googleCalendarController.getEvents);
+
+// ─────────────────────────────────────
+// PLANES Y FACTURACIÓN (solo superadmin)
+// ─────────────────────────────────────
+router.get   ('/plans/presets',            auth, requireSuperAdmin, planController.getPresets);
+router.post  ('/plans/presets',            auth, requireSuperAdmin, planController.createPreset);
+router.put   ('/plans/presets/:key',       auth, requireSuperAdmin, planController.updatePreset);
+router.delete('/plans/presets/:key',       auth, requireSuperAdmin, planController.deletePreset);
+router.get   ('/plans/overview',           auth, requireSuperAdmin, planController.getOverview);
+router.get   ('/plans/billing-alerts',     auth, requireSuperAdmin, planController.getBillingAlerts);
+router.get   ('/plans/company/:id',        auth, requireSuperAdmin, planController.getCompanyPlan);
+router.put   ('/plans/company/:id',        auth, requireSuperAdmin, planController.updateCompanyPlan);
+
+// ─────────────────────────────────────
+// INGRESOS / REVENUE (solo superadmin — panel exclusivo dueños)
+// ─────────────────────────────────────
+router.get('/revenue/summary',             auth, requireSuperAdmin, revenueController.getSummary);
+router.get('/revenue/companies',           auth, requireSuperAdmin, revenueController.getCompanies);
+router.put('/revenue/companies/:id/billing', auth, requireSuperAdmin, revenueController.updateBilling);
+router.get('/revenue/admins',              auth, requireSuperAdmin, revenueController.getAdmins);
+
+// ─────────────────────────────────────
+// PAGOS DE EMPRESAS (solo superadmin)
+// ─────────────────────────────────────
+router.get   ('/company-payments',          auth, requireSuperAdmin, companyPaymentController.list);
+router.post  ('/company-payments',          auth, requireSuperAdmin, companyPaymentController.upload, companyPaymentController.create);
+router.put   ('/company-payments/:id',      auth, requireSuperAdmin, companyPaymentController.upload, companyPaymentController.update);
+router.delete('/company-payments/:id',      auth, requireSuperAdmin, companyPaymentController.remove);
+router.get   ('/company-payments/:id/receipt', auth, requireSuperAdmin, companyPaymentController.getReceipt);
+
+// ─────────────────────────────────────
+// DEPLOY / CI-CD (solo superadmin)
+// ─────────────────────────────────────
+router.get ('/deploy/status',        auth, requireSuperAdmin, deployController.getStatus);
+router.post('/deploy/trigger-qa',    auth, requireSuperAdmin, deployController.triggerQA);
+router.post('/deploy/trigger-prod',  auth, requireSuperAdmin, deployController.triggerProd);
+router.get ('/deploy/run/:runId/logs-url', auth, requireSuperAdmin, deployController.getLogsUrl);
+
 // ─────────────────────────────────────
 // EMPRESA
 // ─────────────────────────────────────

@@ -27,6 +27,7 @@ const BusinessSchedule   = require('./BusinessSchedule');
 const DocumentTemplate   = require('./DocumentTemplate');
 const DocumentRequest    = require('./DocumentRequest');
 const MergeTemplate      = require('./MergeTemplate');
+const CompanyPayment     = require('./CompanyPayment');
 
 // ============================
 // ASOCIACIONES ORIGINALES
@@ -75,7 +76,53 @@ const migrate = async () => {
   };
 
   try {
+    // ── Pre-migración: columnas que deben existir ANTES del primer sync ──────
+    // (si el modelo declara un índice sobre una columna nueva, sync falla si la
+    //  columna no existe aún en la tabla).
+    const preCols = [
+      { table: 'integrations', col: 'company_id',          def: { type: DT.UUID,        allowNull: true } },
+      { table: 'bot_files',    col: 'company_id',          def: { type: DT.UUID,        allowNull: true } },
+      { table: 'bot_catalogs', col: 'company_id',          def: { type: DT.UUID,        allowNull: true } },
+      { table: 'users',        col: 'pending_email',        def: { type: DT.STRING,      allowNull: true } },
+      { table: 'users',        col: 'email_change_token',   def: { type: DT.STRING(200), allowNull: true } },
+      { table: 'users',        col: 'email_change_expires', def: { type: DT.DATE,        allowNull: true } },
+      { table: 'users',        col: 'online_started_at',          def: { type: DT.DATE,        allowNull: true } },
+      { table: 'users',        col: 'total_online_minutes',       def: { type: DT.INTEGER,     defaultValue: 0,    allowNull: false } },
+      { table: 'users', col: 'email_verified',             def: { type: DT.BOOLEAN,    defaultValue: false,                   allowNull: false } },
+      { table: 'users', col: 'email_verification_code',    def: { type: DT.STRING(6),  allowNull: true } },
+      { table: 'users', col: 'email_verification_expires', def: { type: DT.DATE,       allowNull: true } },
+      // Campos extendidos de perfil
+      { table: 'users', col: 'cedula',               def: { type: DT.STRING(20),  allowNull: true } },
+      { table: 'users', col: 'identificacion',        def: { type: DT.STRING(50),  allowNull: true } },
+      { table: 'users', col: 'genero',                def: { type: DT.STRING(30),  allowNull: true } },
+      { table: 'users', col: 'fecha_nacimiento',      def: { type: DT.DATEONLY,    allowNull: true } },
+      { table: 'users', col: 'fecha_incorporacion',   def: { type: DT.DATEONLY,    allowNull: true } },
+      { table: 'users', col: 'idioma_preferido',      def: { type: DT.STRING(10),  allowNull: true, defaultValue: 'es' } },
+      { table: 'users', col: 'zona_horaria',          def: { type: DT.STRING(60),  allowNull: true, defaultValue: 'America/Santo_Domingo' } },
+      { table: 'users', col: 'movil',                 def: { type: DT.STRING(30),  allowNull: true } },
+      { table: 'users', col: 'telefono',              def: { type: DT.STRING(30),  allowNull: true } },
+      { table: 'users', col: 'extension_telefono',    def: { type: DT.STRING(10),  allowNull: true } },
+      // OTP de inicio de sesión
+      { table: 'users', col: 'login_otp',             def: { type: DT.STRING(6),   allowNull: true } },
+      { table: 'users', col: 'login_otp_expires',     def: { type: DT.DATE,        allowNull: true } },
+      // Google Calendar
+      { table: 'company',       col: 'google_calendar_tokens', def: { type: DT.JSONB,       allowNull: true, defaultValue: null } },
+      { table: 'appointments',  col: 'google_event_id',        def: { type: DT.STRING(500), allowNull: true } },
+    ];
+    for (const { table, col, def } of preCols) {
+      await safeAdd(table, col, def);
+    }
+
     await sequelize.sync({ force: false });
+
+    // Marcar como verificados los usuarios que existían ANTES de esta feature
+    // (columna recién agregada viene en NULL o false para registros previos)
+    try {
+      await sequelize.query(
+        `UPDATE users SET email_verified = true WHERE email_verified IS NOT TRUE AND created_at < NOW() - INTERVAL '1 minute'`
+      );
+      logger.info('  ✅ Usuarios existentes marcados como email_verified');
+    } catch (e) { logger.warn('  ⚠️  No se pudo marcar usuarios existentes:', e.message); }
 
     // Garantizar que las tablas de módulos existan SIEMPRE, independientemente del alter
     await CustomModule.sync({ force: false });
@@ -96,6 +143,7 @@ const migrate = async () => {
     await safeSync(DocumentTemplate);
     await safeSync(DocumentRequest);
     await safeSync(MergeTemplate);
+    await safeSync(CompanyPayment);
     await safeAdd('merge_templates', 'canal', { type: DT.STRING(30), allowNull: false, defaultValue: 'all' });
 
     // Agregar trigger_keywords a document_templates si no existe
@@ -103,7 +151,7 @@ const migrate = async () => {
 
     // Corregir columnas INTEGER → UUID en appointments y document_templates
     // PostgreSQL no permite cambiar INTEGER a UUID directamente; drop + add es seguro en tablas nuevas
-    for (const [table, col] of [['appointments','created_by'],['appointments','assigned_to'],['document_templates','created_by']]) {
+    for (const [table, col] of [['appointments','created_by'],['appointments','assigned_to'],['document_templates','created_by'],['module_records','created_by'],['module_records','conversation_id']]) {
       try {
         await sequelize.query(`
           DO $$ BEGIN
@@ -174,6 +222,22 @@ const migrate = async () => {
       `);
     } catch (_) {}
 
+    // Agregar config-menu features a empresas existentes
+    const configFeatureKeys = [
+      'config_company_profile', 'config_info_panel', 'config_import_contacts',
+      'config_messenger', 'config_instagram', 'config_tiktok', 'config_telegram',
+      'config_bot_response', 'config_chat_routing', 'config_reports',
+      'config_integrations', 'config_widgets', 'config_plugins',
+    ];
+    for (const feat of configFeatureKeys) {
+      try {
+        await sequelize.query(`
+          UPDATE company SET active_features = active_features || '{"${feat}":true}'::jsonb
+          WHERE active_features IS NOT NULL AND NOT (active_features ? '${feat}')
+        `);
+      } catch (_) {}
+    }
+
     // ── Migración multi-tenant y recuperación de contraseña ──────────────
     // Nuevas columnas en users
     await safeAdd('users', 'reset_token',         { type: DT.STRING(200), allowNull: true });
@@ -182,11 +246,20 @@ const migrate = async () => {
     // company_id en tablas que aún no lo tengan
     const tablasTenant = [
       'whatsapp_chats', 'campaigns', 'labels',
-      'quick_messages', 'custom_modules', 'module_records'
+      'quick_messages', 'custom_modules', 'module_records',
+      'flow_rules', 'integrations'
     ];
     for (const t of tablasTenant) {
       await safeAdd(t, 'company_id', { type: DT.UUID, allowNull: true });
     }
+
+    // Agregar 'web' al ENUM de canales si aún no existe
+    try {
+      await sequelize.query(`ALTER TYPE "enum_conversations_channel" ADD VALUE IF NOT EXISTS 'web'`);
+    } catch (_) {}
+
+    // Agregar web_id a contacts
+    await safeAdd('contacts', 'web_id', { type: DT.STRING, allowNull: true, unique: true });
 
     // Agregar 'superadmin' al ENUM de roles si aún no existe
     try {
@@ -211,6 +284,15 @@ const migrate = async () => {
           { t: 'module_records', extra: '' },
           { t: 'payment_vouchers', extra: '' },
           { t: 'bot_configs',    extra: '' },
+          { t: 'flow_rules',    extra: '' },
+          { t: 'integrations',  extra: '' },
+          { t: 'bot_files',           extra: '' },
+          { t: 'bot_catalogs',        extra: '' },
+          { t: 'document_templates',  extra: '' },
+          { t: 'document_requests',   extra: '' },
+          { t: 'appointments',        extra: '' },
+          { t: 'business_schedules',  extra: '' },
+          { t: 'merge_templates',     extra: '' },
         ];
         for (const { t, extra } of tablasPoblar) {
           try {
@@ -270,5 +352,6 @@ module.exports = {
   DocumentTemplate,
   DocumentRequest,
   MergeTemplate,
+  CompanyPayment,
   migrate
 };

@@ -118,6 +118,9 @@ whatsappService.setSocketIO(io);
 // ─────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
 
+// CORS abierto para rutas del widget
+app.use('/api/widget', cors({ origin: '*', methods: ['GET', 'POST'] }));
+
 app.use(cors({
   origin:         process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials:    true,
@@ -166,6 +169,12 @@ app.get('/', (req, res) => {
 // IMPORTANTE: debe ir ANTES de notFound para que no sea interceptado
 // ─────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Widget JS público — servido sin auth con CORS abierto
+app.get('/widget.js', (req, res) => {
+  res.set({ 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=3600' });
+  res.sendFile(path.join(__dirname, '../public/widget.js'));
+});
 
 app.use('/api', routes);
 app.use(notFound);

@@ -122,7 +122,7 @@ router.get('/session/:sessionId/chat/:jid/config', auth, async (req, res) => {
     const jid           = decodeURIComponent(req.params.jid);
     const [chat] = await WhatsappChat.findOrCreate({
       where:    { session_id: sessionId, jid },
-      defaults: { session_id: sessionId, jid, bot_enabled: false, session_type: 'personal' }
+      defaults: { session_id: sessionId, jid, bot_enabled: true, session_type: 'personal' }
     });
     res.json({ success: true, data: chat });
   } catch (err) {
@@ -387,7 +387,7 @@ router.get('/business/chat/:jid/config', auth, async (req, res) => {
     const jid       = decodeURIComponent(req.params.jid);
     const [chat] = await WhatsappChat.findOrCreate({
       where:    { session_id: sessionId, jid },
-      defaults: { session_id: sessionId, jid, bot_enabled: false, session_type: 'business', bot_mode: 'generic' }
+      defaults: { session_id: sessionId, jid, bot_enabled: true, session_type: 'business', bot_mode: 'generic' }
     });
     res.json({ success: true, data: chat });
   } catch (err) {

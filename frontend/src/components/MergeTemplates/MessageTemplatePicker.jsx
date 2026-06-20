@@ -2,13 +2,20 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
-const VAR_LABELS = {
-  nombre_cliente: 'Nombre',
-  telefono: 'Teléfono',
-  email: 'Email',
-  numero_ticket: 'N° Ticket',
-  numero_pedido: 'N° Pedido',
-  fecha: 'Fecha',
+const SOURCE_LABELS = {
+  contact: 'Contacto',
+  chatbot: 'Chatbot',
+  system: 'Sistema',
+  conversation: 'Conversacion',
+  static: 'Fijo',
+};
+
+const SOURCE_COLORS = {
+  contact:      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  chatbot:      'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  system:       'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  conversation: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+  static:       'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
 };
 
 export default function MessageTemplatePicker({ conversationId, onInsert, onClose }) {
@@ -19,6 +26,7 @@ export default function MessageTemplatePicker({ conversationId, onInsert, onClos
   const [resultado, setResultado] = useState(null);
   const [merging, setMerging]     = useState(false);
   const [search, setSearch]       = useState('');
+  const [autoResolved, setAutoResolved] = useState(false);
 
   useEffect(() => {
     api.get('/merge-templates?activo=true')
@@ -34,14 +42,22 @@ export default function MessageTemplatePicker({ conversationId, onInsert, onClos
   const handleSelect = async (tpl) => {
     setSelected(tpl);
     setResultado(null);
+    setAutoResolved(false);
+
     if (!conversationId) {
       setDatos(Object.fromEntries((tpl.variables || []).map((v) => [v, ''])));
       return;
     }
+
     try {
       const res = await api.post(`/merge-templates/${tpl.id}/use/${conversationId}`, { datos: {} });
       setDatos(res.data.datosResueltos || {});
       setResultado(res.data.resultado);
+      const hasUnresolved = (res.data.variablesSinValor || []).length > 0;
+      setAutoResolved(!hasUnresolved);
+      if (!hasUnresolved) {
+        toast.success('Variables resueltas automaticamente');
+      }
     } catch {
       setDatos(Object.fromEntries((tpl.variables || []).map((v) => [v, ''])));
     }
@@ -54,6 +70,8 @@ export default function MessageTemplatePicker({ conversationId, onInsert, onClos
       if (conversationId) {
         const res = await api.post(`/merge-templates/${selected.id}/use/${conversationId}`, { datos });
         setResultado(res.data.resultado);
+        const hasUnresolved = (res.data.variablesSinValor || []).length > 0;
+        setAutoResolved(!hasUnresolved);
       } else {
         const res = await api.post(`/merge-templates/${selected.id}/merge`, { datos });
         setResultado(res.data.resultado);
@@ -71,7 +89,7 @@ export default function MessageTemplatePicker({ conversationId, onInsert, onClos
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] flex flex-col">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
-            <h3 className="font-bold text-slate-800 dark:text-white">Plantillas de mensaje</h3>
+            <h3 className="font-bold text-slate-800 dark:text-white">Plantillas auto-merge</h3>
             <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
@@ -90,13 +108,21 @@ export default function MessageTemplatePicker({ conversationId, onInsert, onClos
                 {filtered.map((tpl) => (
                   <button key={tpl.id} onClick={() => handleSelect(tpl)}
                     className="w-full text-left p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{tpl.nombre}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-white truncate flex-1">{tpl.nombre}</p>
+                      {tpl.auto_merge && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">Auto</span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">{tpl.contenido?.substring(0, 80)}</p>
                     {tpl.variables?.length > 0 && (
                       <div className="flex gap-1 mt-1.5 flex-wrap">
-                        {tpl.variables.slice(0, 4).map((v) => (
-                          <span key={v} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-mono">{`{${v}}`}</span>
-                        ))}
+                        {tpl.variables.slice(0, 4).map((v) => {
+                          const src = tpl.variable_mapping?.[v]?.source || 'chatbot';
+                          return (
+                            <span key={v} className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${SOURCE_COLORS[src]}`}>{`{${v}}`}</span>
+                          );
+                        })}
                       </div>
                     )}
                   </button>
@@ -109,15 +135,22 @@ export default function MessageTemplatePicker({ conversationId, onInsert, onClos
     );
   }
 
+  const mapping = selected.variable_mapping || {};
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-2">
-            <button onClick={() => setSelected(null)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400">
+            <button onClick={() => { setSelected(null); setAutoResolved(false); }} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
             <h3 className="font-bold text-slate-800 dark:text-white truncate">{selected.nombre}</h3>
+            {autoResolved && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                Auto-resuelto
+              </span>
+            )}
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -128,14 +161,30 @@ export default function MessageTemplatePicker({ conversationId, onInsert, onClos
           {(selected.variables || []).length > 0 && (
             <div className="space-y-3">
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Variables</p>
-              {selected.variables.map((v) => (
-                <div key={v}>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{VAR_LABELS[v] || v}</label>
-                  <input value={datos[v] || ''} onChange={(e) => { setDatos((p) => ({ ...p, [v]: e.target.value })); setResultado(null); }}
-                    placeholder={`{${v}}`}
-                    className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500" />
-                </div>
-              ))}
+              {selected.variables.map((v) => {
+                const m = mapping[v];
+                const source = m?.source || 'chatbot';
+                const hasValue = datos[v] && datos[v].trim() !== '';
+                return (
+                  <div key={v}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">{v}</label>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${SOURCE_COLORS[source]}`}>
+                        {SOURCE_LABELS[source]}
+                      </span>
+                      {hasValue && source !== 'chatbot' && (
+                        <span className="text-[9px] text-green-500 font-medium">auto</span>
+                      )}
+                    </div>
+                    <input value={datos[v] || ''} onChange={(e) => { setDatos((p) => ({ ...p, [v]: e.target.value })); setResultado(null); setAutoResolved(false); }}
+                      placeholder={`{${v}}`}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 ${hasValue && source !== 'chatbot'
+                        ? 'border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/10 text-slate-800 dark:text-slate-200'
+                        : 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
+                      }`} />
+                  </div>
+                );
+              })}
               <button onClick={handleMerge} disabled={merging}
                 className="w-full py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-sm font-medium text-slate-700 dark:text-slate-200 rounded-lg transition-colors">
                 {merging ? 'Procesando...' : 'Actualizar vista previa'}
