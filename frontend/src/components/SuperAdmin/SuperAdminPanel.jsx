@@ -1,9 +1,4 @@
-<<<<<<< HEAD
 ﻿// frontend/src/components/SuperAdmin/SuperAdminPanel.jsx
-// Panel exclusivo del SuperAdministrador para gestionar empresas y sus feature flags
-=======
-// frontend/src/components/SuperAdmin/SuperAdminPanel.jsx
->>>>>>> 442748dd687a56f7b037ab07433682f4e5a228d3
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, ToggleLeft, Rocket, CreditCard, Trash2, Plus, SlidersHorizontal, Loader2, AlertTriangle, X, TrendingUp } from 'lucide-react';
