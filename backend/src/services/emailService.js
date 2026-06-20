@@ -2,8 +2,8 @@ const https = require('https');
 const logger = require('../config/logger');
 
 // ── Zoho OAuth2 token manager ─────────────────────────────────────────────────
-let _cachedToken   = process.env.ZOHO_MAIL_TOKEN || null;
-let _tokenExpiry   = Date.now() + 3500 * 1000; // ~1h menos margen
+let _cachedToken   = null;
+let _tokenExpiry   = 0;
 
 async function getZohoToken() {
   if (_cachedToken && Date.now() < _tokenExpiry) return _cachedToken;
