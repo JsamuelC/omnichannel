@@ -4,7 +4,7 @@ import {
   TrendingUp, AlertTriangle, CheckCircle, Clock, ChevronDown,
   ChevronUp, Save, DollarSign, Calendar, XCircle, FileText,
   LayoutGrid, Loader2, ArrowLeft, Plus, Pencil, Trash2,
-  BarChart2, RefreshCw, X,
+  BarChart2, RefreshCw, X, Upload, Receipt, Eye, CreditCard,
 } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -75,6 +75,297 @@ function LimitInput({ icon, label, value, onChange }) {
           {isUnlimited && <span className="text-xs text-emerald-400 whitespace-nowrap font-semibold">∞</span>}
         </div>
       </div>
+    </div>
+  );
+}
+
+const PAYMENT_METHODS = [
+  { value: 'bank_transfer',   label: 'Transferencia bancaria' },
+  { value: 'cash',            label: 'Efectivo' },
+  { value: 'card',            label: 'Tarjeta' },
+  { value: 'mobile_payment',  label: 'Pago móvil' },
+  { value: 'check',           label: 'Cheque' },
+  { value: 'paypal',          label: 'PayPal' },
+  { value: 'other',           label: 'Otro' },
+];
+
+const STATUS_PAYMENT = {
+  confirmed: { label: 'Confirmado', color: 'bg-emerald-500/20 text-emerald-400' },
+  pending:   { label: 'Pendiente',  color: 'bg-amber-500/20 text-amber-400' },
+  refunded:  { label: 'Reembolsado', color: 'bg-red-500/20 text-red-400' },
+};
+
+// ── Sección pagos de empresa ─────────────────────────────────────────────────
+
+function CompanyPayments({ companyId, companyName }) {
+  const [payments,  setPayments]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [showForm,  setShowForm]  = useState(false);
+  const [saving,    setSaving]    = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [preview,   setPreview]   = useState(null);
+  const [form, setForm] = useState({
+    amount: '', currency: 'USD', payment_method: 'bank_transfer',
+    reference_number: '', payment_date: new Date().toISOString().split('T')[0],
+    period_covered: '', notes: '', status: 'confirmed',
+  });
+  const [receiptFile, setReceiptFile] = useState(null);
+
+  const fetchPayments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get(`/company-payments?company_id=${companyId}&limit=50`);
+      setPayments(res.data?.payments || []);
+    } catch { toast.error('Error cargando pagos'); }
+    finally { setLoading(false); }
+  }, [companyId]);
+
+  useEffect(() => { fetchPayments(); }, [fetchPayments]);
+
+  const resetForm = () => {
+    setForm({ amount: '', currency: 'USD', payment_method: 'bank_transfer', reference_number: '',
+              payment_date: new Date().toISOString().split('T')[0], period_covered: '', notes: '', status: 'confirmed' });
+    setReceiptFile(null);
+    setEditingId(null);
+    setShowForm(false);
+  };
+
+  const handleEdit = (p) => {
+    setForm({
+      amount: p.amount, currency: p.currency, payment_method: p.payment_method,
+      reference_number: p.reference_number || '', payment_date: p.payment_date,
+      period_covered: p.period_covered || '', notes: p.notes || '', status: p.status,
+    });
+    setEditingId(p.id);
+    setReceiptFile(null);
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.amount || !form.payment_date) return toast.error('Monto y fecha son obligatorios');
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append('company_id', companyId);
+      Object.entries(form).forEach(([k, v]) => { if (v) fd.append(k, v); });
+      if (receiptFile) fd.append('receipt', receiptFile);
+
+      if (editingId) {
+        await api.put(`/company-payments/${editingId}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        toast.success('Pago actualizado');
+      } else {
+        await api.post('/company-payments', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        toast.success('Pago registrado');
+      }
+      resetForm();
+      fetchPayments();
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.message);
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('¿Eliminar este pago?')) return;
+    try {
+      await api.delete(`/company-payments/${id}`);
+      toast.success('Pago eliminado');
+      fetchPayments();
+    } catch { toast.error('Error eliminando pago'); }
+  };
+
+  const totalPaid = payments.filter(p => p.status === 'confirmed').reduce((s, p) => s + Number(p.amount), 0);
+
+  return (
+    <div className="bg-slate-800/30 border border-slate-700/40 rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-slate-800">
+        <div className="flex items-center gap-2">
+          <Receipt size={14} className="text-emerald-400" />
+          <span className="text-sm font-semibold text-white">Historial de pagos</span>
+          <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{payments.length}</span>
+          {totalPaid > 0 && <span className="text-xs text-emerald-400 ml-2">${totalPaid.toFixed(2)} total</span>}
+        </div>
+        <button
+          onClick={() => { resetForm(); setShowForm(!showForm); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition-colors"
+        >
+          <Plus size={12} /> Registrar pago
+        </button>
+      </div>
+
+      {/* Formulario de pago */}
+      {showForm && (
+        <div className="p-4 border-b border-slate-800 bg-slate-900/50 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              {editingId ? 'Editar pago' : 'Nuevo pago'}
+            </p>
+            <button onClick={resetForm} className="text-slate-400 hover:text-white"><X size={14} /></button>
+          </div>
+
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
+            {/* Monto */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">Monto *</label>
+              <div className="flex gap-2">
+                <input type="number" min="0" step="0.01" value={form.amount}
+                  onChange={e => setForm(p => ({ ...p, amount: e.target.value }))}
+                  placeholder="0.00"
+                  className="flex-1 bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500" />
+                <select value={form.currency} onChange={e => setForm(p => ({ ...p, currency: e.target.value }))}
+                  className="bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2 py-2 focus:outline-none">
+                  <option>USD</option><option>DOP</option><option>EUR</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Método de pago */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">Método de pago *</label>
+              <select value={form.payment_method} onChange={e => setForm(p => ({ ...p, payment_method: e.target.value }))}
+                className="bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none">
+                {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+
+            {/* ID de transferencia */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">ID transferencia / referencia</label>
+              <input value={form.reference_number} onChange={e => setForm(p => ({ ...p, reference_number: e.target.value }))}
+                placeholder="Ej: TRF-20260620-001"
+                className="bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500" />
+            </div>
+
+            {/* Fecha de pago */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400 flex items-center gap-1"><Calendar size={11} /> Fecha de pago *</label>
+              <input type="date" value={form.payment_date} onChange={e => setForm(p => ({ ...p, payment_date: e.target.value }))}
+                className="bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500" />
+            </div>
+
+            {/* Período cubierto */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">Período cubierto</label>
+              <input value={form.period_covered} onChange={e => setForm(p => ({ ...p, period_covered: e.target.value }))}
+                placeholder="Ej: Junio 2026"
+                className="bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500" />
+            </div>
+
+            {/* Estado */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">Estado</label>
+              <select value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
+                className="bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none">
+                <option value="confirmed">Confirmado</option>
+                <option value="pending">Pendiente</option>
+                <option value="refunded">Reembolsado</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Comprobante + Notas */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400 flex items-center gap-1"><Upload size={11} /> Comprobante de pago</label>
+              <label className="flex items-center gap-2 px-3 py-2 bg-slate-900 border border-dashed border-slate-600 hover:border-emerald-500 text-sm rounded-lg cursor-pointer transition-colors">
+                <Upload size={14} className="text-slate-400" />
+                <span className={receiptFile ? 'text-emerald-400' : 'text-slate-400'}>
+                  {receiptFile ? receiptFile.name : 'Subir imagen o PDF...'}
+                </span>
+                <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" className="hidden"
+                  onChange={e => setReceiptFile(e.target.files?.[0] || null)} />
+              </label>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">Notas</label>
+              <input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+                placeholder="Ej: Pago parcial de factura #123"
+                className="bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500" />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={resetForm} className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">Cancelar</button>
+            <button onClick={handleSave} disabled={saving}
+              className="flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-colors">
+              {saving ? <Spinner size={13} /> : <Save size={13} />}
+              {saving ? 'Guardando...' : editingId ? 'Actualizar' : 'Registrar pago'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Lista de pagos */}
+      <div className="max-h-[300px] overflow-y-auto">
+        {loading ? (
+          <div className="flex items-center justify-center py-8 text-slate-400 text-sm gap-2"><Spinner size={14} /> Cargando...</div>
+        ) : payments.length === 0 ? (
+          <p className="text-sm text-slate-500 text-center py-8">Sin pagos registrados</p>
+        ) : (
+          <div className="divide-y divide-slate-800">
+            {payments.map(p => {
+              const method = PAYMENT_METHODS.find(m => m.value === p.payment_method);
+              const st = STATUS_PAYMENT[p.status] || STATUS_PAYMENT.pending;
+              return (
+                <div key={p.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-800/30 transition-colors">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
+                    <CreditCard size={14} className="text-emerald-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">${Number(p.amount).toFixed(2)}</span>
+                      <span className="text-xs text-slate-500">{p.currency}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${st.color}`}>{st.label}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                      <span>{method?.label || p.payment_method}</span>
+                      {p.reference_number && <span className="text-slate-500">· Ref: {p.reference_number}</span>}
+                      {p.period_covered && <span className="text-slate-500">· {p.period_covered}</span>}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xs text-slate-400">{p.payment_date}</p>
+                    {p.notes && <p className="text-xs text-slate-500 truncate max-w-[150px]">{p.notes}</p>}
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    {p.receipt_path && (
+                      <button onClick={() => setPreview(p.id)} title="Ver comprobante"
+                        className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-900/20 rounded-lg transition-colors">
+                        <Eye size={13} />
+                      </button>
+                    )}
+                    <button onClick={() => handleEdit(p)} title="Editar"
+                      className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+                      <Pencil size={13} />
+                    </button>
+                    <button onClick={() => handleDelete(p.id)} title="Eliminar"
+                      className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Preview de comprobante */}
+      {preview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setPreview(null)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-slate-800">
+              <h3 className="text-sm font-bold text-white">Comprobante de pago</h3>
+              <button onClick={() => setPreview(null)} className="text-slate-400 hover:text-white"><X size={16} /></button>
+            </div>
+            <div className="p-4">
+              <img src={`${import.meta.env.VITE_API_URL || '/api'}/company-payments/${preview}/receipt`}
+                alt="Comprobante" className="max-w-full max-h-[60vh] rounded-lg mx-auto"
+                onError={e => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = '<p class="text-slate-400 text-sm text-center py-8">No se puede mostrar el comprobante (puede ser un PDF). <a href="' + (import.meta.env.VITE_API_URL || '/api') + '/company-payments/' + preview + '/receipt" target="_blank" class="text-violet-400 underline">Descargar</a></p>'; }} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -855,6 +1146,9 @@ export default function PlansPanel({ companies }) {
                     </div>
                   )}
                 </div>
+
+                {/* Historial de pagos */}
+                <CompanyPayments companyId={selected.id} companyName={selected.nombre} />
               </div>
             )}
           </div>

@@ -32,6 +32,7 @@ const outlookController       = require('../controllers/outlookController');
 const googleCalendarController = require('../controllers/googleCalendarController');
 const planController          = require('../controllers/planController');
 const revenueController       = require('../controllers/revenueController');
+const companyPaymentController = require('../controllers/companyPaymentController');
 const { upload: tplUpload }   = require('../middleware/uploadTemplate');
 const { handleCatalogUpload, CATALOG_DIR } = require('../middleware/uploadCatalog');
 
@@ -583,6 +584,15 @@ router.get('/revenue/summary',             auth, requireSuperAdmin, revenueContr
 router.get('/revenue/companies',           auth, requireSuperAdmin, revenueController.getCompanies);
 router.put('/revenue/companies/:id/billing', auth, requireSuperAdmin, revenueController.updateBilling);
 router.get('/revenue/admins',              auth, requireSuperAdmin, revenueController.getAdmins);
+
+// ─────────────────────────────────────
+// PAGOS DE EMPRESAS (solo superadmin)
+// ─────────────────────────────────────
+router.get   ('/company-payments',          auth, requireSuperAdmin, companyPaymentController.list);
+router.post  ('/company-payments',          auth, requireSuperAdmin, companyPaymentController.upload, companyPaymentController.create);
+router.put   ('/company-payments/:id',      auth, requireSuperAdmin, companyPaymentController.upload, companyPaymentController.update);
+router.delete('/company-payments/:id',      auth, requireSuperAdmin, companyPaymentController.remove);
+router.get   ('/company-payments/:id/receipt', auth, requireSuperAdmin, companyPaymentController.getReceipt);
 
 // ─────────────────────────────────────
 // DEPLOY / CI-CD (solo superadmin)

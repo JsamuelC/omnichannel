@@ -27,6 +27,7 @@ const BusinessSchedule   = require('./BusinessSchedule');
 const DocumentTemplate   = require('./DocumentTemplate');
 const DocumentRequest    = require('./DocumentRequest');
 const MergeTemplate      = require('./MergeTemplate');
+const CompanyPayment     = require('./CompanyPayment');
 
 // ============================
 // ASOCIACIONES ORIGINALES
@@ -142,6 +143,7 @@ const migrate = async () => {
     await safeSync(DocumentTemplate);
     await safeSync(DocumentRequest);
     await safeSync(MergeTemplate);
+    await safeSync(CompanyPayment);
     await safeAdd('merge_templates', 'canal', { type: DT.STRING(30), allowNull: false, defaultValue: 'all' });
 
     // Agregar trigger_keywords a document_templates si no existe
@@ -342,5 +344,6 @@ module.exports = {
   DocumentTemplate,
   DocumentRequest,
   MergeTemplate,
+  CompanyPayment,
   migrate
 };
