@@ -114,12 +114,31 @@ whatsappService.setSocketIO(io);
 
 
 // ─────────────────────────────────────
+// WIDGET JS — ANTES de helmet para evitar headers restrictivos
+// ─────────────────────────────────────
+app.get('/widget.js', (req, res) => {
+  res.set({
+    'Access-Control-Allow-Origin': '*',
+    'Content-Type': 'application/javascript; charset=utf-8',
+    'Cache-Control': 'public, max-age=3600',
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+  });
+  res.sendFile(path.join(__dirname, '../public/widget.js'));
+});
+
+// ─────────────────────────────────────
 // MIDDLEWARES
 // ─────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
 
-// CORS abierto para rutas del widget
-app.use('/api/widget', cors({ origin: '*', methods: ['GET', 'POST'] }));
+// CORS abierto para rutas del widget + quitar headers restrictivos
+app.use('/api/widget', (req, res, next) => {
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  res.removeHeader('Cross-Origin-Opener-Policy');
+  res.removeHeader('Cross-Origin-Embedder-Policy');
+  res.removeHeader('Origin-Agent-Cluster');
+  next();
+}, cors({ origin: '*', methods: ['GET', 'POST'] }));
 
 app.use(cors({
   origin:         process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -169,12 +188,6 @@ app.get('/', (req, res) => {
 // IMPORTANTE: debe ir ANTES de notFound para que no sea interceptado
 // ─────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
-// Widget JS público — servido sin auth con CORS abierto
-app.get('/widget.js', (req, res) => {
-  res.set({ 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=3600' });
-  res.sendFile(path.join(__dirname, '../public/widget.js'));
-});
 
 app.use('/api', routes);
 app.use(notFound);
