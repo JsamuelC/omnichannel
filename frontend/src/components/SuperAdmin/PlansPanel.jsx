@@ -3,23 +3,27 @@ import {
   Users, MessageSquare, HardDrive, Megaphone, Smartphone,
   TrendingUp, AlertTriangle, CheckCircle, Clock, ChevronDown,
   ChevronUp, Save, DollarSign, Calendar, XCircle, FileText,
-  LayoutGrid, Loader2, ArrowLeft,
+  LayoutGrid, Loader2, ArrowLeft, Plus, Pencil, Trash2,
+  BarChart2, RefreshCw, X,
 } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
-const PLAN_COLORS = {
-  free:       { bg: 'bg-slate-700/40',   border: 'border-slate-600',      text: 'text-slate-300',  badge: 'bg-slate-700 text-slate-300',         ring: 'ring-slate-500' },
-  basic:      { bg: 'bg-indigo-900/20',  border: 'border-indigo-700/40',  text: 'text-indigo-300', badge: 'bg-indigo-900/60 text-indigo-300',     ring: 'ring-indigo-500' },
-  pro:        { bg: 'bg-violet-900/20',  border: 'border-violet-700/40',  text: 'text-violet-300', badge: 'bg-violet-900/60 text-violet-300',     ring: 'ring-violet-500' },
-  enterprise: { bg: 'bg-amber-900/20',   border: 'border-amber-700/40',   text: 'text-amber-300',  badge: 'bg-amber-900/60 text-amber-300',       ring: 'ring-amber-500' },
+// ── Colores dinámicos por color del plan ─────────────────────────────────────
+const colorMap = {
+  slate:  { bg: 'bg-slate-700/40',   border: 'border-slate-600',      text: 'text-slate-300',  badge: 'bg-slate-700 text-slate-300',         ring: 'ring-slate-500' },
+  indigo: { bg: 'bg-indigo-900/20',  border: 'border-indigo-700/40',  text: 'text-indigo-300', badge: 'bg-indigo-900/60 text-indigo-300',     ring: 'ring-indigo-500' },
+  violet: { bg: 'bg-violet-900/20',  border: 'border-violet-700/40',  text: 'text-violet-300', badge: 'bg-violet-900/60 text-violet-300',     ring: 'ring-violet-500' },
+  amber:  { bg: 'bg-amber-900/20',   border: 'border-amber-700/40',   text: 'text-amber-300',  badge: 'bg-amber-900/60 text-amber-300',       ring: 'ring-amber-500' },
+  emerald:{ bg: 'bg-emerald-900/20', border: 'border-emerald-700/40', text: 'text-emerald-300',badge: 'bg-emerald-900/60 text-emerald-300',   ring: 'ring-emerald-500' },
+  rose:   { bg: 'bg-rose-900/20',    border: 'border-rose-700/40',    text: 'text-rose-300',   badge: 'bg-rose-900/60 text-rose-300',         ring: 'ring-rose-500' },
+  sky:    { bg: 'bg-sky-900/20',     border: 'border-sky-700/40',     text: 'text-sky-300',    badge: 'bg-sky-900/60 text-sky-300',           ring: 'ring-sky-500' },
 };
-
-const PLAN_ICONS = { free: '·', basic: '◆', pro: '◈', enterprise: '★' };
+const getColors = (color) => colorMap[color] || colorMap.slate;
 
 const ALERT_STYLES = {
-  overdue:  { wrap: 'bg-red-900/20 border-red-700/40',   icon: <XCircle  size={14} className="text-red-400 flex-shrink-0" />,   label: 'Vencido',  dot: 'bg-red-500' },
-  due_soon: { wrap: 'bg-amber-900/20 border-amber-700/40', icon: <Clock  size={14} className="text-amber-400 flex-shrink-0" />, label: 'Próximo',  dot: 'bg-amber-400' },
+  overdue:  { wrap: 'bg-red-900/20 border-red-700/40',     icon: <XCircle size={14} className="text-red-400 flex-shrink-0" />,   label: 'Vencido' },
+  due_soon: { wrap: 'bg-amber-900/20 border-amber-700/40', icon: <Clock   size={14} className="text-amber-400 flex-shrink-0" />, label: 'Próximo' },
 };
 
 const LIMITS_CONFIG = [
@@ -32,33 +36,13 @@ const LIMITS_CONFIG = [
   { key: 'max_custom_modules',      label: 'Módulos personalizados',  icon: <LayoutGrid size={13} /> },
 ];
 
-// ── Subcomponentes ─────────────────────────────────────────────────────────────
+const COLOR_OPTIONS = ['slate','indigo','violet','amber','emerald','rose','sky'];
+const CYCLE_LABELS  = { monthly: 'Mensual', quarterly: 'Trimestral', annual: 'Anual' };
 
-function LimitInput({ icon, label, value, onChange }) {
-  const isUnlimited = value === -1;
-  return (
-    <div className={`flex items-center gap-3 p-3 rounded-xl border transition-colors
-      ${isUnlimited ? 'bg-emerald-900/10 border-emerald-700/30' : 'bg-slate-800/60 border-slate-700/40'}`}>
-      <div className={`flex-shrink-0 ${isUnlimited ? 'text-emerald-400' : 'text-slate-400'}`}>{icon}</div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-slate-400 mb-1">{label}</p>
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={-1}
-            value={isUnlimited ? '' : value}
-            onChange={e => onChange(e.target.value === '' ? -1 : Number(e.target.value))}
-            placeholder="−1 = ilimitado"
-            className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-1.5
-                       focus:outline-none focus:border-violet-500 transition-colors"
-          />
-          {isUnlimited && (
-            <span className="text-xs text-emerald-400 whitespace-nowrap font-semibold">∞</span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+// ── Subcomponentes ────────────────────────────────────────────────────────────
+
+function Spinner({ size = 16 }) {
+  return <Loader2 size={size} className="animate-spin text-violet-400" />;
 }
 
 function StatCard({ icon, label, value, sub, color = 'text-white' }) {
@@ -71,22 +55,214 @@ function StatCard({ icon, label, value, sub, color = 'text-white' }) {
   );
 }
 
-function Spinner({ size = 16 }) {
-  return <Loader2 size={size} className="animate-spin text-violet-400" />;
+function LimitInput({ icon, label, value, onChange }) {
+  const isUnlimited = value === -1;
+  return (
+    <div className={`flex items-center gap-3 p-3 rounded-xl border transition-colors
+      ${isUnlimited ? 'bg-emerald-900/10 border-emerald-700/30' : 'bg-slate-800/60 border-slate-700/40'}`}>
+      <div className={`flex-shrink-0 ${isUnlimited ? 'text-emerald-400' : 'text-slate-400'}`}>{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-slate-400 mb-1">{label}</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="number" min={-1}
+            value={isUnlimited ? '' : value}
+            onChange={e => onChange(e.target.value === '' ? -1 : Number(e.target.value))}
+            placeholder="−1 = ilimitado"
+            className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-1.5
+                       focus:outline-none focus:border-violet-500 transition-colors"
+          />
+          {isUnlimited && <span className="text-xs text-emerald-400 whitespace-nowrap font-semibold">∞</span>}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-// ── Panel principal ────────────────────────────────────────────────────────────
+// ── Modal crear/editar plan ───────────────────────────────────────────────────
+
+function PlanModal({ plan, planKey, onClose, onSaved }) {
+  const isNew = !planKey;
+  const [form, setForm] = useState({
+    key:             planKey || '',
+    label:           plan?.label           || '',
+    color:           plan?.color           || 'indigo',
+    icon:            plan?.icon            || '◉',
+    price:           plan?.price           ?? 0,
+    price_quarterly: plan?.price_quarterly ?? 0,
+    price_annual:    plan?.price_annual    ?? 0,
+    limits: {
+      max_operators:           plan?.limits?.max_operators           ?? 5,
+      max_conversations_month: plan?.limits?.max_conversations_month ?? 1000,
+      max_storage_mb:          plan?.limits?.max_storage_mb          ?? 500,
+      max_campaigns_month:     plan?.limits?.max_campaigns_month     ?? 5,
+      max_whatsapp_accounts:   plan?.limits?.max_whatsapp_accounts   ?? 2,
+      max_merge_templates:     plan?.limits?.max_merge_templates     ?? 20,
+      max_custom_modules:      plan?.limits?.max_custom_modules      ?? 3,
+    },
+  });
+  const [saving, setSaving] = useState(false);
+  const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const setL = (k, v) => setForm(p => ({ ...p, limits: { ...p.limits, [k]: v } }));
+
+  const handleSave = async () => {
+    if (!form.label) return toast.error('El nombre del plan es obligatorio');
+    if (isNew && !form.key) return toast.error('El identificador es obligatorio');
+    setSaving(true);
+    try {
+      if (isNew) {
+        await api.post('/plans/presets', form);
+        toast.success(`Plan "${form.label}" creado`);
+      } else {
+        await api.put(`/plans/presets/${planKey}`, form);
+        toast.success(`Plan "${form.label}" actualizado`);
+      }
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const pc = getColors(form.color);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
+          <h2 className="text-base font-black text-white">{isNew ? 'Nuevo plan' : `Editar "${plan?.label}"`}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white"><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* Identificador (solo nuevo) */}
+          {isNew && (
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">Identificador único (sin espacios)</label>
+              <input
+                value={form.key}
+                onChange={e => setF('key', e.target.value.toLowerCase().replace(/\s/g, '_'))}
+                placeholder="ej: startup"
+                className="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-violet-500"
+              />
+            </div>
+          )}
+
+          {/* Nombre e icono */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">Nombre del plan</label>
+              <input
+                value={form.label}
+                onChange={e => setF('label', e.target.value)}
+                placeholder="ej: Startup"
+                className="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-violet-500"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">Icono (emoji o símbolo)</label>
+              <input
+                value={form.icon}
+                onChange={e => setF('icon', e.target.value)}
+                placeholder="◉"
+                className="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-violet-500"
+              />
+            </div>
+          </div>
+
+          {/* Color */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs text-slate-400">Color</label>
+            <div className="flex gap-2 flex-wrap">
+              {COLOR_OPTIONS.map(c => {
+                const cc = getColors(c);
+                return (
+                  <button
+                    key={c}
+                    onClick={() => setF('color', c)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all
+                      ${cc.badge} ${form.color === c ? `ring-2 ${cc.ring}` : 'opacity-60 hover:opacity-100'}`}
+                  >
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Precios por ciclo */}
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Precios por ciclo (USD)</p>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { key: 'price',           label: 'Mensual',     placeholder: '49' },
+                { key: 'price_quarterly', label: 'Trimestral',  placeholder: '42' },
+                { key: 'price_annual',    label: 'Anual',       placeholder: '39' },
+              ].map(({ key, label, placeholder }) => (
+                <div key={key} className="flex flex-col gap-1">
+                  <label className="text-xs text-slate-400">{label} / mes</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
+                    <input
+                      type="number" min={0}
+                      value={form[key]}
+                      onChange={e => setF(key, Number(e.target.value))}
+                      placeholder={placeholder}
+                      className="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg pl-7 pr-3 py-2 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500 mt-2">El precio trimestral y anual es el precio mensual equivalente al pagar ese período.</p>
+          </div>
+
+          {/* Límites */}
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Límites de uso (−1 = ilimitado)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {LIMITS_CONFIG.map(({ key, label, icon }) => (
+                <LimitInput key={key} icon={icon} label={label} value={form.limits[key]} onChange={v => setL(key, v)} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 p-5 border-t border-slate-800 sticky bottom-0 bg-slate-900">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">Cancelar</button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            {saving ? <Spinner size={13} /> : <Save size={13} />}
+            {saving ? 'Guardando...' : 'Guardar plan'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Panel principal ───────────────────────────────────────────────────────────
 
 export default function PlansPanel({ companies }) {
-  const [presets,    setPresets]    = useState({});
-  const [overview,   setOverview]   = useState(null);
-  const [alerts,     setAlerts]     = useState([]);
-  const [selected,   setSelected]   = useState(null);
-  const [planData,   setPlanData]   = useState(null);
-  const [loading,    setLoading]    = useState(true);
-  const [loadingCo,  setLoadingCo]  = useState(false);
-  const [saving,     setSaving]     = useState(false);
-  const [expanded,   setExpanded]   = useState('limits');
+  const [presets,   setPresets]   = useState({});
+  const [overview,  setOverview]  = useState(null);
+  const [alerts,    setAlerts]    = useState([]);
+  const [selected,  setSelected]  = useState(null);
+  const [planData,  setPlanData]  = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [loadingCo, setLoadingCo] = useState(false);
+  const [saving,    setSaving]    = useState(false);
+  const [expanded,  setExpanded]  = useState('limits');
+  const [activeTab, setActiveTab] = useState('companies'); // companies | presets | metrics
+  const [modal,     setModal]     = useState(null); // null | { planKey, plan } | { new: true }
+  const [deleting,  setDeleting]  = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,9 +274,9 @@ export default function PlansPanel({ companies }) {
       ]);
       setPresets(p.data || {});
       setOverview(o.data || null);
-      setAlerts(a.data || []);
+      setAlerts(a.data  || []);
     } catch {
-      toast.error('Error cargando resumen de planes');
+      toast.error('Error cargando planes');
     } finally {
       setLoading(false);
     }
@@ -110,10 +286,11 @@ export default function PlansPanel({ companies }) {
 
   const selectCompany = async (company) => {
     setSelected(company);
+    setActiveTab('companies');
     setLoadingCo(true);
     try {
       const res = await api.get(`/plans/company/${company.id}`);
-      const d = res.data;
+      const d   = res.data;
       setPlanData({
         plan:              d.plan || 'basic',
         plan_limits:       d.plan_limits || {},
@@ -130,11 +307,33 @@ export default function PlansPanel({ companies }) {
   const applyPreset = (planKey) => {
     const preset = presets[planKey];
     if (!preset) return;
-    setPlanData(p => ({ ...p, plan: planKey, plan_limits: { ...preset.limits } }));
+    const priceBycycle = {
+      monthly:   preset.price,
+      quarterly: preset.price_quarterly ?? preset.price,
+      annual:    preset.price_annual    ?? preset.price,
+    };
+    const cycle = planData?.billing?.cycle || 'monthly';
+    setPlanData(p => ({
+      ...p,
+      plan:        planKey,
+      plan_limits: { ...preset.limits },
+      billing:     { ...p.billing, price: priceBycycle[cycle] ?? preset.price },
+    }));
   };
 
   const setLimit   = (key, val) => setPlanData(p => ({ ...p, plan_limits: { ...p.plan_limits, [key]: val } }));
-  const setBilling = (key, val) => setPlanData(p => ({ ...p, billing: { ...p.billing, [key]: val } }));
+  const setBilling = (key, val) => {
+    setPlanData(p => {
+      const updated = { ...p.billing, [key]: val };
+      // Si cambia el ciclo, actualiza el precio automáticamente desde el preset
+      if (key === 'cycle' && p.plan && presets[p.plan]) {
+        const pr = presets[p.plan];
+        const prices = { monthly: pr.price, quarterly: pr.price_quarterly ?? pr.price, annual: pr.price_annual ?? pr.price };
+        updated.price = prices[val] ?? pr.price;
+      }
+      return { ...p, billing: updated };
+    });
+  };
 
   const handleSave = async () => {
     if (!selected || !planData) return;
@@ -154,21 +353,52 @@ export default function PlansPanel({ companies }) {
     }
   };
 
-  const colors = PLAN_COLORS[planData?.plan] || PLAN_COLORS.basic;
+  const handleDeletePreset = async (key) => {
+    if (!window.confirm(`¿Eliminar el plan "${presets[key]?.label}"? Esta acción no se puede deshacer.`)) return;
+    setDeleting(key);
+    try {
+      await api.delete(`/plans/presets/${key}`);
+      toast.success('Plan eliminado');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error eliminando plan');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const pc = getColors(planData ? (presets[planData.plan]?.color || 'violet') : 'violet');
 
   // ── Render ─────────────────────────────────────────────────────────────────
-
   return (
     <div className="flex flex-1 overflow-hidden">
 
-      {/* ── Sidebar empresas ──────────────────────────────── */}
+      {/* ── Sidebar ── */}
       <div className="w-64 flex-shrink-0 border-r border-slate-800 flex flex-col">
-        <div className="p-4 border-b border-slate-800">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Empresas</p>
+        {/* Tabs sidebar */}
+        <div className="p-3 border-b border-slate-800 space-y-1">
+          {[
+            { key: 'companies', label: 'Empresas',  icon: <Users size={13} /> },
+            { key: 'presets',   label: 'Gestionar planes', icon: <LayoutGrid size={13} /> },
+            { key: 'metrics',   label: 'Métricas',  icon: <BarChart2 size={13} /> },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => { setActiveTab(t.key); setSelected(null); setPlanData(null); }}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                ${activeTab === t.key && !selected ? 'bg-violet-600/20 text-violet-300' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+            >
+              {t.icon}{t.label}
+            </button>
+          ))}
         </div>
+
+        {/* Lista empresas */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-2 py-1">Empresas</p>
           {companies.map(c => {
-            const pc      = PLAN_COLORS[c.plan] || PLAN_COLORS.basic;
+            const preset   = presets[c.plan];
+            const pc2      = getColors(preset?.color || 'slate');
             const hasAlert = alerts.some(a => a.id === c.id);
             const isActive = selected?.id === c.id;
             return (
@@ -176,18 +406,15 @@ export default function PlansPanel({ companies }) {
                 key={c.id}
                 onClick={() => selectCompany(c)}
                 className={`w-full text-left flex items-center gap-2.5 p-3 rounded-xl border transition-all
-                  ${isActive
-                    ? 'bg-violet-600/20 border-violet-500/40'
-                    : 'hover:bg-slate-800/70 border-transparent'}`}
+                  ${isActive ? 'bg-violet-600/20 border-violet-500/40' : 'hover:bg-slate-800/70 border-transparent'}`}
               >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black flex-shrink-0
-                  bg-gradient-to-br from-violet-600 to-indigo-700 text-white`}>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black flex-shrink-0 bg-gradient-to-br from-violet-600 to-indigo-700 text-white">
                   {c.nombre?.[0]?.toUpperCase() || '?'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-white truncate">{c.nombre}</p>
-                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${pc.badge}`}>
-                    {PLAN_ICONS[c.plan] || '·'} {c.plan || 'basic'}
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${pc2.badge}`}>
+                    {preset?.icon || '·'} {preset?.label || c.plan}
                   </span>
                 </div>
                 {hasAlert && <AlertTriangle size={12} className="text-amber-400 flex-shrink-0" />}
@@ -197,47 +424,165 @@ export default function PlansPanel({ companies }) {
         </div>
       </div>
 
-      {/* ── Área principal ─────────────────────────────────── */}
+      {/* ── Área principal ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-
-        {/* Loading inicial */}
         {loading && (
           <div className="flex-1 flex items-center justify-center gap-3 text-slate-400 text-sm">
-            <Spinner size={18} /> Cargando planes...
+            <Spinner size={18} /> Cargando...
           </div>
         )}
 
-        {/* Overview cuando no hay empresa seleccionada */}
-        {!loading && !selected && (
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* ── TAB: GESTIONAR PLANES (presets) ── */}
+        {!loading && !selected && activeTab === 'presets' && (
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-white">Planes disponibles</h2>
+              <button
+                onClick={() => setModal({ isNew: true })}
+                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl transition-colors"
+              >
+                <Plus size={14} /> Nuevo plan
+              </button>
+            </div>
 
-            {/* Tarjetas resumen */}
-            {overview && (
-              <div>
-                <h2 className="text-sm font-bold text-white mb-3">Resumen general</h2>
-                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-                  <StatCard icon={<Users size={13} />}        label="Total empresas"   value={overview.total}        color="text-white" />
-                  <StatCard icon={<DollarSign size={13} />}   label="MRR estimado"     value={`$${overview.mrr}`}    sub="USD/mes activos"  color="text-emerald-400" />
-                  {Object.entries(overview.by_plan || {}).map(([plan, count]) => (
-                    <StatCard key={plan}
-                      icon={<TrendingUp size={13} />}
-                      label={plan}
-                      value={count}
-                      sub="empresa(s)"
-                      color={PLAN_COLORS[plan]?.text || 'text-white'}
-                    />
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {Object.entries(presets).map(([key, preset]) => {
+                const pc3 = getColors(preset.color);
+                return (
+                  <div key={key} className={`${pc3.bg} border ${pc3.border} rounded-xl p-4`}>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-lg ${pc3.text}`}>{preset.icon}</span>
+                          <h3 className="text-base font-black text-white">{preset.label}</h3>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${pc3.badge}`}>{key}</span>
+                        </div>
+                        <div className="flex gap-3 mt-2">
+                          <span className="text-xs text-slate-400">Mensual: <strong className="text-white">${preset.price}</strong></span>
+                          <span className="text-xs text-slate-400">Trimestral: <strong className="text-white">${preset.price_quarterly ?? preset.price}</strong></span>
+                          <span className="text-xs text-slate-400">Anual: <strong className="text-white">${preset.price_annual ?? preset.price}</strong></span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => setModal({ planKey: key, plan: preset })}
+                          className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        {!['free','basic','pro','enterprise'].includes(key) && (
+                          <button
+                            onClick={() => handleDeletePreset(key)}
+                            disabled={deleting === key}
+                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+                          >
+                            {deleting === key ? <Spinner size={13} /> : <Trash2 size={13} />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {LIMITS_CONFIG.slice(0, 4).map(({ key: lk, label, icon }) => (
+                        <div key={lk} className="flex items-center gap-1.5 text-xs text-slate-400">
+                          <span className="text-slate-500">{icon}</span>
+                          <span>{label}:</span>
+                          <strong className={preset.limits[lk] === -1 ? 'text-emerald-400' : 'text-white'}>
+                            {preset.limits[lk] === -1 ? '∞' : preset.limits[lk]}
+                          </strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB: MÉTRICAS ── */}
+        {!loading && !selected && activeTab === 'metrics' && overview && (
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-white">Métricas de planes</h2>
+              <button onClick={load} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors">
+                <RefreshCw size={12} /> Actualizar
+              </button>
+            </div>
+
+            {/* KPIs financieros */}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+              <StatCard icon={<Users size={13} />}      label="Total empresas"  value={overview.total}           color="text-white" />
+              <StatCard icon={<DollarSign size={13} />} label="MRR"             value={`$${overview.mrr}`}       sub="ingresos / mes"        color="text-emerald-400" />
+              <StatCard icon={<DollarSign size={13} />} label="QRR"             value={`$${overview.qrr}`}       sub="ingresos / trimestre"  color="text-sky-400" />
+              <StatCard icon={<DollarSign size={13} />} label="ARR"             value={`$${overview.arr}`}       sub="ingresos / año"        color="text-violet-400" />
+            </div>
+
+            {/* Distribución por plan */}
+            <div>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Distribución por plan</h3>
+              <div className="space-y-3">
+                {Object.entries(overview.plan_metrics || {}).map(([key, m]) => {
+                  const pc4 = getColors(presets[key]?.color || 'slate');
+                  return (
+                    <div key={key} className={`${pc4.bg} border ${pc4.border} rounded-xl p-4`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm ${pc4.text}`}>{presets[key]?.icon || '·'}</span>
+                          <span className="text-sm font-bold text-white">{m.label}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${pc4.badge}`}>{m.count} empresa{m.count !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-white">{m.pct}%</p>
+                          {m.price > 0 && <p className="text-xs text-slate-400">${m.price}/mes base</p>}
+                        </div>
+                      </div>
+                      <div className="w-full bg-slate-700/40 rounded-full h-1.5">
+                        <div className={`h-1.5 rounded-full bg-gradient-to-r from-violet-500 to-indigo-500`} style={{ width: `${m.pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Por estado y ciclo */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-4">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Por estado de pago</h3>
+                <div className="space-y-2">
+                  {Object.entries(overview.by_status || {}).map(([status, count]) => (
+                    <div key={status} className="flex items-center justify-between">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        status === 'active'    ? 'bg-emerald-500/20 text-emerald-400' :
+                        status === 'overdue'   ? 'bg-red-500/20 text-red-400' :
+                        status === 'trial'     ? 'bg-sky-500/20 text-sky-400' :
+                                                 'bg-slate-700 text-slate-400'
+                      }`}>{status}</span>
+                      <span className="text-sm font-bold text-white">{count}</span>
+                    </div>
                   ))}
                 </div>
               </div>
-            )}
 
-            {/* Alertas de facturación */}
+              <div className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-4">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Por ciclo de cobro</h3>
+                <div className="space-y-2">
+                  {Object.entries(overview.by_cycle || {}).map(([cycle, count]) => (
+                    <div key={cycle} className="flex items-center justify-between">
+                      <span className="text-sm text-slate-300">{CYCLE_LABELS[cycle] || cycle}</span>
+                      <span className="text-sm font-bold text-white">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Alertas */}
             {alerts.length > 0 && (
               <div>
-                <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                  <AlertTriangle size={14} className="text-amber-400" />
-                  Alertas de facturación
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-semibold">{alerts.length}</span>
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <AlertTriangle size={13} className="text-amber-400" /> Alertas de cobro
+                  <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded-full font-semibold">{alerts.length}</span>
                 </h3>
                 <div className="space-y-2">
                   {alerts.map(a => {
@@ -248,19 +593,10 @@ export default function PlansPanel({ companies }) {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-white truncate">{a.nombre}</p>
                           <p className="text-xs text-slate-400">
-                            Vence: {a.next_payment}
-                            {' · '}
-                            {a.days_until < 0
-                              ? `${Math.abs(a.days_until)} días vencido`
-                              : `en ${a.days_until} días`}
+                            {a.days_until < 0 ? `${Math.abs(a.days_until)} días vencido` : `Vence en ${a.days_until} días`}
                           </p>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-sm font-bold text-white">${a.price} {a.currency}</p>
-                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${PLAN_COLORS[a.plan]?.badge || ''}`}>
-                            {a.plan}
-                          </span>
-                        </div>
+                        <p className="text-sm font-bold text-white flex-shrink-0">${a.price} {a.currency}</p>
                         <button
                           onClick={() => selectCompany({ id: a.id, nombre: a.nombre })}
                           className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex-shrink-0"
@@ -273,26 +609,75 @@ export default function PlansPanel({ companies }) {
                 </div>
               </div>
             )}
+          </div>
+        )}
 
-            {!overview && !loading && (
-              <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-                Selecciona una empresa para gestionar su plan
+        {/* ── TAB: COMPANIES (overview cuando no hay empresa seleccionada) ── */}
+        {!loading && !selected && activeTab === 'companies' && overview && (
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+              <StatCard icon={<Users size={13} />}      label="Total empresas" value={overview.total}     color="text-white" />
+              <StatCard icon={<DollarSign size={13} />} label="MRR estimado"   value={`$${overview.mrr}`} sub="USD/mes activos" color="text-emerald-400" />
+              {Object.entries(overview.by_plan || {}).map(([plan, count]) => {
+                const preset = presets[plan];
+                return (
+                  <StatCard key={plan}
+                    icon={<TrendingUp size={13} />}
+                    label={preset?.label || plan}
+                    value={count}
+                    sub="empresa(s)"
+                    color={getColors(preset?.color || 'slate').text}
+                  />
+                );
+              })}
+            </div>
+            {alerts.length > 0 && (
+              <div>
+                <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                  <AlertTriangle size={14} className="text-amber-400" /> Alertas de facturación
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-semibold">{alerts.length}</span>
+                </h3>
+                <div className="space-y-2">
+                  {alerts.map(a => {
+                    const as = ALERT_STYLES[a.alert_type];
+                    const preset = presets[a.plan];
+                    return (
+                      <div key={a.id} className={`flex items-center gap-3 p-3 rounded-xl border ${as.wrap}`}>
+                        {as.icon}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">{a.nombre}</p>
+                          <p className="text-xs text-slate-400">
+                            Vence: {a.next_payment} · {a.days_until < 0 ? `${Math.abs(a.days_until)} días vencido` : `en ${a.days_until} días`}
+                          </p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-sm font-bold text-white">${a.price} {a.currency}</p>
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${getColors(preset?.color || 'slate').badge}`}>
+                            {preset?.label || a.plan}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => selectCompany({ id: a.id, nombre: a.nombre })}
+                          className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                        >
+                          Gestionar
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Editor de plan */}
+        {/* ── EDITOR de plan por empresa ── */}
         {!loading && selected && (
           <div className="flex-1 overflow-y-auto">
-
-            {/* Header fijo del editor */}
+            {/* Header */}
             <div className="sticky top-0 z-10 bg-slate-950 border-b border-slate-800 px-6 py-4 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => { setSelected(null); setPlanData(null); }}
-                  className="text-slate-400 hover:text-white transition-colors"
-                >
+                <button onClick={() => { setSelected(null); setPlanData(null); }} className="text-slate-400 hover:text-white transition-colors">
                   <ArrowLeft size={16} />
                 </button>
                 <div>
@@ -300,9 +685,7 @@ export default function PlansPanel({ companies }) {
                   {planData && (
                     <p className="text-xs text-slate-400 mt-0.5">
                       {planData.current_operators} operador{planData.current_operators !== 1 ? 'es' : ''} activo{planData.current_operators !== 1 ? 's' : ''}
-                      {planData.plan_limits.max_operators !== -1 && (
-                        <span className="text-slate-500"> / {planData.plan_limits.max_operators} máx.</span>
-                      )}
+                      {planData.plan_limits.max_operators !== -1 && <span className="text-slate-500"> / {planData.plan_limits.max_operators} máx.</span>}
                     </p>
                   )}
                 </div>
@@ -310,20 +693,14 @@ export default function PlansPanel({ companies }) {
               <button
                 onClick={handleSave}
                 disabled={saving || loadingCo}
-                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500
-                           disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-colors"
               >
                 {saving ? <Spinner size={13} /> : <Save size={13} />}
                 {saving ? 'Guardando...' : 'Guardar cambios'}
               </button>
             </div>
 
-            {/* Loading empresa */}
-            {loadingCo && (
-              <div className="flex items-center justify-center gap-3 py-16 text-slate-400 text-sm">
-                <Spinner size={18} /> Cargando datos...
-              </div>
-            )}
+            {loadingCo && <div className="flex items-center justify-center gap-3 py-16 text-slate-400 text-sm"><Spinner size={18} /> Cargando datos...</div>}
 
             {!loadingCo && planData && (
               <div className="p-6 space-y-5">
@@ -333,26 +710,20 @@ export default function PlansPanel({ companies }) {
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Plan contratado</p>
                   <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
                     {Object.entries(presets).map(([key, preset]) => {
-                      const pc     = PLAN_COLORS[key] || PLAN_COLORS.basic;
+                      const pc5  = getColors(preset.color);
                       const active = planData.plan === key;
                       return (
                         <button
                           key={key}
                           onClick={() => applyPreset(key)}
                           className={`p-4 rounded-xl border text-left transition-all
-                            ${active
-                              ? `${pc.bg} ${pc.border} ring-2 ${pc.ring}`
-                              : 'bg-slate-800/40 border-slate-700/40 hover:border-slate-600 hover:bg-slate-800/60'}`}
+                            ${active ? `${pc5.bg} ${pc5.border} ring-2 ${pc5.ring}` : 'bg-slate-800/40 border-slate-700/40 hover:border-slate-600 hover:bg-slate-800/60'}`}
                         >
                           <div className="flex items-center justify-between mb-1">
-                            <p className={`text-sm font-bold ${active ? pc.text : 'text-white'}`}>
-                              {PLAN_ICONS[key]} {preset.label}
-                            </p>
-                            {active && <CheckCircle size={13} className={pc.text} />}
+                            <p className={`text-sm font-bold ${active ? pc5.text : 'text-white'}`}>{preset.icon} {preset.label}</p>
+                            {active && <CheckCircle size={13} className={pc5.text} />}
                           </div>
-                          <p className="text-xs text-slate-400">
-                            {preset.price === 0 ? 'Gratis' : `$${preset.price}/mes`}
-                          </p>
+                          <p className="text-xs text-slate-400">{preset.price === 0 ? 'Gratis' : `$${preset.price}/mes`}</p>
                           <p className="text-xs text-slate-500 mt-1">
                             {preset.limits.max_operators === -1 ? '∞' : preset.limits.max_operators} op ·{' '}
                             {preset.limits.max_storage_mb === -1 ? '∞' : `${preset.limits.max_storage_mb}MB`}
@@ -363,7 +734,7 @@ export default function PlansPanel({ companies }) {
                   </div>
                 </div>
 
-                {/* Límites de uso */}
+                {/* Límites */}
                 <div className="bg-slate-800/30 border border-slate-700/40 rounded-xl overflow-hidden">
                   <button
                     onClick={() => setExpanded(expanded === 'limits' ? null : 'limits')}
@@ -372,25 +743,14 @@ export default function PlansPanel({ companies }) {
                     <div className="flex items-center gap-2">
                       <TrendingUp size={14} className="text-violet-400" />
                       <span className="text-sm font-semibold text-white">Límites de uso</span>
-                      <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">
-                        −1 = ilimitado
-                      </span>
+                      <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">−1 = ilimitado</span>
                     </div>
-                    {expanded === 'limits'
-                      ? <ChevronUp  size={14} className="text-slate-400" />
-                      : <ChevronDown size={14} className="text-slate-400" />}
+                    {expanded === 'limits' ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
                   </button>
-
                   {expanded === 'limits' && (
                     <div className="px-4 pb-4 grid grid-cols-1 xl:grid-cols-2 gap-3">
                       {LIMITS_CONFIG.map(({ key, label, icon }) => (
-                        <LimitInput
-                          key={key}
-                          icon={icon}
-                          label={label}
-                          value={planData.plan_limits[key] ?? -1}
-                          onChange={v => setLimit(key, v)}
-                        />
+                        <LimitInput key={key} icon={icon} label={label} value={planData.plan_limits[key] ?? -1} onChange={v => setLimit(key, v)} />
                       ))}
                     </div>
                   )}
@@ -411,18 +771,28 @@ export default function PlansPanel({ companies }) {
                           planData.billing.status === 'overdue'   ? 'bg-red-500/20 text-red-400' :
                           planData.billing.status === 'trial'     ? 'bg-blue-500/20 text-blue-400' :
                                                                      'bg-slate-700 text-slate-400'
-                        }`}>
-                          {planData.billing.status}
-                        </span>
+                        }`}>{planData.billing.status}</span>
                       )}
                     </div>
-                    {expanded === 'billing'
-                      ? <ChevronUp  size={14} className="text-slate-400" />
-                      : <ChevronDown size={14} className="text-slate-400" />}
+                    {expanded === 'billing' ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
                   </button>
 
                   {expanded === 'billing' && (
                     <div className="px-4 pb-4 grid grid-cols-1 xl:grid-cols-2 gap-3">
+
+                      {/* Ciclo — primero para que actualice precio automáticamente */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-slate-400">Ciclo de cobro</label>
+                        <select
+                          value={planData.billing.cycle || 'monthly'}
+                          onChange={e => setBilling('cycle', e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none"
+                        >
+                          <option value="monthly">Mensual</option>
+                          <option value="quarterly">Trimestral</option>
+                          <option value="annual">Anual</option>
+                        </select>
+                      </div>
 
                       {/* Precio */}
                       <div className="flex flex-col gap-1">
@@ -433,45 +803,26 @@ export default function PlansPanel({ companies }) {
                             value={planData.billing.price || ''}
                             onChange={e => setBilling('price', e.target.value)}
                             placeholder="0"
-                            className="flex-1 bg-slate-900 border border-slate-700 text-white text-sm rounded-lg
-                                       px-3 py-2 focus:outline-none focus:border-emerald-500 transition-colors"
+                            className="flex-1 bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500 transition-colors"
                           />
                           <select
                             value={planData.billing.currency || 'USD'}
                             onChange={e => setBilling('currency', e.target.value)}
-                            className="bg-slate-900 border border-slate-700 text-white text-sm rounded-lg
-                                       px-2 py-2 focus:outline-none"
+                            className="bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2 py-2 focus:outline-none"
                           >
                             <option>USD</option><option>DOP</option><option>EUR</option><option>COP</option>
                           </select>
                         </div>
                       </div>
 
-                      {/* Ciclo */}
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs text-slate-400">Ciclo de cobro</label>
-                        <select
-                          value={planData.billing.cycle || 'monthly'}
-                          onChange={e => setBilling('cycle', e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg
-                                     px-3 py-2 focus:outline-none"
-                        >
-                          <option value="monthly">Mensual</option>
-                          <option value="annual">Anual</option>
-                        </select>
-                      </div>
-
                       {/* Próximo pago */}
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-slate-400 flex items-center gap-1">
-                          <Calendar size={11} /> Próximo pago
-                        </label>
+                        <label className="text-xs text-slate-400 flex items-center gap-1"><Calendar size={11} /> Próximo pago</label>
                         <input
                           type="date"
                           value={planData.billing.next_payment || ''}
                           onChange={e => setBilling('next_payment', e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg
-                                     px-3 py-2 focus:outline-none focus:border-emerald-500 transition-colors"
+                          className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500 transition-colors"
                         />
                       </div>
 
@@ -481,8 +832,7 @@ export default function PlansPanel({ companies }) {
                         <select
                           value={planData.billing.status || 'active'}
                           onChange={e => setBilling('status', e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg
-                                     px-3 py-2 focus:outline-none"
+                          className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none"
                         >
                           <option value="active">Activo</option>
                           <option value="overdue">Vencido</option>
@@ -499,19 +849,27 @@ export default function PlansPanel({ companies }) {
                           onChange={e => setBilling('notes', e.target.value)}
                           placeholder="Ej: Cliente paga por transferencia los primeros 5 días del mes"
                           rows={2}
-                          className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg
-                                     px-3 py-2 focus:outline-none focus:border-emerald-500 transition-colors resize-none"
+                          className="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500 transition-colors resize-none"
                         />
                       </div>
                     </div>
                   )}
                 </div>
-
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* ── Modal crear/editar plan ── */}
+      {modal && (
+        <PlanModal
+          planKey={modal.planKey}
+          plan={modal.plan}
+          onClose={() => setModal(null)}
+          onSaved={load}
+        />
+      )}
     </div>
   );
 }

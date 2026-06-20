@@ -567,11 +567,14 @@ router.get   ('/gcal/events',     auth, requireFeature('appointments'), googleCa
 // ─────────────────────────────────────
 // PLANES Y FACTURACIÓN (solo superadmin)
 // ─────────────────────────────────────
-router.get('/plans/presets',               auth, requireSuperAdmin, planController.getPresets);
-router.get('/plans/overview',              auth, requireSuperAdmin, planController.getOverview);
-router.get('/plans/billing-alerts',        auth, requireSuperAdmin, planController.getBillingAlerts);
-router.get('/plans/company/:id',           auth, requireSuperAdmin, planController.getCompanyPlan);
-router.put('/plans/company/:id',           auth, requireSuperAdmin, planController.updateCompanyPlan);
+router.get   ('/plans/presets',            auth, requireSuperAdmin, planController.getPresets);
+router.post  ('/plans/presets',            auth, requireSuperAdmin, planController.createPreset);
+router.put   ('/plans/presets/:key',       auth, requireSuperAdmin, planController.updatePreset);
+router.delete('/plans/presets/:key',       auth, requireSuperAdmin, planController.deletePreset);
+router.get   ('/plans/overview',           auth, requireSuperAdmin, planController.getOverview);
+router.get   ('/plans/billing-alerts',     auth, requireSuperAdmin, planController.getBillingAlerts);
+router.get   ('/plans/company/:id',        auth, requireSuperAdmin, planController.getCompanyPlan);
+router.put   ('/plans/company/:id',        auth, requireSuperAdmin, planController.updateCompanyPlan);
 
 // ─────────────────────────────────────
 // INGRESOS / REVENUE (solo superadmin — panel exclusivo dueños)

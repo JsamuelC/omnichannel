@@ -29,7 +29,7 @@ const WhatsappChat = sequelize.define('whatsapp_chats', {
   },
   bot_enabled: {
     type:         DataTypes.BOOLEAN,
-    defaultValue: false
+    defaultValue: true
   },
   bot_mode: {
     type:         DataTypes.STRING(20),
