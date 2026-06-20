@@ -22,6 +22,7 @@ import WhatsappConfig  from './components/Configuration/WhatsappConfig';
 import Integraciones   from './components/Configuration/Integraciones';
 import FlowRulesConfig       from './components/Configuration/FlowRulesConfig';
 import MensajesRapidosConfig  from './components/Configuration/MensajesRapidosConfig';
+import WidgetsConfig          from './components/Configuration/WidgetsConfig';
 import ModulosConfig          from './components/Modules/ModulosConfig';
 import ModuleView             from './components/Modules/ModuleView';
 import CalendarPanel          from './components/Calendar/CalendarPanel';
@@ -117,7 +118,7 @@ export default function App() {
 
          {/* Desarrolladores */}
         <Route path="config/integraciones" element={<RoleRoute role="admin"><FeatureRoute feature="config_integrations"><Integraciones /></FeatureRoute></RoleRoute>} />
-        <Route path="config/widgets"       element={<FeatureRoute feature="config_widgets"><Placeholder name="Widgets" /></FeatureRoute>} />
+        <Route path="config/widgets"       element={<FeatureRoute feature="config_widgets"><WidgetsConfig /></FeatureRoute>} />
         <Route path="config/complementos"  element={<FeatureRoute feature="config_plugins"><Placeholder name="Complementos" /></FeatureRoute>} />
 
         {/* ── Módulos personalizados ── */}
