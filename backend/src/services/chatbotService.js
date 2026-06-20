@@ -446,9 +446,9 @@ class ChatbotService {
   async buildCalendarContext(sessionId) {
     try {
       const { BusinessSchedule, Appointment } = require('../models');
+      const Company = require('../models/Company');
       const { Op } = require('sequelize');
 
-      // Determinar company_id desde sesión
       const { WhatsappChat } = require('../models');
       const anyChat = await WhatsappChat.findOne({ where: { session_id: sessionId }, attributes: ['company_id'] });
       const companyId = anyChat?.company_id;
@@ -460,6 +460,43 @@ class ChatbotService {
 
       function timeToMin(t) { const [h,m] = t.split(':').map(Number); return h*60+m; }
       function minToTime(min) { return `${String(Math.floor(min/60)).padStart(2,'0')}:${String(min%60).padStart(2,'0')}`; }
+
+      // Cargar eventos externos (Outlook / Google Calendar) para los próximos 14 días
+      let externalBusy = [];
+      if (companyId) {
+        try {
+          const company = await Company.findByPk(companyId, { attributes: ['id', 'outlook_tokens', 'google_calendar_tokens'] });
+          const today = new Date();
+          const endRange = new Date(today);
+          endRange.setDate(today.getDate() + 14);
+          const startStr = today.toISOString().slice(0, 10);
+          const endStr   = endRange.toISOString().slice(0, 10);
+
+          if (company?.outlook_tokens?.access_token) {
+            try {
+              const outlook = require('./outlookService');
+              const events = await outlook.getCalendarEvents(company, startStr, endStr);
+              for (const ev of (events || [])) {
+                const s = new Date(ev.start?.dateTime || ev.start);
+                const e = new Date(ev.end?.dateTime || ev.end);
+                externalBusy.push({ date: s.toISOString().slice(0,10), start: s.getHours()*60+s.getMinutes(), end: e.getHours()*60+e.getMinutes() });
+              }
+            } catch (_) {}
+          }
+
+          if (company?.google_calendar_tokens?.access_token) {
+            try {
+              const gcal = require('./googleCalendarService');
+              const events = await gcal.getCalendarEvents(company, startStr, endStr);
+              for (const ev of (events || [])) {
+                const s = new Date(ev.start?.dateTime || ev.start?.date || ev.start);
+                const e = new Date(ev.end?.dateTime || ev.end?.date || ev.end);
+                externalBusy.push({ date: s.toISOString().slice(0,10), start: s.getHours()*60+s.getMinutes(), end: e.getHours()*60+e.getMinutes() });
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
 
       const DIAS_ES = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
       const results = [];
@@ -478,12 +515,17 @@ class ChatbotService {
           attributes: ['start_time', 'duration_minutes'],
         });
         const occupied = existing.map(a => ({ start: timeToMin(a.start_time), end: timeToMin(a.start_time) + (a.duration_minutes||30) }));
+
+        // Agregar bloques ocupados del calendario externo
+        const extForDay = externalBusy.filter(b => b.date === dateStr);
+        occupied.push(...extForDay);
+
         const dur = sched.slot_duration || 30;
         const slots = [];
         for (let t = timeToMin(sched.start_time); t + dur <= timeToMin(sched.end_time); t += dur) {
           if (!occupied.some(o => t < o.end && (t+dur) > o.start)) slots.push(minToTime(t));
         }
-        if (slots.length) results.push({ date: dateStr, day: DIAS_ES[dow], slots: slots.slice(0,4) });
+        if (slots.length) results.push({ date: dateStr, day: DIAS_ES[dow], slots: slots.slice(0,6) });
       }
 
       if (!results.length) return null;
@@ -492,11 +534,68 @@ class ChatbotService {
       for (const r of results) {
         lines.push(`${r.day} ${r.date}: ${r.slots.join(', ')}`);
       }
-      lines.push(`Si el cliente desea agendar, sugiere estas opciones y confirma su nombre completo y teléfono.`);
+      lines.push(`Cuando el cliente confirme una cita, responde con el token: [SCHEDULE:nombre_completo|teléfono|YYYY-MM-DD|HH:MM]`);
+      lines.push(`Ejemplo: [SCHEDULE:María García|809-555-0001|2026-06-25|10:00]`);
+      lines.push(`IMPORTANTE: solo usa [SCHEDULE:...] cuando el cliente confirme nombre, teléfono, fecha y hora. Antes de eso, pregunta y sugiere opciones.`);
       lines.push(`=================================`);
       return lines.join('\n');
     } catch (err) {
       logger.warn('buildCalendarContext error:', err.message);
+      return null;
+    }
+  }
+
+  extractScheduleCommand(text) {
+    const match = text.match(/\[SCHEDULE:([^\]]+)\]/i);
+    if (!match) return { text, schedule: null };
+    const parts = match[1].split('|').map(s => s.trim());
+    const cleaned = text.replace(/\[SCHEDULE:[^\]]+\]/gi, '').trim();
+    if (parts.length < 4) return { text: cleaned, schedule: null };
+    return {
+      text: cleaned,
+      schedule: { name: parts[0], phone: parts[1], date: parts[2], time: parts[3] },
+    };
+  }
+
+  async createAppointmentFromBot(schedule, sessionId, companyId) {
+    try {
+      const { Appointment } = require('../models');
+      const Company = require('../models/Company');
+      const outlook = require('./outlookService');
+      const gcal    = require('./googleCalendarService');
+
+      const appointment = await Appointment.create({
+        company_id:       companyId || null,
+        title:            `Cita agendada por WhatsApp`,
+        contact_name:     schedule.name,
+        contact_phone:    schedule.phone,
+        date:             schedule.date,
+        start_time:       schedule.time,
+        duration_minutes: 30,
+        status:           'confirmed',
+      });
+
+      // Sincronizar con calendario externo
+      if (companyId) {
+        const company = await Company.findByPk(companyId, { attributes: ['id', 'outlook_tokens', 'google_calendar_tokens'] });
+        if (company?.outlook_tokens?.access_token) {
+          try {
+            const eventId = await outlook.createCalendarEvent(company, appointment);
+            if (eventId) await appointment.update({ outlook_event_id: eventId });
+          } catch (_) {}
+        }
+        if (company?.google_calendar_tokens?.access_token) {
+          try {
+            const eventId = await gcal.createCalendarEvent(company, appointment);
+            if (eventId) await appointment.update({ google_event_id: eventId });
+          } catch (_) {}
+        }
+      }
+
+      logger.info(`📅 Cita creada por bot: ${schedule.name} — ${schedule.date} ${schedule.time}`);
+      return appointment;
+    } catch (err) {
+      logger.error('Error creando cita desde bot:', err.message);
       return null;
     }
   }
@@ -797,8 +896,15 @@ class ChatbotService {
       } else {
         logger.warn(`⚠️  Bot WA [${jid}]: IA devolvió respuesta vacía`);
       }
-      // Extraer comandos: [HUMAN_NEEDED] → [START_DOC:nombre] → [SEND_FILE:id]
-      const { text: afterHandoff, handoff } = this.extractHandoff(rawResponse);
+      // Extraer comandos: [SCHEDULE:...] → [HUMAN_NEEDED] → [START_DOC:nombre] → [SEND_FILE:id]
+      const { text: afterSchedule, schedule } = this.extractScheduleCommand(rawResponse);
+      if (schedule) {
+        const anyChat2 = await WhatsappChat.findOne({ where: { session_id: sessionId, jid }, attributes: ['company_id'] });
+        await this.createAppointmentFromBot(schedule, sessionId, anyChat2?.company_id);
+        logger.info(`📅 Bot WA [${jid}] agendó cita: ${schedule.name} ${schedule.date} ${schedule.time}`);
+      }
+
+      const { text: afterHandoff, handoff } = this.extractHandoff(afterSchedule);
       const { text: afterDoc, docName }     = this.extractDocCommand(afterHandoff);
       const result = await this.extractFileCommand(afterDoc);
       if (result?.catalogFile) {
@@ -807,7 +913,7 @@ class ChatbotService {
       if (docName) {
         logger.info(`📄 Bot WA [${jid}] solicita recolección de doc: "${docName}"`);
       }
-      return { ...result, handoff, startDoc: docName || null };
+      return { ...result, handoff, startDoc: docName || null, schedule: schedule || null };
 
     } catch (err) {
       logger.error(`❌ ChatbotService.handleWhatsappMessage [${jid}]:`, err.message);
