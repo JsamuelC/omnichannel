@@ -3,12 +3,20 @@ const { Company } = require('../models');
 const gcalService = require('../services/googleCalendarService');
 const logger      = require('../config/logger');
 
+async function resolveCompanyId(req) {
+  if (req.user.company_id) return req.user.company_id;
+  if (req.user.role === 'superadmin') {
+    const first = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['id'] });
+    return first?.id || null;
+  }
+  return null;
+}
+
 class GoogleCalendarController {
 
-  // GET /api/gcal/connect — redirige al consentimiento de Google
   async connect(req, res) {
     try {
-      const companyId = req.user.company_id;
+      const companyId = await resolveCompanyId(req);
       if (!companyId) return res.status(403).json({ success: false, message: 'Se requiere empresa' });
 
       if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
@@ -24,7 +32,6 @@ class GoogleCalendarController {
     }
   }
 
-  // GET /api/gcal/callback — recibe el code de Google
   async callback(req, res) {
     const front = process.env.FRONTEND_URL || 'http://localhost:5173';
     try {
@@ -35,7 +42,6 @@ class GoogleCalendarController {
       const company = await Company.findByPk(companyId);
       if (!company) throw new Error('Empresa no encontrada');
 
-      // Intercambio de código por tokens
       const tokens  = await gcalService.exchangeCode(code);
       const info    = await gcalService.getUserInfo(tokens.access_token);
 
@@ -56,10 +62,10 @@ class GoogleCalendarController {
     }
   }
 
-  // GET /api/gcal/status
   async status(req, res) {
     try {
-      const company = await Company.findByPk(req.user.company_id);
+      const companyId = await resolveCompanyId(req);
+      const company = companyId ? await Company.findByPk(companyId) : null;
       if (!company) return res.json({ success: true, data: { connected: false } });
 
       const tokens = company.google_calendar_tokens;
@@ -78,10 +84,10 @@ class GoogleCalendarController {
     }
   }
 
-  // DELETE /api/gcal/disconnect
   async disconnect(req, res) {
     try {
-      const company = await Company.findByPk(req.user.company_id);
+      const companyId = await resolveCompanyId(req);
+      const company = companyId ? await Company.findByPk(companyId) : null;
       if (!company) return res.status(404).json({ success: false, message: 'Empresa no encontrada' });
 
       await company.update({ google_calendar_tokens: null });
@@ -92,10 +98,10 @@ class GoogleCalendarController {
     }
   }
 
-  // GET /api/gcal/events?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
   async getEvents(req, res) {
     try {
-      const company = await Company.findByPk(req.user.company_id);
+      const companyId = await resolveCompanyId(req);
+      const company = companyId ? await Company.findByPk(companyId) : null;
       if (!company?.google_calendar_tokens?.access_token) {
         return res.json({ success: true, data: [] });
       }

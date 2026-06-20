@@ -3,19 +3,28 @@ const { Appointment } = require('../models');
 const outlook     = require('../services/outlookService');
 const logger      = require('../config/logger');
 
+async function resolveCompanyId(req) {
+  if (req.user.company_id) return req.user.company_id;
+  if (req.user.role === 'superadmin') {
+    const first = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['id'] });
+    return first?.id || null;
+  }
+  return null;
+}
+
 // GET /api/outlook/connect
-// Redirige al login de Microsoft
-exports.connect = (req, res) => {
+exports.connect = async (req, res) => {
+  const companyId = await resolveCompanyId(req);
   const state = Buffer.from(JSON.stringify({
-    companyId: req.user.company_id,
-    userId:    req.user.id,
+    companyId,
+    userId: req.user.id,
   })).toString('base64');
 
   const url = outlook.getAuthUrl(state);
   res.json({ success: true, data: { url } });
 };
 
-// GET /api/outlook/callback  (Microsoft redirige aquí)
+// GET /api/outlook/callback
 exports.callback = async (req, res) => {
   const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
   try {
@@ -53,7 +62,8 @@ exports.callback = async (req, res) => {
 // DELETE /api/outlook/disconnect
 exports.disconnect = async (req, res) => {
   try {
-    const company = await Company.findByPk(req.user.company_id);
+    const companyId = await resolveCompanyId(req);
+    const company = companyId ? await Company.findByPk(companyId) : null;
     if (!company) return res.status(404).json({ success: false, error: 'Empresa no encontrada' });
 
     await company.update({ outlook_tokens: null });
@@ -66,9 +76,8 @@ exports.disconnect = async (req, res) => {
 // GET /api/outlook/status
 exports.status = async (req, res) => {
   try {
-    const company = await Company.findByPk(req.user.company_id, {
-      attributes: ['outlook_tokens'],
-    });
+    const companyId = await resolveCompanyId(req);
+    const company = companyId ? await Company.findByPk(companyId, { attributes: ['outlook_tokens'] }) : null;
     const tokens = company?.outlook_tokens;
     if (!tokens?.access_token) {
       return res.json({ success: true, data: { connected: false } });
@@ -90,7 +99,8 @@ exports.status = async (req, res) => {
 // GET /api/outlook/events?start=YYYY-MM-DD&end=YYYY-MM-DD
 exports.getEvents = async (req, res) => {
   try {
-    const company = await Company.findByPk(req.user.company_id);
+    const companyId = await resolveCompanyId(req);
+    const company = companyId ? await Company.findByPk(companyId) : null;
     if (!company?.outlook_tokens?.access_token) {
       return res.json({ success: true, data: [] });
     }
