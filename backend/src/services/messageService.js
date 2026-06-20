@@ -86,14 +86,21 @@ class MessageService {
     if (!conversation) throw new Error('Conversación no encontrada');
 
     const contact     = conversation.contact;
-    const recipientId = this.getChannelId(contact, conversation.channel);
-    if (!recipientId) throw new Error(`Contacto sin ID para canal ${conversation.channel}`);
 
-    const metaResponse = await metaService.sendMessage(conversation.channel, recipientId, text);
+    let externalId = null;
+
+    if (conversation.channel === 'web') {
+      // Canal web: no pasa por Meta, solo guarda el mensaje y emite por socket
+    } else {
+      const recipientId = this.getChannelId(contact, conversation.channel);
+      if (!recipientId) throw new Error(`Contacto sin ID para canal ${conversation.channel}`);
+      const metaResponse = await metaService.sendMessage(conversation.channel, recipientId, text);
+      externalId = metaResponse?.messages?.[0]?.id || null;
+    }
 
     const message = await Message.create({
       conversation_id: conversationId,
-      external_id:     metaResponse?.messages?.[0]?.id || null,
+      external_id:     externalId,
       direction:       'outbound',
       sender_type:     senderType,
       sender_id:       senderId,
@@ -220,7 +227,8 @@ class MessageService {
     return {
       whatsapp:  contact.whatsapp_id,
       messenger: contact.messenger_id,
-      instagram: contact.instagram_id
+      instagram: contact.instagram_id,
+      web:       contact.web_id
     }[channel];
   }
 
