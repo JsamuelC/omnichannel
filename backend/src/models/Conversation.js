@@ -30,7 +30,7 @@ const Conversation = sequelize.define('conversations', {
 
   // Canal de comunicación
   channel: {
-    type: DataTypes.ENUM('whatsapp', 'messenger', 'instagram'),
+    type: DataTypes.ENUM('whatsapp', 'messenger', 'instagram', 'web'),
     allowNull: false
   },
 

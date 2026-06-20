@@ -253,6 +253,14 @@ const migrate = async () => {
       await safeAdd(t, 'company_id', { type: DT.UUID, allowNull: true });
     }
 
+    // Agregar 'web' al ENUM de canales si aún no existe
+    try {
+      await sequelize.query(`ALTER TYPE "enum_conversations_channel" ADD VALUE IF NOT EXISTS 'web'`);
+    } catch (_) {}
+
+    // Agregar web_id a contacts
+    await safeAdd('contacts', 'web_id', { type: DT.STRING, allowNull: true, unique: true });
+
     // Agregar 'superadmin' al ENUM de roles si aún no existe
     try {
       await sequelize.query(`ALTER TYPE "enum_users_role" ADD VALUE IF NOT EXISTS 'superadmin'`);

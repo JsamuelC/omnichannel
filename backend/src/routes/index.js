@@ -28,6 +28,7 @@ const templateCtrl            = require('../controllers/documentTemplateControll
 const docRequestCtrl          = require('../controllers/documentRequestController');
 const mergeTemplateCtrl       = require('../controllers/mergeTemplateController');
 const deployController        = require('../controllers/deployController');
+const widgetController        = require('../controllers/widgetController');
 const outlookController       = require('../controllers/outlookController');
 const googleCalendarController = require('../controllers/googleCalendarController');
 const planController          = require('../controllers/planController');
@@ -82,6 +83,14 @@ router.put   ('/users/:id',          auth, requireRole('admin'), requireFeature(
 router.patch ('/users/:id/toggle',   auth, requireRole('admin'), requireFeature('team_management'), companyScope, userController.toggleActive.bind(userController));
 router.delete('/users/:id',          auth, requireRole('admin'), requireFeature('team_management'), companyScope, userController.remove.bind(userController));
 router.patch ('/users/:id/password', auth,                       companyScope, userController.changePassword.bind(userController));
+
+// ─────────────────────────────────────
+// WIDGET DE CHAT WEB (sin auth — público)
+// ─────────────────────────────────────
+router.post('/widget/init',                    widgetController.init);
+router.post('/widget/message',                 widgetController.sendMessage);
+router.get ('/widget/messages/:conversationId', widgetController.getMessages);
+router.get ('/widget/config/:companyId',        widgetController.getConfig);
 
 // ─────────────────────────────────────
 // WEBHOOKS META (sin auth — validados por HMAC)
