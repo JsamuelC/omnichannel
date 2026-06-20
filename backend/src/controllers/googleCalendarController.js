@@ -24,7 +24,7 @@ class GoogleCalendarController {
       }
 
       const authUrl = gcalService.getAuthUrl(companyId);
-      res.redirect(authUrl);
+      res.json({ success: true, data: { url: authUrl } });
     } catch (err) {
       logger.error('GCal connect error:', err);
       const front = process.env.FRONTEND_URL || 'http://localhost:5173';

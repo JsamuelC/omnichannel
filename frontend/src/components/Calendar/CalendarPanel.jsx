@@ -598,10 +598,15 @@ export default function CalendarPanel() {
     });
   };
 
-  const handleConnectGCal = () => {
+  const handleConnectGCal = async () => {
     setConnectingGCal(true);
-    const base = import.meta.env.VITE_API_URL || '/api';
-    window.location.href = `${base}/gcal/connect`;
+    try {
+      const res = await api.get('/gcal/connect');
+      window.location.href = res.data.url;
+    } catch (err) {
+      toast.error('No se pudo iniciar la conexión con Google Calendar');
+      setConnectingGCal(false);
+    }
   };
 
   const handleDisconnectGCal = () => {
