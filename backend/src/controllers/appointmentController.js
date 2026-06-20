@@ -5,6 +5,15 @@ const gcal     = require('../services/googleCalendarService');
 const logger   = require('../config/logger');
 const { Op }   = require('sequelize');
 
+async function resolveCompanyId(req) {
+  if (req.user?.company_id) return req.user.company_id;
+  if (req.user?.role === 'superadmin') {
+    const first = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['id'] });
+    return first?.id || null;
+  }
+  return null;
+}
+
 async function syncToOutlook(companyId, appointment, action = 'create') {
   try {
     const company = await Company.findByPk(companyId, { attributes: ['id', 'outlook_tokens'] });
@@ -86,8 +95,10 @@ const create = async (req, res) => {
     if (!date)                 return res.status(400).json({ success: false, message: 'La fecha es requerida' });
     if (!start_time)           return res.status(400).json({ success: false, message: 'La hora es requerida' });
 
+    const companyId = await resolveCompanyId(req);
+
     const appt = await Appointment.create({
-      company_id:       req.user?.company_id || null,
+      company_id:       companyId,
       title:            title?.trim() || null,
       contact_name:     contact_name.trim(),
       contact_phone:    contact_phone?.trim() || null,
@@ -101,9 +112,9 @@ const create = async (req, res) => {
       created_by:       req.user?.id || null,
     });
 
-    if (req.user?.company_id) {
-      syncToOutlook(req.user.company_id, appt, 'create');
-      syncToGoogle(req.user.company_id, appt, 'create');
+    if (companyId) {
+      syncToOutlook(companyId, appt, 'create');
+      syncToGoogle(companyId, appt, 'create');
     }
     res.json({ success: true, data: appt });
   } catch (err) {
@@ -114,7 +125,7 @@ const create = async (req, res) => {
 // PUT /appointments/:id
 const update = async (req, res) => {
   try {
-    const companyId = req.user?.company_id;
+    const companyId = await resolveCompanyId(req);
     const where = { id: req.params.id, ...(companyId ? { company_id: companyId } : {}) };
     const appt = await Appointment.findOne({ where });
     if (!appt) return res.status(404).json({ success: false, message: 'Cita no encontrada' });
@@ -125,9 +136,9 @@ const update = async (req, res) => {
       if (req.body[f] !== undefined) updates[f] = req.body[f];
     }
     await appt.update(updates);
-    if (req.user?.company_id) {
-      syncToOutlook(req.user.company_id, appt, 'update');
-      syncToGoogle(req.user.company_id, appt, 'update');
+    if (companyId) {
+      syncToOutlook(companyId, appt, 'update');
+      syncToGoogle(companyId, appt, 'update');
     }
     res.json({ success: true, data: appt });
   } catch (err) {
@@ -138,13 +149,13 @@ const update = async (req, res) => {
 // DELETE /appointments/:id
 const remove = async (req, res) => {
   try {
-    const companyId = req.user?.company_id;
+    const companyId = await resolveCompanyId(req);
     const where = { id: req.params.id, ...(companyId ? { company_id: companyId } : {}) };
     const appt = await Appointment.findOne({ where });
     if (!appt) return res.status(404).json({ success: false, message: 'Cita no encontrada' });
-    if (req.user?.company_id) {
-      syncToOutlook(req.user.company_id, appt, 'delete');
-      syncToGoogle(req.user.company_id, appt, 'delete');
+    if (companyId) {
+      syncToOutlook(companyId, appt, 'delete');
+      syncToGoogle(companyId, appt, 'delete');
     }
     await appt.destroy();
     res.json({ success: true });
