@@ -1,5 +1,5 @@
 // backend/src/controllers/googleCalendarController.js
-const { Company } = require('../models');
+const Company     = require('../models/Company');
 const gcalService = require('../services/googleCalendarService');
 const logger      = require('../config/logger');
 
