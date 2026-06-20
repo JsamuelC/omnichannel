@@ -103,6 +103,7 @@ jobs:
           curl -f https://${{ secrets.PROD_DOMAIN }}/api/health || exit 1
 
       - name: Tag release en Git
+        continue-on-error: true
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
