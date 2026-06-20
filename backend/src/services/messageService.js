@@ -220,7 +220,8 @@ class MessageService {
     return {
       whatsapp:  contact.whatsapp_id,
       messenger: contact.messenger_id,
-      instagram: contact.instagram_id
+      instagram: contact.instagram_id,
+      web:       contact.web_id
     }[channel];
   }
 

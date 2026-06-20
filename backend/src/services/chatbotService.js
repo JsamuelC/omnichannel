@@ -435,10 +435,13 @@ class ChatbotService {
   }
 
   async getBotConfig(companyId, channel) {
+    const ch = channel === 'web' ? 'all' : channel;
     return await BotConfig.findOne({
-      where: { company_id: companyId || null, channel, is_active: true }
+      where: { company_id: companyId || null, channel: ch, is_active: true }
     }) || await BotConfig.findOne({
       where: { channel: 'all', is_active: true }
+    }) || await BotConfig.findOne({
+      where: { is_active: true }
     });
   }
 
