@@ -76,6 +76,8 @@ services:
     image: ${ECR_REGISTRY}/tecnossync-frontend:${IMAGE_TAG:-qa}
     container_name: tecnossync_qa_frontend
     restart: unless-stopped
+    environment:
+      BACKEND_HOST: tecnossync_qa_backend
     ports:
       - "5174:80"
     depends_on:
