@@ -625,11 +625,15 @@ export default function CalendarPanel() {
     });
   };
 
-  // ── Fetch month appointments ───────────────────────────
+  // ── Fetch month appointments + external calendar events ─
   const fetchMonth = useCallback(async () => {
     setLoadingMonth(true);
     try {
       const monthStr = `${year}-${String(month+1).padStart(2,'0')}`;
+      const lastDay  = new Date(year, month + 1, 0).getDate();
+      const startDate = `${monthStr}-01`;
+      const endDate   = `${monthStr}-${String(lastDay).padStart(2,'0')}`;
+
       const res = await api.get(`/appointments?month=${monthStr}`);
       const rows = res.data || [];
       const map = {};
@@ -637,15 +641,42 @@ export default function CalendarPanel() {
         if (!map[a.date]) map[a.date] = [];
         map[a.date].push(a);
       }
+
+      // Cargar eventos de Outlook para todo el mes
+      if (outlookStatus?.connected) {
+        try {
+          const olRes = await api.get(`/outlook/events?start=${startDate}&end=${endDate}`);
+          for (const ev of (olRes.data || [])) {
+            const d = new Date(ev.start?.dateTime || ev.start);
+            const ds = d.toISOString().slice(0, 10);
+            if (!map[ds]) map[ds] = [];
+            map[ds].push({ id: ev.id, status: 'confirmed', contact_name: ev.subject || 'Outlook', start_time: `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`, _source: 'outlook' });
+          }
+        } catch (_) {}
+      }
+
+      // Cargar eventos de Google Calendar para todo el mes
+      if (gcalStatus?.connected) {
+        try {
+          const gcRes = await api.get(`/gcal/events?startDate=${startDate}&endDate=${endDate}`);
+          const gcEvents = gcRes.data?.data || gcRes.data || [];
+          for (const ev of gcEvents) {
+            const d = new Date(ev.start?.dateTime || ev.start?.date || ev.start);
+            const ds = d.toISOString().slice(0, 10);
+            if (!map[ds]) map[ds] = [];
+            map[ds].push({ id: ev.id, status: 'confirmed', contact_name: ev.summary || 'Google', start_time: `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`, _source: 'gcal' });
+          }
+        } catch (_) {}
+      }
+
       setMonthAppts(map);
-      // Update day panel
       if (selectedDate) setDayAppts(map[selectedDate] || []);
     } catch (err) {
       console.error('fetchMonth error:', err);
     } finally {
       setLoadingMonth(false);
     }
-  }, [year, month]);
+  }, [year, month, outlookStatus?.connected, gcalStatus?.connected]);
 
   useEffect(() => { fetchMonth(); }, [fetchMonth]);
 
