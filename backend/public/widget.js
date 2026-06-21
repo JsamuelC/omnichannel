@@ -132,7 +132,7 @@
         var res = await fetch(API + '/widget/init', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ company_id: COMPANY, session_id: sessionId, visitor_name: visitorData.name || null, visitor_email: visitorData.email || null }),
+          body: JSON.stringify({ company_id: COMPANY, session_id: sessionId, visitor_name: visitorData.name || null, visitor_email: visitorData.email || null, visitor_phone: visitorData.phone || null, form_data: visitorData }),
         });
         var data = await res.json();
         if (data.success) {
