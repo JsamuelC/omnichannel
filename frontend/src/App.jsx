@@ -71,6 +71,21 @@ export default function App() {
   const { token, fetchMe } = useAuthStore();
   useEffect(() => { if (token) fetchMe(); }, []);
 
+  // Interceptar callback de OAuth en popup — cerrar y pasar token al padre
+  useEffect(() => {
+    if (window.opener && window.location.hash.includes('access_token=')) {
+      const hash = window.location.hash;
+      const accessToken = hash.split('access_token=')[1]?.split('&')[0];
+      const path = window.location.pathname;
+      let type = 'oauth_token';
+      if (path.includes('instagram')) type = 'ig_token';
+      else if (path.includes('messenger')) type = 'msg_token';
+      window.opener.postMessage({ type, token: accessToken }, window.location.origin);
+      window.close();
+      return;
+    }
+  }, []);
+
   return (
     <Routes>
       <Route path="/login"                  element={<Login />} />
