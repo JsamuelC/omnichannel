@@ -38,7 +38,7 @@ export default function MessengerConfig() {
   const handleConnect = () => {
     setConnecting(true);
     const redirectUri = `${window.location.origin}/config/messenger`;
-    const scope = 'pages_show_list,pages_read_engagement,pages_manage_metadata';
+    const scope = 'pages_show_list,pages_read_engagement';
     const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=token&display=popup`;
     const w = 600, h = 700;
     const left = window.screenX + (window.innerWidth - w) / 2;
