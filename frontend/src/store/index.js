@@ -192,6 +192,22 @@ export const useConversationStore = create((set, get) => ({
     }));
   },
 
+  deleteConversation: async (id) => {
+    await api.delete(`/conversations/${id}`);
+    set((s) => ({
+      conversations:      s.conversations.filter((c) => c.id !== id),
+      activeConversation: s.activeConversation?.id === id ? null : s.activeConversation,
+      messages:           s.activeConversation?.id === id ? [] : s.messages
+    }));
+  },
+
+  removeConversation: (id) => {
+    set((s) => ({
+      conversations:      s.conversations.filter((c) => c.id !== id),
+      activeConversation: s.activeConversation?.id === id ? null : s.activeConversation
+    }));
+  },
+
   updateActiveConversationMeta: (metaPatch) => {
     set((s) => {
       if (!s.activeConversation) return s;

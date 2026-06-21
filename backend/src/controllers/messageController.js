@@ -156,6 +156,27 @@ class MessageController {
       res.status(500).json({ success: false, message: error.message });
     }
   }
+
+  // DELETE /conversations/:id
+  async deleteConversation(req, res) {
+    try {
+      const conversation = await Conversation.findByPk(req.params.id);
+      if (!conversation) {
+        return res.status(404).json({ success: false, message: 'Conversación no encontrada.' });
+      }
+
+      const { Message } = require('../models');
+      await Message.destroy({ where: { conversation_id: conversation.id } });
+      await conversation.destroy();
+
+      const io = req.app.get('io');
+      if (io) io.to('agents').emit('conversation:deleted', { conversationId: conversation.id });
+
+      res.json({ success: true, message: 'Conversación eliminada.' });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
 }
 
 module.exports = new MessageController();

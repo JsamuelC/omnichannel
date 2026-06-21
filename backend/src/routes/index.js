@@ -181,6 +181,10 @@ router.post('/conversations/:id/resolve',
   auth, requireConversationAccess,
   messageController.resolveConversation.bind(messageController));
 
+router.delete('/conversations/:id',
+  auth, requireRole('admin'),
+  messageController.deleteConversation.bind(messageController));
+
 // ─────────────────────────────────────
 // CONFIGURACIÓN DEL BOT
 // ─────────────────────────────────────

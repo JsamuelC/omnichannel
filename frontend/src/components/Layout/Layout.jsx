@@ -130,7 +130,7 @@ const CHANNEL_LABEL = { whatsapp: 'WhatsApp', messenger: 'Messenger', instagram:
 
 export default function Layout() {
   const { user, logout, isAdmin, hasFeature } = useAuthStore();
-  const { addIncomingMessage, fetchConversations } = useConversationStore();
+  const { addIncomingMessage, fetchConversations, removeConversation } = useConversationStore();
   const { theme, toggleTheme }           = useThemeStore();
   const { modules, fetchModules }        = useModuleStore();
   const [sidebarOpen, setSidebarOpen]    = useState(false); // móvil
@@ -179,16 +179,22 @@ export default function Layout() {
     };
 
     socket.on('message:new',               onNewMessage);
+    socket.on('message:sent',              fetchConversations);
     socket.on('conversation:escalated',    onEscalated);
     socket.on('conversation:assigned',     fetchConversations);
     socket.on('conversation:assigned_to_you', onAssignedToYou);
+    socket.on('conversation:updated',      fetchConversations);
+    socket.on('conversation:deleted',      (d) => removeConversation(d.conversationId));
     socket.on('document:ready',            onDocReady);
 
     return () => {
       socket.off('message:new',               onNewMessage);
+      socket.off('message:sent',              fetchConversations);
       socket.off('conversation:escalated',    onEscalated);
       socket.off('conversation:assigned',     fetchConversations);
       socket.off('conversation:assigned_to_you', onAssignedToYou);
+      socket.off('conversation:updated',      fetchConversations);
+      socket.off('conversation:deleted',      (d) => removeConversation(d.conversationId));
       socket.off('document:ready',            onDocReady);
     };
   }, []);

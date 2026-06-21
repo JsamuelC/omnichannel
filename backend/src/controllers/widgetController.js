@@ -15,6 +15,7 @@ exports.init = async (req, res) => {
     if (!company) return res.status(404).json({ success: false, error: 'Empresa no encontrada' });
 
     const webId = session_id || `web_${uuid()}`;
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null;
 
     const [contact] = await Contact.findOrCreate({
       where: { web_id: webId },
@@ -33,15 +34,33 @@ exports.init = async (req, res) => {
     if (visitor_phone && visitor_phone !== contact.phone) updates.phone = visitor_phone;
     if (Object.keys(updates).length) await contact.update(updates);
 
-    const [conversation] = await Conversation.findOrCreate({
+    // Guardar IP y datos del formulario en metadata de la conversación
+
+    const [conversation, convCreated] = await Conversation.findOrCreate({
       where: { contact_id: contact.id, channel: 'web', status: ['open', 'bot', 'assigned'] },
       defaults: {
         contact_id: contact.id,
         channel:    'web',
         status:     'bot',
         company_id: company_id,
+        metadata:   { client_ip: clientIp, form_data: form_data || null },
       },
     });
+
+    if (!convCreated && clientIp) {
+      const meta = conversation.metadata || {};
+      meta.client_ip = clientIp;
+      if (form_data) meta.form_data = form_data;
+      await conversation.update({ metadata: meta });
+    }
+
+    // Emitir a agentes para que la bandeja se actualice en tiempo real
+    const io = req.app.get('io');
+    if (io) {
+      io.to('agents').emit('conversation:updated', {
+        conversation: { ...conversation.toJSON(), contact: contact.toJSON() },
+      });
+    }
 
     res.json({
       success: true,
