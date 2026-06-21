@@ -129,7 +129,13 @@ app.get('/widget.js', (req, res) => {
 // ─────────────────────────────────────
 // MIDDLEWARES
 // ─────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: false,
+  strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+}));
 
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/widget')) {
