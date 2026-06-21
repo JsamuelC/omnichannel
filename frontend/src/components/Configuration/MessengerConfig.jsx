@@ -4,7 +4,7 @@ import { CheckCircle, XCircle, Link2Off, MessageCircle } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
-const META_APP_ID = '1692654055287413';
+const META_APP_ID = '897060716742578';
 
 export default function MessengerConfig() {
   const navigate = useNavigate();
