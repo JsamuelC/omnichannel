@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, Link2Off, MessageCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Link2Off, MessageCircle, Loader2 } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -12,11 +12,27 @@ export default function MessengerConfig() {
   const [loading, setLoading]     = useState(true);
   const [connecting, setConnecting] = useState(false);
 
-  useEffect(() => {
+  const loadStatus = () => {
     api.get('/channels/messenger/status')
       .then(r => setStatus(r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadStatus(); }, []);
+
+  // Detectar token de OAuth en localStorage (puesto por App.jsx desde popup)
+  useEffect(() => {
+    const check = () => {
+      const token = localStorage.getItem('msg_oauth_token');
+      if (token) {
+        localStorage.removeItem('msg_oauth_token');
+        connectWithToken(token);
+      }
+    };
+    check();
+    const interval = setInterval(check, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleConnect = () => {
@@ -27,20 +43,12 @@ export default function MessengerConfig() {
     const w = 600, h = 700;
     const left = window.screenX + (window.innerWidth - w) / 2;
     const top = window.screenY + (window.innerHeight - h) / 2;
-    const popup = window.open(url, 'fb_messenger', `width=${w},height=${h},left=${left},top=${top}`);
-
-    const interval = setInterval(() => {
-      if (!popup || popup.closed) {
-        clearInterval(interval);
-        const token = localStorage.getItem('msg_oauth_token');
-        if (token) { localStorage.removeItem('msg_oauth_token'); connectWithToken(token); }
-        else setConnecting(false);
-      }
-    }, 500);
+    window.open(url, 'fb_messenger', `width=${w},height=${h},left=${left},top=${top}`);
   };
 
   const connectWithToken = async (token) => {
     setLoading(true);
+    setConnecting(true);
     try {
       const r = await api.get(`/channels/pages?user_token=${token}`);
       const pages = r.data || [];
@@ -51,17 +59,11 @@ export default function MessengerConfig() {
       });
       if (res?.success) {
         toast.success('Messenger conectado');
-        const r2 = await api.get('/channels/messenger/status');
-        setStatus(r2.data);
+        loadStatus();
       }
     } catch (e) { toast.error(e.message); }
     finally { setLoading(false); setConnecting(false); }
   };
-
-  useEffect(() => {
-    const token = localStorage.getItem('msg_oauth_token');
-    if (token) { localStorage.removeItem('msg_oauth_token'); connectWithToken(token); }
-  }, []);
 
   const handleDisconnect = async () => {
     if (!window.confirm('¿Desconectar Messenger?')) return;
@@ -98,7 +100,7 @@ export default function MessengerConfig() {
           </div>
 
           {loading ? (
-            <p className="text-sm" style={{ color: '#94a3b8' }}>Cargando...</p>
+            <div className="flex items-center gap-2 text-sm" style={{ color: '#94a3b8' }}><Loader2 size={16} className="animate-spin" /> Cargando...</div>
           ) : status?.connected ? (
             <div className="rounded-xl p-5" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
               <div className="flex items-center gap-2 mb-3">
@@ -124,7 +126,7 @@ export default function MessengerConfig() {
               <button onClick={handleConnect} disabled={connecting}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
                 style={{ background: '#0084ff' }}>
-                <MessageCircle size={15} />
+                {connecting ? <Loader2 size={15} className="animate-spin" /> : <MessageCircle size={15} />}
                 {connecting ? 'Conectando...' : 'Conectar con Facebook'}
               </button>
             </div>
