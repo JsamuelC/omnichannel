@@ -111,8 +111,9 @@ export default function Inbox() {
           </div>
 
           {/* Panel de informacion lateral */}
-          {activeConversation && showInfo && (
-            <div className="hidden lg:flex flex-col h-full w-72 xl:w-80 flex-shrink-0 border-l border-[#d1d7db] dark:border-[#2a3942] bg-white dark:bg-[#111b21] overflow-hidden">
+          {activeConversation && (
+            <div className={`flex-col h-full flex-shrink-0 border-l border-[#d1d7db] dark:border-[#2a3942] bg-white dark:bg-[#111b21] overflow-hidden transition-all duration-300
+              ${showInfo ? 'w-72 xl:w-80 flex' : 'w-0 hidden'}`}>
               <ConversationInfoPanel conversation={activeConversation} />
             </div>
           )}

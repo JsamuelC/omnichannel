@@ -20,7 +20,7 @@ const generateToken = (user) =>
   jwt.sign(
     { id: user.id, role: user.role, company_id: user.company_id || null },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '8h', issuer: 'tecnossync', algorithm: 'HS256' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d', issuer: 'tecnossync', algorithm: 'HS256' }
   );
 
 class AuthController {
