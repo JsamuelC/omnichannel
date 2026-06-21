@@ -178,6 +178,11 @@ router.post('/conversations/:id/messages',
   auth, requireConversationAccess,
   messageController.sendMessage.bind(messageController));
 
+router.post('/conversations/:id/media',
+  auth, requireConversationAccess,
+  require('multer')({ dest: require('path').join(__dirname, '../../uploads'), limits: { fileSize: 25 * 1024 * 1024 } }).single('file'),
+  messageController.sendMedia.bind(messageController));
+
 router.post('/conversations/:id/assign',
   auth, requireRole('admin'),
   messageController.assignConversation.bind(messageController));

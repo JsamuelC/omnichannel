@@ -40,6 +40,7 @@ export default function ChatWindow() {
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [showCloseMenu, setShowCloseMenu] = useState(false);
   const [closeTimer, setCloseTimer] = useState(null);
+  const fileInputRef = useRef(null);
   const { modules } = useModuleStore();
 
   const messagesEndRef = useRef(null);
@@ -104,6 +105,27 @@ export default function ChatWindow() {
       setShowResolveModal(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al resolver.');
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('conversationId', activeConversation.id);
+      const res = await api.post(`/conversations/${activeConversation.id}/media`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data) {
+        const { messages: msgs } = useConversationStore.getState();
+        useConversationStore.setState({ messages: [...msgs, res.data] });
+      }
+      toast.success('Archivo enviado');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error al enviar archivo');
     }
   };
 
@@ -413,6 +435,21 @@ export default function ChatWindow() {
             <Zap size={16} />
           </button>
 
+          {/* Botón adjuntar */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors
+                       bg-white dark:bg-[#2a3942] text-[#667781] hover:text-[#00a884] hover:bg-[#e8f5f0]"
+            title="Adjuntar archivo"
+          >
+            <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor">
+              <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+            </svg>
+          </button>
+          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload}
+            accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" />
+
           {/* Botón módulos */}
           {modules.length > 0 && (
             <div className="relative flex-shrink-0">
@@ -576,6 +613,72 @@ export default function ChatWindow() {
   );
 }
 
+// ─── Contenido multimedia del mensaje ────────────────────────
+function MessageMedia({ message }) {
+  const type = message.content_type || 'text';
+  const url  = message.media_url;
+
+  if (type === 'image' && url) {
+    return (
+      <div className="mb-1">
+        <img src={url} alt="" className="max-w-full rounded-lg cursor-pointer max-h-64 object-cover"
+          onClick={() => window.open(url, '_blank')} />
+        {message.content && message.content !== '[Imagen]' && (
+          <p className="text-sm whitespace-pre-wrap leading-relaxed mt-1">{message.content}</p>
+        )}
+      </div>
+    );
+  }
+
+  if ((type === 'audio' || type === 'ptt') && url) {
+    return (
+      <div className="mb-1">
+        <audio controls className="max-w-full" style={{ height: 36 }}>
+          <source src={url} />
+        </audio>
+        {message.content && !message.content.startsWith('[') && (
+          <p className="text-sm whitespace-pre-wrap leading-relaxed mt-1">{message.content}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (type === 'video' && url) {
+    return (
+      <div className="mb-1">
+        <video controls className="max-w-full rounded-lg max-h-64">
+          <source src={url} />
+        </video>
+      </div>
+    );
+  }
+
+  if (type === 'document' && url) {
+    const fileName = message.content || 'Documento';
+    return (
+      <div className="mb-1">
+        <a href={url} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+          <svg viewBox="0 0 20 20" className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor">
+            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+          </svg>
+          <span className="text-sm truncate">{fileName}</span>
+        </a>
+      </div>
+    );
+  }
+
+  if (type === 'sticker' && url) {
+    return (
+      <div className="mb-1">
+        <img src={url} alt="Sticker" className="w-24 h-24 object-contain" />
+      </div>
+    );
+  }
+
+  return <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>;
+}
+
 // ─── Burbuja de mensaje ──────────────────────────────────────
 function MessageBubble({ message, currentUserId }) {
   const isBot    = message.sender_type === 'bot';
@@ -601,10 +704,9 @@ function MessageBubble({ message, currentUserId }) {
             className="px-3 py-1.5 shadow-sm bg-[#d9fdd3] dark:bg-[#005c4b] text-[#111b21] dark:text-[#e9edef]"
             style={{ borderRadius: '8px 0px 8px 8px' }}
           >
-            <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+            <MessageMedia message={message} />
             <p className="text-[11px] text-[#667781] dark:text-[#8696a0] text-right mt-0.5 flex items-center justify-end gap-1 -mb-0.5">
               {time}
-              {/* Tick de estado */}
               {message.status === 'read' && (
                 <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 text-[#53bdeb]" fill="currentColor">
                   <path d="M1 8l4 4L15 3"/>
@@ -617,7 +719,6 @@ function MessageBubble({ message, currentUserId }) {
     );
   }
 
-  // Mensajes entrantes (contacto) → izquierda, burbuja blanca estilo WhatsApp
   return (
     <div className="flex justify-start msg-contact">
       <div className="max-w-[65%]">
@@ -625,7 +726,7 @@ function MessageBubble({ message, currentUserId }) {
           className="bg-white dark:bg-[#202c33] text-[#111b21] dark:text-[#e9edef] px-3 py-1.5 shadow-sm"
           style={{ borderRadius: '0px 8px 8px 8px' }}
         >
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+          <MessageMedia message={message} />
           <p className="text-[11px] text-[#667781] dark:text-[#8696a0] text-right mt-0.5 -mb-0.5">{time}</p>
         </div>
       </div>
