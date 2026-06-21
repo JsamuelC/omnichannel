@@ -11,6 +11,14 @@ const Conversation = sequelize.define('conversations', {
     primaryKey: true
   },
 
+  // Identificador legible único (CHAT-000001)
+  ticket_number: {
+    type: DataTypes.STRING(20),
+    unique: true,
+    allowNull: true,
+    comment: 'ID legible con formato CHAT-000001'
+  },
+
   // Relaciones
   contact_id: {
     type: DataTypes.UUID,
@@ -75,8 +83,24 @@ const Conversation = sequelize.define('conversations', {
     { fields: ['status'] },
     { fields: ['assigned_agent_id'] },
     { fields: ['last_message_at'] },
-    { fields: ['company_id'] }
+    { fields: ['company_id'] },
+    { fields: ['ticket_number'], unique: true }
   ]
+});
+
+// Auto-generar ticket_number antes de crear
+Conversation.beforeCreate(async (conv) => {
+  if (!conv.ticket_number) {
+    try {
+      const [result] = await sequelize.query(
+        `SELECT MAX(CAST(SUBSTRING(ticket_number FROM 6) AS INTEGER)) AS max_num FROM conversations WHERE ticket_number IS NOT NULL`
+      );
+      const next = (result[0]?.max_num || 0) + 1;
+      conv.ticket_number = 'CHAT-' + String(next).padStart(6, '0');
+    } catch {
+      conv.ticket_number = 'CHAT-' + String(Date.now()).slice(-6);
+    }
+  }
 });
 
 module.exports = Conversation;

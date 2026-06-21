@@ -129,7 +129,44 @@ app.get('/widget.js', (req, res) => {
 // ─────────────────────────────────────
 // MIDDLEWARES
 // ─────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:  ["'self'"],
+      scriptSrc:   ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc:    ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc:     ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc:      ["'self'", "data:", "blob:", "https:"],
+      connectSrc:  ["'self'", "wss:", "ws:", "https:"],
+      frameSrc:    ["'none'"],
+      objectSrc:   ["'none'"],
+      baseUri:     ["'self'"],
+      formAction:  ["'self'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  frameguard: { action: 'sameorigin' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  noSniff: true,
+  permissionsPolicy: {
+    features: {
+      camera:        ["()"],
+      microphone:    ["()"],
+      geolocation:   ["()"],
+      payment:       ["()"],
+      usb:           ["()"],
+      magnetometer:  ["()"],
+      gyroscope:     ["()"],
+      accelerometer: ["()"],
+    },
+  },
+}));
 
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/widget')) {

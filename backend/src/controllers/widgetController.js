@@ -1,4 +1,4 @@
-const { Contact, Conversation, Message } = require('../models');
+const { Contact, Conversation, Message, BotConfig } = require('../models');
 const Company        = require('../models/Company');
 const logger         = require('../config/logger');
 const chatbotService = require('../services/chatbotService');
@@ -57,9 +57,12 @@ exports.init = async (req, res) => {
     // Emitir a agentes para que la bandeja se actualice en tiempo real
     const io = req.app.get('io');
     if (io) {
-      io.to('agents').emit('conversation:updated', {
-        conversation: { ...conversation.toJSON(), contact: contact.toJSON() },
+      const fullConv = await Conversation.findByPk(conversation.id, {
+        include: [{ model: Contact, as: 'contact' }]
       });
+      if (fullConv) {
+        io.to('agents').emit(convCreated ? 'conversation:new' : 'conversation:updated', { conversation: fullConv.toJSON() });
+      }
     }
 
     res.json({
@@ -117,30 +120,44 @@ exports.sendMessage = async (req, res) => {
     let botReply = null;
     if (conversation.status === 'bot') {
       try {
-        const result = await chatbotService.handleMessage(conversation, message, io);
-        const botText = result ? (typeof result === 'string' ? result : result.text) : null;
+        // Verificar si el bot tiene habilitadas respuestas en tiempo real para el widget
+        const botConfig = await BotConfig.findOne({
+          where: {
+            company_id: conversation.company_id,
+            is_active: true,
+            channel: ['web', 'all']
+          },
+          order: [['channel', 'ASC']] // prioriza config específica 'web' sobre 'all'
+        });
 
-        if (botText) {
-          await new Promise(r => setTimeout(r, 800));
-          const botMsg = await Message.create({
-            conversation_id,
-            direction:    'outbound',
-            sender_type:  'bot',
-            content_type: 'text',
-            content:      botText,
-            status:       'sent',
-          });
+        const realtimeEnabled = botConfig ? botConfig.widget_realtime_response !== false : true;
 
-          await conversation.update({
-            last_message_at:      new Date(),
-            last_message_preview: `Bot: ${botText.substring(0, 80)}`,
-          });
+        if (realtimeEnabled) {
+          const result = await chatbotService.handleMessage(conversation, message, io);
+          const botText = result ? (typeof result === 'string' ? result : result.text) : null;
 
-          if (io) {
-            io.to('agents').emit('message:sent', { message: botMsg.toJSON(), conversationId: conversation_id });
+          if (botText) {
+            await new Promise(r => setTimeout(r, 800));
+            const botMsg = await Message.create({
+              conversation_id,
+              direction:    'outbound',
+              sender_type:  'bot',
+              content_type: 'text',
+              content:      botText,
+              status:       'sent',
+            });
+
+            await conversation.update({
+              last_message_at:      new Date(),
+              last_message_preview: `Bot: ${botText.substring(0, 80)}`,
+            });
+
+            if (io) {
+              io.to('agents').emit('message:sent', { message: botMsg.toJSON(), conversationId: conversation_id });
+            }
+
+            botReply = botMsg.toJSON();
           }
-
-          botReply = botMsg.toJSON();
         }
       } catch (botErr) {
         logger.warn('Widget bot error:', botErr.message);

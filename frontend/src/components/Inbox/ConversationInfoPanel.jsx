@@ -481,6 +481,7 @@ export default function ConversationInfoPanel({ conversation }) {
         <InfoRow label="Duración" value={getDuration()} />
         <InfoRow label="Agente"   value={conversation?.assigned_agent?.name} />
         <InfoRow label="Estado"   value={statusInfo.label} />
+        <InfoRow label="Ticket"   value={conversation?.ticket_number} mono />
         <InfoRow label="ID"       value={`#${conversation?.id?.slice(0, 8)}`} mono />
       </Section>
 

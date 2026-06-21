@@ -5,13 +5,24 @@ import ConversationList          from './ConversationList';
 import ChatWindow                from '../Chat/ChatWindow';
 import WhatsappBusinessPanel     from './WhatsappBusinessPanel';
 import ConversationInfoPanel     from './ConversationInfoPanel';
-import { PanelRight, Briefcase } from 'lucide-react';
+import { PanelRight, PanelLeft, Briefcase } from 'lucide-react';
+
+const SIDEBAR_KEY = 'ts-sidebar-visible';
 
 export default function Inbox() {
   const { fetchConversations, activeConversation } = useConversationStore();
-  const [showList, setShowList] = useState(true);
+  const [showList, setShowList] = useState(() => {
+    const saved = localStorage.getItem(SIDEBAR_KEY);
+    return saved !== null ? saved === 'true' : true;
+  });
   const [showInfo, setShowInfo] = useState(true);
   const [inboxTab, setInboxTab] = useState('general');
+
+  const toggleSidebar = () => {
+    const next = !showList;
+    setShowList(next);
+    localStorage.setItem(SIDEBAR_KEY, String(next));
+  };
 
   useEffect(() => { fetchConversations(); }, []);
 
@@ -52,20 +63,33 @@ export default function Inbox() {
           WhatsApp Personal/Business
         </button>
 
-        {/* Toggle panel info — solo en general */}
-        {inboxTab === 'general' && activeConversation && (
-          <div className="ml-auto flex items-center pr-3">
+        {/* Toggle sidebar + panel info — solo en general */}
+        {inboxTab === 'general' && (
+          <div className="ml-auto flex items-center gap-2 pr-3">
             <button
-              onClick={() => setShowInfo(!showInfo)}
-              title={showInfo ? 'Ocultar panel' : 'Ver informacion'}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors font-medium
-                ${showInfo
-                  ? 'bg-[#f0fdf4] dark:bg-[#00a884]/10 text-[#00a884] border border-[#00a884]/30'
-                  : 'text-[#54656f] dark:text-[#8696a0] hover:bg-[#f5f6f6] dark:hover:bg-white/5 border border-transparent'}`}
+              onClick={toggleSidebar}
+              title={showList ? 'Ocultar bandeja' : 'Mostrar bandeja'}
+              className={`hidden md:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors font-medium
+                ${showList
+                  ? 'text-[#54656f] dark:text-[#8696a0] hover:bg-[#f5f6f6] dark:hover:bg-white/5 border border-transparent'
+                  : 'bg-[#f0fdf4] dark:bg-[#00a884]/10 text-[#00a884] border border-[#00a884]/30'}`}
             >
-              <PanelRight size={14} />
-              Info
+              <PanelLeft size={14} />
+              Bandeja
             </button>
+            {activeConversation && (
+              <button
+                onClick={() => setShowInfo(!showInfo)}
+                title={showInfo ? 'Ocultar panel' : 'Ver informacion'}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors font-medium
+                  ${showInfo
+                    ? 'bg-[#f0fdf4] dark:bg-[#00a884]/10 text-[#00a884] border border-[#00a884]/30'
+                    : 'text-[#54656f] dark:text-[#8696a0] hover:bg-[#f5f6f6] dark:hover:bg-white/5 border border-transparent'}`}
+              >
+                <PanelRight size={14} />
+                Info
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -78,8 +102,7 @@ export default function Inbox() {
           <div className={`
             h-full flex-shrink-0 bg-white dark:bg-[#111b21] border-r border-[#d1d7db] dark:border-[#2a3942] flex flex-col
             transition-all duration-300
-            md:w-80 md:flex
-            ${showList ? 'w-full flex' : 'w-0 hidden md:w-80 md:flex'}
+            ${showList ? 'w-full md:w-80 flex' : 'w-0 hidden'}
           `}>
             <ConversationList
               onSelectConversation={() => {
@@ -95,7 +118,7 @@ export default function Inbox() {
           `}>
             {activeConversation && (
               <button
-                onClick={() => setShowList(true)}
+                onClick={() => { setShowList(true); localStorage.setItem(SIDEBAR_KEY, 'true'); }}
                 className="md:hidden flex items-center gap-2 px-4 py-3 bg-[#f0f2f5] dark:bg-[#202c33] border-b border-[#d1d7db] dark:border-[#2a3942]
                            text-sm font-medium text-[#00a884] hover:bg-[#f0fdf4] dark:hover:bg-white/5 transition-colors"
               >

@@ -5,7 +5,7 @@
 // scopeConversations pueda inyectar { assigned_agent_id: userId }
 // ─────────────────────────────────────────────────────────────
 const { Op } = require('sequelize');
-const { Contact, Conversation, Message } = require('../models');
+const { Contact, Conversation, Message, User } = require('../models');
 const metaService    = require('./metaService');
 const chatbotService = require('./chatbotService');
 const logger         = require('../config/logger');
@@ -215,9 +215,10 @@ class MessageService {
       conversation = await Conversation.create({
         contact_id: contact.id,
         channel,
-        status: 'bot'
+        status: 'bot',
+        company_id: contact.company_id || null
       });
-      logger.info(`💬 Nueva conversación: ${conversation.id} (${channel})`);
+      logger.info(`💬 Nueva conversación: ${conversation.id} / ${conversation.ticket_number} (${channel})`);
     }
 
     return conversation;
@@ -245,26 +246,37 @@ class MessageService {
     if (status)  where.status  = status;
     if (channel) where.channel = channel;
 
-    // Búsqueda por ID de conversación (si empieza con #)
-    if (search && search.startsWith('#')) {
-      const idSearch = search.slice(1).toLowerCase();
-      where.id = { [Op.iLike]: `${idSearch}%` };
+    // Búsqueda por ticket_number (CHAT-) o ID de conversación (#)
+    if (search && (search.toUpperCase().startsWith('CHAT-') || search.startsWith('#'))) {
+      const term = search.startsWith('#') ? search.slice(1) : search;
+      where[Op.or] = [
+        { ticket_number: { [Op.iLike]: `%${term}%` } },
+        { id: { [Op.iLike]: `${term.toLowerCase()}%` } }
+      ];
       search = null;
     }
 
     // Para búsqueda por nombre de contacto usamos required: true en el include
-    const include = [{
-      model:    Contact,
-      as:       'contact',
-      required: !!search,
-      where: search ? {
-        [Op.or]: [
-          { name:  { [Op.iLike]: `%${search}%` } },
-          { phone: { [Op.iLike]: `%${search}%` } },
-          { email: { [Op.iLike]: `%${search}%` } }
-        ]
-      } : undefined
-    }];
+    const include = [
+      {
+        model:    Contact,
+        as:       'contact',
+        required: !!search,
+        where: search ? {
+          [Op.or]: [
+            { name:  { [Op.iLike]: `%${search}%` } },
+            { phone: { [Op.iLike]: `%${search}%` } },
+            { email: { [Op.iLike]: `%${search}%` } }
+          ]
+        } : undefined
+      },
+      {
+        model:      User,
+        as:         'assigned_agent',
+        required:   false,
+        attributes: ['id', 'name', 'avatar_url', 'role']
+      }
+    ];
 
     const { count, rows } = await Conversation.findAndCountAll({
       where,

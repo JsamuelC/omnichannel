@@ -19,7 +19,7 @@ const BotConfig = sequelize.define('bot_configs', {
 
   // Canal al que aplica esta config
   channel: {
-    type: DataTypes.ENUM('whatsapp', 'messenger', 'instagram', 'all'),
+    type: DataTypes.ENUM('whatsapp', 'messenger', 'instagram', 'web', 'all'),
     defaultValue: 'all'
   },
 
@@ -101,6 +101,13 @@ Siempre saluda cordialmente y despídete de manera amistosa.`
     type: DataTypes.FLOAT,
     defaultValue: 0.7,
     validate: { min: 0, max: 1 }
+  },
+
+  // Controla si el bot responde en tiempo real desde el Widget de Google/Web
+  widget_realtime_response: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    comment: 'Habilita/deshabilita respuestas automáticas del bot en el widget web'
   }
 }, {
   indexes: [
