@@ -278,7 +278,7 @@ function ConversationItem({ conversation, isActive, onClick }) {
       {/* Contenido */}
       <div className="flex-1 min-w-0 border-b border-transparent">
         <p className="text-[10px] font-mono text-[#00a884] dark:text-[#00a884] opacity-70 mb-0.5">
-          #{conversation.ticket_id || conversation.id?.replace(/\D/g, '').slice(0, 6)}
+          #{(conversation.ticket_id || conversation.id || '').replace(/\D/g, '').slice(0, 6)}
         </p>
         <div className="flex items-start justify-between gap-2">
           <p className="text-[15px] truncate text-[#111b21] dark:text-[#e9edef] font-medium">
