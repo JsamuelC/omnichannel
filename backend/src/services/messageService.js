@@ -245,6 +245,13 @@ class MessageService {
     if (status)  where.status  = status;
     if (channel) where.channel = channel;
 
+    // Búsqueda por ID de conversación (si empieza con #)
+    if (search && search.startsWith('#')) {
+      const idSearch = search.slice(1).toLowerCase();
+      where.id = { [Op.iLike]: `${idSearch}%` };
+      search = null;
+    }
+
     // Para búsqueda por nombre de contacto usamos required: true en el include
     const include = [{
       model:    Contact,
@@ -253,7 +260,8 @@ class MessageService {
       where: search ? {
         [Op.or]: [
           { name:  { [Op.iLike]: `%${search}%` } },
-          { phone: { [Op.iLike]: `%${search}%` } }
+          { phone: { [Op.iLike]: `%${search}%` } },
+          { email: { [Op.iLike]: `%${search}%` } }
         ]
       } : undefined
     }];
