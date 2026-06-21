@@ -67,19 +67,23 @@ const FeatureRoute = ({ feature, children }) => {
   return children;
 };
 
-// Interceptar callback de OAuth en popup ANTES de que React renderice
+// Interceptar callback de OAuth ANTES de que React renderice
 (function() {
   if (window.location.hash.includes('access_token=')) {
-    const hash = window.location.hash;
-    const accessToken = hash.split('access_token=')[1]?.split('&')[0];
-    const path = window.location.pathname;
+    var hash = window.location.hash;
+    var accessToken = hash.split('access_token=')[1];
+    if (accessToken) accessToken = accessToken.split('&')[0];
+    var path = window.location.pathname;
     if (accessToken) {
-      let key = 'oauth_token';
+      var key = 'oauth_token';
       if (path.includes('instagram')) key = 'ig_oauth_token';
       else if (path.includes('messenger')) key = 'msg_oauth_token';
       localStorage.setItem(key, accessToken);
-      window.location.hash = '';
-      window.close();
+      // Reemplazar la página con un mensaje de cierre
+      document.title = 'Conectado';
+      document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0f172a;font-family:system-ui"><div style="text-align:center;color:#e2e8f0"><div style="font-size:48px;margin-bottom:16px">✅</div><h2 style="margin:0 0 8px;font-size:18px">Conexión exitosa</h2><p style="color:#94a3b8;font-size:14px">Puedes cerrar esta ventana.</p></div></div>';
+      try { window.close(); } catch(e) {}
+      return;
     }
   }
 })();
