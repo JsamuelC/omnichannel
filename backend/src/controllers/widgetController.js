@@ -7,7 +7,7 @@ const { v4: uuid }   = require('uuid');
 // POST /api/widget/init — inicia sesión anónima del visitante
 exports.init = async (req, res) => {
   try {
-    const { company_id, visitor_name, visitor_email, session_id } = req.body;
+    const { company_id, visitor_name, visitor_email, visitor_phone, session_id, form_data } = req.body;
 
     if (!company_id) return res.status(400).json({ success: false, error: 'company_id requerido' });
 
@@ -22,13 +22,16 @@ exports.init = async (req, res) => {
         web_id:     webId,
         name:       visitor_name || 'Visitante web',
         email:      visitor_email || null,
+        phone:      visitor_phone || null,
         company_id: company_id,
       },
     });
 
-    if (visitor_name && visitor_name !== contact.name) {
-      await contact.update({ name: visitor_name });
-    }
+    const updates = {};
+    if (visitor_name && visitor_name !== contact.name)   updates.name  = visitor_name;
+    if (visitor_email && visitor_email !== contact.email) updates.email = visitor_email;
+    if (visitor_phone && visitor_phone !== contact.phone) updates.phone = visitor_phone;
+    if (Object.keys(updates).length) await contact.update(updates);
 
     const [conversation] = await Conversation.findOrCreate({
       where: { contact_id: contact.id, channel: 'web', status: ['open', 'bot', 'assigned'] },
