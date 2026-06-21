@@ -38,6 +38,8 @@ export default function ChatWindow() {
   const [showModulePicker,setShowModulePicker]   = useState(false);
   const [moduleModal,     setModuleModal]       = useState(null);
   const [showResolveModal, setShowResolveModal] = useState(false);
+  const [showCloseMenu, setShowCloseMenu] = useState(false);
+  const [closeTimer, setCloseTimer] = useState(null);
   const { modules } = useModuleStore();
 
   const messagesEndRef = useRef(null);
@@ -65,10 +67,11 @@ export default function ChatWindow() {
   }, [isAdmin]);
 
   useEffect(() => {
-    api.get('/quick-messages?channel=inbox')
+    const ch = activeConversation?.channel || 'all';
+    api.get(`/quick-messages?channel=${ch}`)
       .then(res => setQuickMessages(res.data || []))
       .catch(() => {});
-  }, []);
+  }, [activeConversation?.channel]);
 
   // ── Handlers ──────────────────────────────────────────────
   const handleSend = async (e) => {
@@ -101,6 +104,23 @@ export default function ChatWindow() {
       setShowResolveModal(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al resolver.');
+    }
+  };
+
+  const handleCloseConversation = (delaySeconds) => {
+    setShowCloseMenu(false);
+    if (delaySeconds === 0) {
+      resolveConversation(activeConversation.id);
+      toast.success('Conversación finalizada.');
+    } else {
+      if (closeTimer) clearTimeout(closeTimer);
+      const mins = delaySeconds >= 60 ? `${delaySeconds / 60} minuto${delaySeconds > 60 ? 's' : ''}` : `${delaySeconds} segundos`;
+      toast.success(`Conversación se cerrará en ${mins}.`);
+      const timer = setTimeout(() => {
+        resolveConversation(activeConversation.id);
+        toast.success('Conversación finalizada automáticamente.');
+      }, delaySeconds * 1000);
+      setCloseTimer(timer);
     }
   };
 
@@ -465,13 +485,44 @@ export default function ChatWindow() {
           </button>
         </form>
 
-        {/* Indicador de canal activo */}
-        <p className="text-xs text-[#667781] dark:text-[#8696a0] mt-2 flex items-center gap-1.5 pl-1">
-          <span className={`w-2 h-2 rounded-full ${chConfig.color}`} />
-          Respondiendo en {chConfig.label}
-          <span className="text-[#d1d7db] dark:text-[#2a3942]">·</span>
-          <span>Enter para enviar · Shift+Enter nueva línea</span>
-        </p>
+        {/* Barra inferior: canal + finalizar conversación */}
+        <div className="flex items-center justify-between mt-2 pl-1">
+          <p className="text-xs text-[#667781] dark:text-[#8696a0] flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${chConfig.color}`} />
+            Respondiendo en {chConfig.label}
+          </p>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowCloseMenu(p => !p)}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg
+                         bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40
+                         text-red-600 dark:text-red-400 transition-colors"
+            >
+              <svg viewBox="0 0 20 20" className="w-3.5 h-3.5" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+              Finalizar
+            </button>
+            {showCloseMenu && (
+              <div className="absolute bottom-9 right-0 z-30 bg-white dark:bg-[#2a3942] rounded-xl shadow-xl border border-slate-100 dark:border-[#3b4a54] w-48 overflow-hidden">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-3 py-2 border-b border-slate-50 dark:border-[#3b4a54]">Finalizar conversación</p>
+                {[
+                  { label: 'Cerrar ahora', delay: 0 },
+                  { label: 'En 1 minuto', delay: 60 },
+                  { label: 'En 5 minutos', delay: 300 },
+                ].map(opt => (
+                  <button key={opt.delay} type="button"
+                    className="w-full text-left text-sm px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-[#3b4a54] text-slate-700 dark:text-slate-200 transition-colors"
+                    onClick={() => handleCloseConversation(opt.delay)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ── Modal de confirmación para resolver ────────── */}
