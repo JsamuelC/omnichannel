@@ -194,7 +194,39 @@
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
 
-    if (!convId) initSession(); else loadHistory();
+    // Polling para recibir respuestas del agente en tiempo real
+    var lastPollTime = new Date().toISOString();
+    var pollInterval = null;
+    var seenIds = new Set();
+
+    async function pollNewMessages() {
+      if (!convId) return;
+      try {
+        var res = await fetch(API + '/widget/poll/' + convId + '?after=' + encodeURIComponent(lastPollTime));
+        var data = await res.json();
+        if (data.success && data.data && data.data.length > 0) {
+          data.data.forEach(function(m) {
+            if (!seenIds.has(m.id)) {
+              seenIds.add(m.id);
+              hideTyping();
+              addMsg(m.content, 'in', fmtTime(m.created_at));
+            }
+          });
+          lastPollTime = data.data[data.data.length - 1].created_at;
+        }
+      } catch (_) {}
+    }
+
+    function startPolling() {
+      if (pollInterval) return;
+      pollInterval = setInterval(pollNewMessages, 3000);
+    }
+
+    function stopPolling() {
+      if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    }
+
+    if (!convId) initSession().then(startPolling); else loadHistory().then(startPolling);
     inputEl.focus();
   }
 
@@ -224,7 +256,7 @@
 
   function bindClose() {
     var closeBtn = document.getElementById('ts-close');
-    if (closeBtn) closeBtn.onclick = function() { open = false; box.classList.remove('open'); };
+    if (closeBtn) closeBtn.onclick = function() { open = false; box.classList.remove('open'); if (typeof stopPolling === 'function') stopPolling(); };
   }
 
   btn.onclick = function() {
@@ -233,6 +265,8 @@
     if (open) {
       if (formDone) showChat();
       else showPreForm();
+    } else {
+      if (typeof stopPolling === 'function') stopPolling();
     }
   };
   } // end boot()

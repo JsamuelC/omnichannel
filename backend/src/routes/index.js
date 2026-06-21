@@ -91,6 +91,7 @@ router.patch ('/users/:id/password', auth,                       companyScope, u
 router.post('/widget/init',                    widgetController.init);
 router.post('/widget/message',                 widgetController.sendMessage);
 router.get ('/widget/messages/:conversationId', widgetController.getMessages);
+router.get ('/widget/poll/:conversationId',     widgetController.poll);
 router.get ('/widget/config/:companyId',        widgetController.getConfig);
 
 // ─────────────────────────────────────

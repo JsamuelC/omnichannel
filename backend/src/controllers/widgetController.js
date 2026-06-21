@@ -147,6 +147,32 @@ exports.getMessages = async (req, res) => {
   }
 };
 
+// GET /api/widget/poll/:conversationId?after=ISO_DATE — mensajes nuevos para el visitante
+exports.poll = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { after } = req.query;
+    const { Op } = require('sequelize');
+
+    const where = {
+      conversation_id: conversationId,
+      direction: 'outbound',
+    };
+    if (after) {
+      where.created_at = { [Op.gt]: new Date(after) };
+    }
+
+    const messages = await Message.findAll({
+      where,
+      order: [['created_at', 'ASC']],
+      limit: 20,
+    });
+    res.json({ success: true, data: messages });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 // GET /api/widget/config/:companyId — config pública del widget
 exports.getConfig = async (req, res) => {
   try {
