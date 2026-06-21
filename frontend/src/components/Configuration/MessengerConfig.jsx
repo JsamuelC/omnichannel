@@ -68,8 +68,24 @@ export default function MessengerConfig() {
     if (hash.includes('access_token=')) {
       const token = hash.split('access_token=')[1]?.split('&')[0];
       window.location.hash = '';
+      if (window.opener) {
+        window.opener.postMessage({ type: 'msg_token', token }, window.location.origin);
+        window.close();
+        return;
+      }
       if (token) connectWithToken(token);
     }
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type === 'msg_token' && e.data.token) {
+        connectWithToken(e.data.token);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
   }, []);
 
   const handleDisconnect = async () => {
