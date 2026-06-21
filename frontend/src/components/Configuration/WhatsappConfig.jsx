@@ -4,7 +4,7 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { Copy, Check, Eye, EyeOff, Save, RefreshCw, CheckCircle, XCircle, Zap, Settings, Trash2 } from 'lucide-react';
 
-const META_APP_ID = '1308040240723209';
+const META_APP_ID = '1692654055287413';
 
 // ── Componente de campo seguro ───────────────────────────────
 const Field = ({ label, value, onChange, placeholder, hint, secret, readOnly }) => {
