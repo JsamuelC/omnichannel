@@ -34,6 +34,7 @@ const googleCalendarController = require('../controllers/googleCalendarControlle
 const planController          = require('../controllers/planController');
 const revenueController       = require('../controllers/revenueController');
 const companyPaymentController = require('../controllers/companyPaymentController');
+const channelConfigController  = require('../controllers/channelConfigController');
 const { upload: tplUpload }   = require('../middleware/uploadTemplate');
 const { handleCatalogUpload, CATALOG_DIR } = require('../middleware/uploadCatalog');
 
@@ -602,6 +603,17 @@ router.post  ('/company-payments',          auth, requireSuperAdmin, companyPaym
 router.put   ('/company-payments/:id',      auth, requireSuperAdmin, companyPaymentController.upload, companyPaymentController.update);
 router.delete('/company-payments/:id',      auth, requireSuperAdmin, companyPaymentController.remove);
 router.get   ('/company-payments/:id/receipt', auth, requireSuperAdmin, companyPaymentController.getReceipt);
+
+// ─────────────────────────────────────
+// CONFIGURACIÓN DE CANALES (Messenger / Instagram)
+// ─────────────────────────────────────
+router.get   ('/channels/messenger/status',     auth, requireRole('admin'), channelConfigController.messengerStatus);
+router.post  ('/channels/messenger/connect',    auth, requireRole('admin'), channelConfigController.messengerConnect);
+router.delete('/channels/messenger/disconnect', auth, requireRole('admin'), channelConfigController.messengerDisconnect);
+router.get   ('/channels/instagram/status',     auth, requireRole('admin'), channelConfigController.instagramStatus);
+router.post  ('/channels/instagram/connect',    auth, requireRole('admin'), channelConfigController.instagramConnect);
+router.delete('/channels/instagram/disconnect', auth, requireRole('admin'), channelConfigController.instagramDisconnect);
+router.get   ('/channels/pages',                auth, requireRole('admin'), channelConfigController.getPages);
 
 // ─────────────────────────────────────
 // DEPLOY / CI-CD (solo superadmin)

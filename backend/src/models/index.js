@@ -108,6 +108,9 @@ const migrate = async () => {
       // Google Calendar
       { table: 'company',       col: 'google_calendar_tokens', def: { type: DT.JSONB,       allowNull: true, defaultValue: null } },
       { table: 'appointments',  col: 'google_event_id',        def: { type: DT.STRING(500), allowNull: true } },
+      // Messenger & Instagram config
+      { table: 'company',       col: 'messenger_config',       def: { type: DT.JSONB,       allowNull: true, defaultValue: null } },
+      { table: 'company',       col: 'instagram_config',       def: { type: DT.JSONB,       allowNull: true, defaultValue: null } },
     ];
     for (const { table, col, def } of preCols) {
       await safeAdd(table, col, def);

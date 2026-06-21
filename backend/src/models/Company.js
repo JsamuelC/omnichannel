@@ -69,6 +69,16 @@ const Company = sequelize.define('company', {
     allowNull:    true,
     defaultValue: null,
   },
+  messenger_config: {
+    type:         DataTypes.JSONB,
+    allowNull:    true,
+    defaultValue: null,
+  },
+  instagram_config: {
+    type:         DataTypes.JSONB,
+    allowNull:    true,
+    defaultValue: null,
+  },
   active_features: {
     type: DataTypes.JSONB,
     allowNull: false,

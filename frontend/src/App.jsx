@@ -23,6 +23,8 @@ import Integraciones   from './components/Configuration/Integraciones';
 import FlowRulesConfig       from './components/Configuration/FlowRulesConfig';
 import MensajesRapidosConfig  from './components/Configuration/MensajesRapidosConfig';
 import WidgetsConfig          from './components/Configuration/WidgetsConfig';
+import MessengerConfig        from './components/Configuration/MessengerConfig';
+import InstagramConfig        from './components/Configuration/InstagramConfig';
 import ModulosConfig          from './components/Modules/ModulosConfig';
 import ModuleView             from './components/Modules/ModuleView';
 import CalendarPanel          from './components/Calendar/CalendarPanel';
@@ -102,8 +104,8 @@ export default function App() {
 
          {/* Canales */}
         <Route path="config/whatsapp"  element={<RoleRoute role="admin"><FeatureRoute feature="whatsapp_business"><WhatsappConfig /></FeatureRoute></RoleRoute>} />
-        <Route path="config/messenger" element={<FeatureRoute feature="config_messenger"><Placeholder name="Messenger" /></FeatureRoute>} />
-        <Route path="config/instagram" element={<FeatureRoute feature="config_instagram"><Placeholder name="Instagram" /></FeatureRoute>} />
+        <Route path="config/messenger" element={<RoleRoute role="admin"><FeatureRoute feature="config_messenger"><MessengerConfig /></FeatureRoute></RoleRoute>} />
+        <Route path="config/instagram" element={<RoleRoute role="admin"><FeatureRoute feature="config_instagram"><InstagramConfig /></FeatureRoute></RoleRoute>} />
         <Route path="config/tiktok"    element={<FeatureRoute feature="config_tiktok"><Placeholder name="TikTok" /></FeatureRoute>} />
         <Route path="config/telegram"  element={<FeatureRoute feature="config_telegram"><Placeholder name="Telegram" /></FeatureRoute>} />
 
