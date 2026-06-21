@@ -1,9 +1,4 @@
-﻿// frontend/src/components/Chat/ChatWindow.jsx
-// ─────────────────────────────────────────────────────────────
-// Ventana de chat de Tecnossync
-// RBAC: botón "Asignarme" solo visible para admin
-// Animaciones de mensajes con msg-agent / msg-contact
-// ─────────────────────────────────────────────────────────────
+// frontend/src/components/Chat/ChatWindow.jsx
 import React, { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -18,6 +13,7 @@ const CHANNEL_CONFIG = {
   whatsapp:  { label: 'WhatsApp',  color: 'bg-green-500', textColor: 'text-green-700', bgLight: 'bg-green-50', border: 'border-green-200' },
   messenger: { label: 'Messenger', color: 'bg-blue-500',  textColor: 'text-blue-700',  bgLight: 'bg-blue-50',  border: 'border-blue-200'  },
   instagram: { label: 'Instagram', color: 'bg-pink-500',  textColor: 'text-pink-700',  bgLight: 'bg-pink-50',  border: 'border-pink-200'  },
+  web:       { label: 'Widget Web', color: 'bg-indigo-500', textColor: 'text-indigo-700', bgLight: 'bg-indigo-50', border: 'border-indigo-200' },
 };
 
 export default function ChatWindow() {
@@ -36,17 +32,16 @@ export default function ChatWindow() {
   const [quickSearch,     setQuickSearch]     = useState('');
   const [showModulePicker,setShowModulePicker]   = useState(false);
   const [moduleModal,     setModuleModal]       = useState(null);
+  const [showResolveModal, setShowResolveModal] = useState(false);
   const { modules } = useModuleStore();
 
   const messagesEndRef = useRef(null);
   const inputRef       = useRef(null);
 
-  // Scroll al último mensaje
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Unirse/salir de la sala Socket.io
   useEffect(() => {
     if (!activeConversation) return;
     joinConversation(activeConversation.id);
@@ -54,7 +49,6 @@ export default function ChatWindow() {
     return () => leaveConversation(activeConversation.id);
   }, [activeConversation?.id]);
 
-  // Cargar lista de agentes (solo admin necesita esto)
   useEffect(() => {
     if (!isAdmin) return;
     api.get('/users')
@@ -68,7 +62,6 @@ export default function ChatWindow() {
       .catch(() => {});
   }, []);
 
-  // ── Handlers ──────────────────────────────────────────────
   const handleSend = async (e) => {
     e.preventDefault();
     if (!text.trim() || sending) return;
@@ -91,9 +84,9 @@ export default function ChatWindow() {
   };
 
   const handleResolve = async () => {
-    if (!confirm('¿Marcar esta conversación como resuelta?')) return;
     try {
       await resolveConversation(activeConversation.id);
+      setShowResolveModal(false);
       toast.success('Conversación resuelta.');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al resolver.');
@@ -131,7 +124,7 @@ export default function ChatWindow() {
     }
   };
 
-  // ── Empty state ────────────────────────────────────────────
+  // Empty state
   if (!activeConversation) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center bg-[#f8f9fa] dark:bg-[#0b141a]">
@@ -149,15 +142,12 @@ export default function ChatWindow() {
               : 'Elige una conversación de la bandeja para ver los mensajes'}
           </p>
         </div>
-        <div className="flex gap-2 mt-2">
-          {['whatsapp', 'messenger', 'instagram'].map(ch => {
-            const c = CHANNEL_CONFIG[ch];
-            return (
-              <span key={ch} className={`text-xs font-semibold px-2.5 py-1 rounded-full ${c.bgLight} ${c.textColor} border ${c.border}`}>
-                {c.label}
-              </span>
-            );
-          })}
+        <div className="flex gap-2 mt-2 flex-wrap justify-center">
+          {Object.entries(CHANNEL_CONFIG).map(([ch, c]) => (
+            <span key={ch} className={`text-xs font-semibold px-2.5 py-1 rounded-full ${c.bgLight} ${c.textColor} border ${c.border}`}>
+              {c.label}
+            </span>
+          ))}
         </div>
       </div>
     );
@@ -170,19 +160,24 @@ export default function ChatWindow() {
   return (
     <div className="flex flex-col h-full">
 
-      {/* ── Header del chat ───────────────────────────────── */}
+      {/* Header del chat */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-[#f0f2f5] dark:bg-[#202c33] border-b border-[#d1d7db] dark:border-[#2a3942] flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          {/* Avatar */}
           <div className="relative flex-shrink-0">
             <div className="w-10 h-10 rounded-full bg-[#dfe5e7] dark:bg-[#2a3942] flex items-center justify-center font-semibold text-[#54656f] dark:text-[#8696a0] text-sm">
               {contactName.charAt(0).toUpperCase()}
             </div>
             <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 ${chConfig.color} rounded-full border-2 border-white dark:border-[#202c33]`} />
           </div>
-          {/* Nombre + canal */}
           <div className="min-w-0">
-            <p className="font-medium text-[#111b21] dark:text-[#e9edef] text-[15px] truncate">{contactName}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-[#111b21] dark:text-[#e9edef] text-[15px] truncate">{contactName}</p>
+              {activeConversation.ticket_id && (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#f0f2f5] dark:bg-[#2a3942] text-[#667781] dark:text-[#8696a0] flex-shrink-0">
+                  {activeConversation.ticket_id}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5">
               <span className={`text-xs font-medium ${chConfig.textColor}`}>{chConfig.label}</span>
               {assignedAgent && (
@@ -194,7 +189,7 @@ export default function ChatWindow() {
           </div>
         </div>
 
-        {/* Acciones — solo admin ve todo, agente ve "Resolver" */}
+        {/* Acciones */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {isAdmin && (
             <div className="relative">
@@ -213,7 +208,6 @@ export default function ChatWindow() {
                 </svg>
               </button>
 
-              {/* Dropdown de asignación */}
               {showAssign && (
                 <div className="absolute right-0 top-full mt-1 w-52 bg-white dark:bg-[#233138] rounded-xl border border-[#d1d7db] dark:border-[#2a3942] shadow-lg shadow-slate-200/60 dark:shadow-black/40 z-20 overflow-hidden">
                   <div className="p-1">
@@ -254,7 +248,7 @@ export default function ChatWindow() {
           )}
 
           <button
-            onClick={handleResolve}
+            onClick={() => setShowResolveModal(true)}
             className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg
                        bg-[#d9fdd3] dark:bg-[#005c4b] hover:bg-[#c5f7c0] dark:hover:bg-[#06715f] text-[#008069] dark:text-[#e9edef] border border-[#00a884]/30 dark:border-transparent
                        transition-colors"
@@ -267,7 +261,7 @@ export default function ChatWindow() {
         </div>
       </div>
 
-      {/* ── Área de mensajes ──────────────────────────────── */}
+      {/* Área de mensajes */}
       <div
         className="flex-1 overflow-y-auto px-6 py-4 space-y-1"
         onClick={() => setShowAssign(false)}
@@ -293,10 +287,9 @@ export default function ChatWindow() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── Input de mensaje ──────────────────────────────── */}
+      {/* Input de mensaje */}
       <div className="px-4 pb-3 pt-2 bg-[#f0f2f5] dark:bg-[#202c33] border-t border-[#d1d7db] dark:border-[#2a3942] flex-shrink-0">
 
-        {/* Quick message picker */}
         {showQuickPicker && (
           <div className="mb-2 bg-white dark:bg-[#2a3942] rounded-xl shadow-lg border border-slate-200 dark:border-[#3b4a54] overflow-hidden">
             <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 dark:border-[#3b4a54]">
@@ -345,7 +338,6 @@ export default function ChatWindow() {
         )}
 
         <form onSubmit={handleSend} className="flex items-end gap-2">
-          {/* Botón mensajes rápidos */}
           <button
             type="button"
             onClick={() => { setShowQuickPicker(p => !p); setQuickSearch(''); }}
@@ -359,7 +351,6 @@ export default function ChatWindow() {
             <Zap size={16} />
           </button>
 
-          {/* Botón módulos */}
           {modules.length > 0 && (
             <div className="relative flex-shrink-0">
               <button
@@ -431,7 +422,6 @@ export default function ChatWindow() {
           </button>
         </form>
 
-        {/* Indicador de canal activo */}
         <p className="text-xs text-[#667781] dark:text-[#8696a0] mt-2 flex items-center gap-1.5 pl-1">
           <span className={`w-2 h-2 rounded-full ${chConfig.color}`} />
           Respondiendo en {chConfig.label}
@@ -440,7 +430,7 @@ export default function ChatWindow() {
         </p>
       </div>
 
-      {/* ── Modal módulo ──────────────────────────────── */}
+      {/* Modal módulo */}
       <ModuleRecordModal
         open={!!moduleModal}
         onClose={() => setModuleModal(null)}
@@ -449,14 +439,55 @@ export default function ChatWindow() {
         contactName={activeConversation?.contact?.name || ''}
         conversationId={activeConversation?.id}
       />
+
+      {/* Modal de confirmación para resolver */}
+      {showResolveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowResolveModal(false)}>
+          <div
+            className="bg-white dark:bg-[#233138] rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-6 pt-6 pb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-[#d9fdd3] dark:bg-[#005c4b] flex items-center justify-center">
+                  <svg viewBox="0 0 20 20" className="w-5 h-5 text-[#008069] dark:text-[#25d366]" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-[#111b21] dark:text-[#e9edef]">Resolver conversación</h3>
+                  {activeConversation?.ticket_id && (
+                    <span className="text-xs font-mono text-[#667781] dark:text-[#8696a0]">{activeConversation.ticket_id}</span>
+                  )}
+                </div>
+              </div>
+              <p className="text-sm text-[#667781] dark:text-[#8696a0]">
+                Esta conversación con <span className="font-medium text-[#111b21] dark:text-[#e9edef]">{contactName}</span> se marcará como resuelta y se cerrará. Esta acción se puede revertir si el contacto escribe de nuevo.
+              </p>
+            </div>
+            <div className="flex gap-3 px-6 pb-6">
+              <button
+                onClick={() => setShowResolveModal(false)}
+                className="flex-1 py-2.5 text-sm font-medium rounded-xl border border-[#d1d7db] dark:border-[#2a3942] text-[#54656f] dark:text-[#8696a0] hover:bg-[#f5f6f6] dark:hover:bg-white/5 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleResolve}
+                className="flex-1 py-2.5 text-sm font-medium rounded-xl bg-[#00a884] hover:bg-[#06987a] text-white transition-colors"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Burbuja de mensaje ──────────────────────────────────────
 function MessageBubble({ message, currentUserId }) {
   const isBot    = message.sender_type === 'bot';
-  const isAgent  = message.sender_type === 'agent';
   const isOutbound = message.direction === 'outbound';
 
   const time = message.sent_at || message.created_at
@@ -464,9 +495,8 @@ function MessageBubble({ message, currentUserId }) {
     : '';
 
   if (isOutbound) {
-    // Mensajes salientes (agente o bot) → derecha, burbuja verde estilo WhatsApp
     return (
-      <div className={`flex justify-end ${isBot ? 'msg-agent' : 'msg-agent'}`}>
+      <div className="flex justify-end msg-agent">
         <div className="max-w-[65%]">
           {isBot && (
             <p className="text-xs text-[#667781] dark:text-[#8696a0] text-right mb-1 flex items-center justify-end gap-1">
@@ -481,7 +511,6 @@ function MessageBubble({ message, currentUserId }) {
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
             <p className="text-[11px] text-[#667781] dark:text-[#8696a0] text-right mt-0.5 flex items-center justify-end gap-1 -mb-0.5">
               {time}
-              {/* Tick de estado */}
               {message.status === 'read' && (
                 <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 text-[#53bdeb]" fill="currentColor">
                   <path d="M1 8l4 4L15 3"/>
@@ -494,7 +523,6 @@ function MessageBubble({ message, currentUserId }) {
     );
   }
 
-  // Mensajes entrantes (contacto) → izquierda, burbuja blanca estilo WhatsApp
   return (
     <div className="flex justify-start msg-contact">
       <div className="max-w-[65%]">

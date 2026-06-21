@@ -5,7 +5,7 @@
 // scopeConversations pueda inyectar { assigned_agent_id: userId }
 // ─────────────────────────────────────────────────────────────
 const { Op } = require('sequelize');
-const { Contact, Conversation, Message } = require('../models');
+const { Contact, Conversation, Message, User } = require('../models');
 const metaService    = require('./metaService');
 const chatbotService = require('./chatbotService');
 const logger         = require('../config/logger');
@@ -253,18 +253,26 @@ class MessageService {
     }
 
     // Para búsqueda por nombre de contacto usamos required: true en el include
-    const include = [{
-      model:    Contact,
-      as:       'contact',
-      required: !!search,
-      where: search ? {
-        [Op.or]: [
-          { name:  { [Op.iLike]: `%${search}%` } },
-          { phone: { [Op.iLike]: `%${search}%` } },
-          { email: { [Op.iLike]: `%${search}%` } }
-        ]
-      } : undefined
-    }];
+    const include = [
+      {
+        model:    Contact,
+        as:       'contact',
+        required: !!search,
+        where: search ? {
+          [Op.or]: [
+            { name:  { [Op.iLike]: `%${search}%` } },
+            { phone: { [Op.iLike]: `%${search}%` } },
+            { email: { [Op.iLike]: `%${search}%` } }
+          ]
+        } : undefined
+      },
+      {
+        model:      User,
+        as:         'assigned_agent',
+        attributes: ['id', 'name', 'avatar_url', 'role'],
+        required:   false
+      }
+    ];
 
     const { count, rows } = await Conversation.findAndCountAll({
       where,

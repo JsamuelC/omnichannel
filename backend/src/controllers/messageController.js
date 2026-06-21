@@ -141,6 +141,64 @@ class MessageController {
     }
   }
 
+  // POST /conversations/from-phone
+  async createFromPhone(req, res) {
+    try {
+      const { phone, name } = req.body;
+      if (!phone?.trim()) {
+        return res.status(400).json({ success: false, message: 'El número de teléfono es requerido.' });
+      }
+
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const companyId = req.user?.company_id || null;
+
+      let contact = await Contact.findOne({ where: { whatsapp_id: cleanPhone } });
+      if (!contact) {
+        contact = await Contact.create({
+          whatsapp_id: cleanPhone,
+          name: name?.trim() || `+${cleanPhone}`,
+          phone: cleanPhone,
+          company_id: companyId,
+        });
+      }
+
+      const { Op } = require('sequelize');
+      let conversation = await Conversation.findOne({
+        where: {
+          contact_id: contact.id,
+          channel: 'whatsapp',
+          status: { [Op.in]: ['open', 'bot', 'assigned'] }
+        },
+        include: [
+          { model: Contact, as: 'contact' },
+          { model: User, as: 'assigned_agent', attributes: ['id', 'name', 'avatar_url', 'role'] }
+        ],
+        order: [['updated_at', 'DESC']]
+      });
+
+      if (!conversation) {
+        conversation = await Conversation.create({
+          contact_id: contact.id,
+          channel: 'whatsapp',
+          status: 'open',
+          company_id: companyId,
+          last_message_at: new Date(),
+        });
+        await conversation.reload({
+          include: [
+            { model: Contact, as: 'contact' },
+            { model: User, as: 'assigned_agent', attributes: ['id', 'name', 'avatar_url', 'role'] }
+          ]
+        });
+      }
+
+      res.json({ success: true, data: conversation });
+    } catch (error) {
+      logger.error('Error createFromPhone:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   // POST /conversations/:id/resolve
   async resolveConversation(req, res) {
     try {

@@ -264,6 +264,25 @@ const migrate = async () => {
     // Agregar web_id a contacts
     await safeAdd('contacts', 'web_id', { type: DT.STRING, allowNull: true, unique: true });
 
+    // Ticket ID legible para conversaciones (CHAT-000001)
+    await safeAdd('conversations', 'ticket_id', { type: DT.STRING(20), allowNull: true, unique: true });
+
+    // Crear secuencia para ticket_id si no existe
+    try {
+      await sequelize.query(`CREATE SEQUENCE IF NOT EXISTS conversation_ticket_seq START 1`);
+    } catch (_) {}
+
+    // Poblar ticket_id en conversaciones existentes que no lo tengan
+    try {
+      await sequelize.query(`
+        UPDATE conversations SET ticket_id = 'CHAT-' || LPAD(nextval('conversation_ticket_seq')::text, 6, '0')
+        WHERE ticket_id IS NULL
+      `);
+    } catch (_) {}
+
+    // Widget real-time config en bot_configs
+    await safeAdd('bot_configs', 'widget_realtime_responses', { type: DT.BOOLEAN, defaultValue: true, allowNull: false });
+
     // Agregar 'superadmin' al ENUM de roles si aún no existe
     try {
       await sequelize.query(`ALTER TYPE "enum_users_role" ADD VALUE IF NOT EXISTS 'superadmin'`);

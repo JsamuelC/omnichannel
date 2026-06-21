@@ -72,6 +72,27 @@ jobs:
           docker push $IMAGE_FRONTEND:prod
           docker push $IMAGE_FRONTEND:latest
 
+      - name: Sync Nginx config files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          source: "infrastructure/nginx-prod.conf,infrastructure/security-headers.inc"
+          target: /tmp/tecnossync-deploy
+          strip_components: 1
+
+      - name: Install Nginx configs
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cp /tmp/tecnossync-deploy/nginx-prod.conf /opt/tecnossync/nginx-prod.conf
+            cp /tmp/tecnossync-deploy/security-headers.inc /opt/tecnossync/security-headers.inc
+            rm -rf /tmp/tecnossync-deploy
+
       - name: Deploy a Producción (zero-downtime)
         uses: appleboy/ssh-action@v1
         with:

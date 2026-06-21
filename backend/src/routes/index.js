@@ -161,6 +161,10 @@ router.get('/conversations',
   auth, scopeConversations,
   messageController.getConversations.bind(messageController));
 
+router.post('/conversations/from-phone',
+  auth, requireRole('admin'),
+  messageController.createFromPhone.bind(messageController));
+
 router.get('/conversations/:id',
   auth, requireConversationAccess,
   messageController.getConversation.bind(messageController));

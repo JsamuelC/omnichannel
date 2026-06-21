@@ -63,6 +63,14 @@ const Conversation = sequelize.define('conversations', {
     defaultValue: 'normal'
   },
 
+  // Identificador legible (CHAT-000001)
+  ticket_id: {
+    type: DataTypes.STRING(20),
+    unique: true,
+    allowNull: true,
+    comment: 'ID legible con formato CHAT-000001'
+  },
+
   // Metadata adicional
   metadata: {
     type: DataTypes.JSONB,
@@ -75,8 +83,24 @@ const Conversation = sequelize.define('conversations', {
     { fields: ['status'] },
     { fields: ['assigned_agent_id'] },
     { fields: ['last_message_at'] },
-    { fields: ['company_id'] }
+    { fields: ['company_id'] },
+    { fields: ['ticket_id'], unique: true }
   ]
+});
+
+// Auto-generate ticket_id before creation
+Conversation.addHook('afterCreate', async (conv) => {
+  if (!conv.ticket_id) {
+    try {
+      const { sequelize } = require('../config/database');
+      const [[{ nextval }]] = await sequelize.query(`SELECT nextval('conversation_ticket_seq')`);
+      const ticketId = `CHAT-${String(nextval).padStart(6, '0')}`;
+      await conv.update({ ticket_id: ticketId }, { hooks: false });
+      conv.ticket_id = ticketId;
+    } catch (e) {
+      // Sequence may not exist yet during first migration
+    }
+  }
 });
 
 module.exports = Conversation;

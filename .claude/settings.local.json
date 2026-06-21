@@ -12,7 +12,12 @@
       "Bash(docker compose *)",
       "Bash(xargs grep -l \"contact\\\\|label\\\\|whatsapp\" -i)",
       "Bash(xargs grep -l \"Contact.find\\\\|Contact.create\\\\|Contact.update\\\\|Label\\\\|WhatsappAccount\")",
-      "Bash(docker exec *)"
+      "Bash(docker exec *)",
+      "Bash(mkdir -p /tmp/tecnossync-web)",
+      "Read(//tmp/**)",
+      "Bash(rm -rf *)",
+      "Bash(unzip -o \"C:/Users/Home/Downloads/tecnossync-website-final.zip\" -d website)",
+      "Bash(unzip -o \"C:/Users/Home/Downloads/privacidad-deploy \\(1\\).zip\" -d privacidad)"
     ]
   }
 }

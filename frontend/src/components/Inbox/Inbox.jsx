@@ -5,11 +5,16 @@ import ConversationList          from './ConversationList';
 import ChatWindow                from '../Chat/ChatWindow';
 import WhatsappBusinessPanel     from './WhatsappBusinessPanel';
 import ConversationInfoPanel     from './ConversationInfoPanel';
-import { PanelRight, Briefcase } from 'lucide-react';
+import { PanelRight, PanelLeft, Briefcase } from 'lucide-react';
+
+const SIDEBAR_KEY = 'ts-inbox-sidebar';
 
 export default function Inbox() {
   const { fetchConversations, activeConversation } = useConversationStore();
-  const [showList, setShowList] = useState(true);
+  const [showList, setShowList] = useState(() => {
+    const saved = localStorage.getItem(SIDEBAR_KEY);
+    return saved !== 'hidden';
+  });
   const [showInfo, setShowInfo] = useState(true);
   const [inboxTab, setInboxTab] = useState('general');
 
@@ -19,11 +24,31 @@ export default function Inbox() {
     if (activeConversation && window.innerWidth < 768) setShowList(false);
   }, [activeConversation]);
 
+  const toggleSidebar = () => {
+    const next = !showList;
+    setShowList(next);
+    localStorage.setItem(SIDEBAR_KEY, next ? 'visible' : 'hidden');
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* TABS */}
       <div className="flex border-b border-[#d1d7db] dark:border-[#2a3942] bg-white dark:bg-[#202c33] flex-shrink-0">
+
+        {/* Toggle sidebar */}
+        {inboxTab === 'general' && (
+          <button
+            onClick={toggleSidebar}
+            title={showList ? 'Ocultar bandeja' : 'Mostrar bandeja'}
+            className={`flex items-center gap-1.5 text-xs px-3 py-3 transition-colors font-medium border-b-2 border-transparent
+              ${showList
+                ? 'text-[#00a884] hover:bg-[#f0fdf4] dark:hover:bg-[#00a884]/10'
+                : 'text-[#54656f] dark:text-[#8696a0] hover:bg-[#f5f6f6] dark:hover:bg-white/5'}`}
+          >
+            <PanelLeft size={16} />
+          </button>
+        )}
 
         {/* Bandeja general */}
         <button
@@ -74,28 +99,29 @@ export default function Inbox() {
       {inboxTab === 'general' ? (
         <div className="flex flex-1 overflow-hidden">
 
-          {/* Lista de conversaciones */}
+          {/* Lista de conversaciones — colapsable */}
           <div className={`
             h-full flex-shrink-0 bg-white dark:bg-[#111b21] border-r border-[#d1d7db] dark:border-[#2a3942] flex flex-col
-            transition-all duration-300
-            md:w-80 md:flex
-            ${showList ? 'w-full flex' : 'w-0 hidden md:w-80 md:flex'}
+            transition-all duration-300 ease-in-out overflow-hidden
+            ${showList ? 'w-full md:w-80' : 'w-0'}
           `}>
-            <ConversationList
-              onSelectConversation={() => {
-                if (window.innerWidth < 768) setShowList(false);
-              }}
-            />
+            {showList && (
+              <ConversationList
+                onSelectConversation={() => {
+                  if (window.innerWidth < 768) setShowList(false);
+                }}
+              />
+            )}
           </div>
 
           {/* Chat */}
           <div className={`
             flex-1 flex flex-col h-full bg-[#f8f9fa] dark:bg-[#0b141a] overflow-hidden
-            ${showList ? 'hidden md:flex' : 'flex'}
+            ${showList && !activeConversation ? 'hidden md:flex' : 'flex'}
           `}>
-            {activeConversation && (
+            {activeConversation && !showList && (
               <button
-                onClick={() => setShowList(true)}
+                onClick={toggleSidebar}
                 className="md:hidden flex items-center gap-2 px-4 py-3 bg-[#f0f2f5] dark:bg-[#202c33] border-b border-[#d1d7db] dark:border-[#2a3942]
                            text-sm font-medium text-[#00a884] hover:bg-[#f0fdf4] dark:hover:bg-white/5 transition-colors"
               >

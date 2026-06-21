@@ -126,7 +126,7 @@ const ALL_NAV_ITEMS = [
   { to: '/gestion-funcionalidades', icon: <SettingsIcon />, label: 'Funcionalidades', id: 'gestion-func', feature: null, roles: ['superadmin'] },
 ];
 
-const CHANNEL_LABEL = { whatsapp: 'WhatsApp', messenger: 'Messenger', instagram: 'Instagram' };
+const CHANNEL_LABEL = { whatsapp: 'WhatsApp', messenger: 'Messenger', instagram: 'Instagram', web: 'Widget Web' };
 
 export default function Layout() {
   const { user, logout, isAdmin, hasFeature } = useAuthStore();

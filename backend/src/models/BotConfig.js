@@ -101,6 +101,12 @@ Siempre saluda cordialmente y despídete de manera amistosa.`
     type: DataTypes.FLOAT,
     defaultValue: 0.7,
     validate: { min: 0, max: 1 }
+  },
+
+  widget_realtime_responses: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    comment: 'Enviar respuestas del bot en tiempo real desde el widget web'
   }
 }, {
   indexes: [

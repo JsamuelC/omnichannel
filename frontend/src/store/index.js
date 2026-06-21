@@ -168,20 +168,33 @@ export const useConversationStore = create((set, get) => ({
     if (activeConversation?.id === data.conversation?.id) {
       set((s) => ({ messages: [...s.messages, data.message] }));
     }
-    set((s) => ({
-      conversations: s.conversations.map((c) =>
-        c.id === data.conversation?.id
-          ? {
-              ...c,
-              last_message_preview: data.message.content,
-              last_message_at:      data.message.sent_at,
-              unread_count: c.id !== activeConversation?.id
-                ? (c.unread_count || 0) + 1
-                : 0
-            }
-          : c
-      )
-    }));
+    set((s) => {
+      const exists = s.conversations.some(c => c.id === data.conversation?.id);
+      if (exists) {
+        return {
+          conversations: s.conversations.map((c) =>
+            c.id === data.conversation?.id
+              ? {
+                  ...c,
+                  last_message_preview: data.message.content,
+                  last_message_at:      data.message.sent_at || data.message.created_at,
+                  unread_count: c.id !== activeConversation?.id
+                    ? (c.unread_count || 0) + 1
+                    : 0
+                }
+              : c
+          )
+        };
+      }
+      const newConv = {
+        ...data.conversation,
+        contact: data.contact || data.conversation?.contact,
+        last_message_preview: data.message.content,
+        last_message_at: data.message.sent_at || data.message.created_at,
+        unread_count: 1,
+      };
+      return { conversations: [newConv, ...s.conversations] };
+    });
   },
 
   resolveConversation: async (id) => {
@@ -210,6 +223,24 @@ export const useConversationStore = create((set, get) => ({
       if (c.unread_count > 0) acc[c.channel] = (acc[c.channel] || 0) + c.unread_count;
       return acc;
     }, {});
+  },
+
+  createFromPhone: async (phone, name) => {
+    const res = await api.post('/conversations/from-phone', { phone, name });
+    const conv = res.data;
+    set((s) => {
+      const exists = s.conversations.some(c => c.id === conv.id);
+      return {
+        conversations: exists ? s.conversations : [conv, ...s.conversations],
+        activeConversation: conv,
+        messages: [],
+      };
+    });
+    try {
+      const msgRes = await api.get(`/conversations/${conv.id}/messages`);
+      set({ messages: msgRes.data.messages });
+    } catch (_) {}
+    return conv;
   }
 }));
 

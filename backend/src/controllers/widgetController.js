@@ -1,4 +1,4 @@
-const { Contact, Conversation, Message } = require('../models');
+const { Contact, Conversation, Message, BotConfig } = require('../models');
 const Company        = require('../models/Company');
 const logger         = require('../config/logger');
 const chatbotService = require('../services/chatbotService');
@@ -82,18 +82,25 @@ exports.sendMessage = async (req, res) => {
       last_message_preview: text.trim().substring(0, 80),
     });
 
-    // Emitir a agentes via socket
+    // Emitir a agentes via socket (incluir contact para que la bandeja muestre nombre)
     const io = req.app.get('io');
     if (io) {
       io.to('agents').emit('message:new', {
         message:      message.toJSON(),
         conversation: conversation.toJSON(),
+        contact:      conversation.contact?.toJSON() || null,
       });
     }
 
     // Respuesta del bot si la conversación está en modo bot
     let botReply = null;
-    if (conversation.status === 'bot') {
+    const botConfig = await BotConfig.findOne({
+      where: { is_active: true, company_id: conversation.company_id },
+      order: [['created_at', 'DESC']]
+    });
+    const widgetRealtime = botConfig?.widget_realtime_responses !== false;
+
+    if (conversation.status === 'bot' && widgetRealtime) {
       try {
         const result = await chatbotService.handleMessage(conversation, message, io);
         const botText = result ? (typeof result === 'string' ? result : result.text) : null;
