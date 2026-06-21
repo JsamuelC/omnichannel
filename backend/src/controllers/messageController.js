@@ -164,6 +164,50 @@ class MessageController {
     }
   }
 
+  // POST /conversations/:id/media — enviar archivo adjunto
+  async sendMedia(req, res) {
+    try {
+      if (!req.file) return res.status(400).json({ success: false, message: 'No se recibió archivo' });
+
+      const conversation = await Conversation.findByPk(req.params.id, {
+        include: [{ model: Contact, as: 'contact' }]
+      });
+      if (!conversation) return res.status(404).json({ success: false, message: 'Conversación no encontrada' });
+
+      const ext = require('path').extname(req.file.originalname).toLowerCase();
+      let contentType = 'document';
+      if (['.jpg','.jpeg','.png','.gif','.webp'].includes(ext)) contentType = 'image';
+      else if (['.mp3','.ogg','.opus','.m4a','.wav'].includes(ext)) contentType = 'audio';
+      else if (['.mp4','.mov','.avi','.webm'].includes(ext)) contentType = 'video';
+
+      const mediaUrl = `/uploads/${req.file.filename}`;
+
+      const message = await Message.create({
+        conversation_id: conversation.id,
+        direction:       'outbound',
+        sender_type:     'agent',
+        sender_id:       req.user?.id,
+        content_type:    contentType,
+        content:         req.file.originalname,
+        media_url:       mediaUrl,
+        status:          'sent',
+      });
+
+      await conversation.update({
+        last_message_at:      new Date(),
+        last_message_preview: `📎 ${req.file.originalname}`,
+      });
+
+      const io = req.app.get('io');
+      if (io) io.to('agents').emit('message:sent', { message: message.toJSON(), conversationId: conversation.id });
+
+      res.json({ success: true, data: message });
+    } catch (error) {
+      logger.error('Error sendMedia:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   // POST /conversations/:id/assign  (solo admin — ver routes)
   async assignConversation(req, res) {
     try {

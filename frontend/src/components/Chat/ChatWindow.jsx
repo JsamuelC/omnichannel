@@ -1,4 +1,9 @@
-// frontend/src/components/Chat/ChatWindow.jsx
+﻿// frontend/src/components/Chat/ChatWindow.jsx
+// ─────────────────────────────────────────────────────────────
+// Ventana de chat de Tecnossync
+// RBAC: botón "Asignarme" solo visible para admin
+// Animaciones de mensajes con msg-agent / msg-contact
+// ─────────────────────────────────────────────────────────────
 import React, { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -17,7 +22,7 @@ const CHANNEL_CONFIG = {
 };
 
 export default function ChatWindow() {
-  const { activeConversation, messages, sendMessage, resolveConversation } = useConversationStore();
+  const { activeConversation, messages, sendMessage, resolveConversation, deleteConversation } = useConversationStore();
   const { user } = useAuthStore();
   const { theme } = useThemeStore();
   const isDark = theme === 'dark';
@@ -33,15 +38,20 @@ export default function ChatWindow() {
   const [showModulePicker,setShowModulePicker]   = useState(false);
   const [moduleModal,     setModuleModal]       = useState(null);
   const [showResolveModal, setShowResolveModal] = useState(false);
+  const [showCloseMenu, setShowCloseMenu] = useState(false);
+  const [closeTimer, setCloseTimer] = useState(null);
+  const fileInputRef = useRef(null);
   const { modules } = useModuleStore();
 
   const messagesEndRef = useRef(null);
   const inputRef       = useRef(null);
 
+  // Scroll al último mensaje
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Unirse/salir de la sala Socket.io
   useEffect(() => {
     if (!activeConversation) return;
     joinConversation(activeConversation.id);
@@ -49,6 +59,7 @@ export default function ChatWindow() {
     return () => leaveConversation(activeConversation.id);
   }, [activeConversation?.id]);
 
+  // Cargar lista de agentes (solo admin necesita esto)
   useEffect(() => {
     if (!isAdmin) return;
     api.get('/users')
@@ -57,11 +68,13 @@ export default function ChatWindow() {
   }, [isAdmin]);
 
   useEffect(() => {
-    api.get('/quick-messages?channel=inbox')
+    const ch = activeConversation?.channel || 'all';
+    api.get(`/quick-messages?channel=${ch}`)
       .then(res => setQuickMessages(res.data || []))
       .catch(() => {});
-  }, []);
+  }, [activeConversation?.channel]);
 
+  // ── Handlers ──────────────────────────────────────────────
   const handleSend = async (e) => {
     e.preventDefault();
     if (!text.trim() || sending) return;
@@ -83,13 +96,63 @@ export default function ChatWindow() {
     }
   };
 
-  const handleResolve = async () => {
+  const handleResolve = () => setShowResolveModal(true);
+
+  const confirmResolve = async () => {
     try {
       await resolveConversation(activeConversation.id);
-      setShowResolveModal(false);
       toast.success('Conversación resuelta.');
+      setShowResolveModal(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al resolver.');
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('conversationId', activeConversation.id);
+      const res = await api.post(`/conversations/${activeConversation.id}/media`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data) {
+        const { messages: msgs } = useConversationStore.getState();
+        useConversationStore.setState({ messages: [...msgs, res.data] });
+      }
+      toast.success('Archivo enviado');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error al enviar archivo');
+    }
+  };
+
+  const handleCloseConversation = (delaySeconds) => {
+    setShowCloseMenu(false);
+    if (delaySeconds === 0) {
+      resolveConversation(activeConversation.id);
+      toast.success('Conversación finalizada.');
+    } else {
+      if (closeTimer) clearTimeout(closeTimer);
+      const mins = delaySeconds >= 60 ? `${delaySeconds / 60} minuto${delaySeconds > 60 ? 's' : ''}` : `${delaySeconds} segundos`;
+      toast.success(`Conversación se cerrará en ${mins}.`);
+      const timer = setTimeout(() => {
+        resolveConversation(activeConversation.id);
+        toast.success('Conversación finalizada automáticamente.');
+      }, delaySeconds * 1000);
+      setCloseTimer(timer);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('¿Eliminar esta conversación y todos sus mensajes? Esta acción no se puede deshacer.')) return;
+    try {
+      await deleteConversation(activeConversation.id);
+      toast.success('Conversación eliminada.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error al eliminar.');
     }
   };
 
@@ -124,7 +187,7 @@ export default function ChatWindow() {
     }
   };
 
-  // Empty state
+  // ── Empty state ────────────────────────────────────────────
   if (!activeConversation) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center bg-[#f8f9fa] dark:bg-[#0b141a]">
@@ -143,11 +206,14 @@ export default function ChatWindow() {
           </p>
         </div>
         <div className="flex gap-2 mt-2 flex-wrap justify-center">
-          {Object.entries(CHANNEL_CONFIG).map(([ch, c]) => (
-            <span key={ch} className={`text-xs font-semibold px-2.5 py-1 rounded-full ${c.bgLight} ${c.textColor} border ${c.border}`}>
-              {c.label}
-            </span>
-          ))}
+          {['whatsapp', 'messenger', 'instagram', 'web'].map(ch => {
+            const c = CHANNEL_CONFIG[ch];
+            return (
+              <span key={ch} className={`text-xs font-semibold px-2.5 py-1 rounded-full ${c.bgLight} ${c.textColor} border ${c.border}`}>
+                {c.label}
+              </span>
+            );
+          })}
         </div>
       </div>
     );
@@ -160,21 +226,23 @@ export default function ChatWindow() {
   return (
     <div className="flex flex-col h-full">
 
-      {/* Header del chat */}
+      {/* ── Header del chat ───────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-[#f0f2f5] dark:bg-[#202c33] border-b border-[#d1d7db] dark:border-[#2a3942] flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
+          {/* Avatar */}
           <div className="relative flex-shrink-0">
             <div className="w-10 h-10 rounded-full bg-[#dfe5e7] dark:bg-[#2a3942] flex items-center justify-center font-semibold text-[#54656f] dark:text-[#8696a0] text-sm">
               {contactName.charAt(0).toUpperCase()}
             </div>
             <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 ${chConfig.color} rounded-full border-2 border-white dark:border-[#202c33]`} />
           </div>
+          {/* Nombre + canal + ticket */}
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <p className="font-medium text-[#111b21] dark:text-[#e9edef] text-[15px] truncate">{contactName}</p>
-              {activeConversation.ticket_id && (
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#f0f2f5] dark:bg-[#2a3942] text-[#667781] dark:text-[#8696a0] flex-shrink-0">
-                  {activeConversation.ticket_id}
+              {activeConversation.ticket_number && (
+                <span className="text-[10px] font-mono bg-[#f0f2f5] dark:bg-[#2a3942] text-[#00a884] px-1.5 py-0.5 rounded-md flex-shrink-0">
+                  {activeConversation.ticket_number}
                 </span>
               )}
             </div>
@@ -189,7 +257,7 @@ export default function ChatWindow() {
           </div>
         </div>
 
-        {/* Acciones */}
+        {/* Acciones — solo admin ve todo, agente ve "Resolver" */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {isAdmin && (
             <div className="relative">
@@ -208,6 +276,7 @@ export default function ChatWindow() {
                 </svg>
               </button>
 
+              {/* Dropdown de asignación */}
               {showAssign && (
                 <div className="absolute right-0 top-full mt-1 w-52 bg-white dark:bg-[#233138] rounded-xl border border-[#d1d7db] dark:border-[#2a3942] shadow-lg shadow-slate-200/60 dark:shadow-black/40 z-20 overflow-hidden">
                   <div className="p-1">
@@ -248,7 +317,7 @@ export default function ChatWindow() {
           )}
 
           <button
-            onClick={() => setShowResolveModal(true)}
+            onClick={handleResolve}
             className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg
                        bg-[#d9fdd3] dark:bg-[#005c4b] hover:bg-[#c5f7c0] dark:hover:bg-[#06715f] text-[#008069] dark:text-[#e9edef] border border-[#00a884]/30 dark:border-transparent
                        transition-colors"
@@ -258,10 +327,23 @@ export default function ChatWindow() {
             </svg>
             Resolver
           </button>
+          {isAdmin && (
+            <button
+              onClick={handleDelete}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg
+                         bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800
+                         transition-colors"
+            >
+              <svg viewBox="0 0 20 20" className="w-3.5 h-3.5" fill="currentColor">
+                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              Eliminar
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Área de mensajes */}
+      {/* ── Área de mensajes ──────────────────────────────── */}
       <div
         className="flex-1 overflow-y-auto px-6 py-4 space-y-1"
         onClick={() => setShowAssign(false)}
@@ -287,9 +369,10 @@ export default function ChatWindow() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input de mensaje */}
+      {/* ── Input de mensaje ──────────────────────────────── */}
       <div className="px-4 pb-3 pt-2 bg-[#f0f2f5] dark:bg-[#202c33] border-t border-[#d1d7db] dark:border-[#2a3942] flex-shrink-0">
 
+        {/* Quick message picker */}
         {showQuickPicker && (
           <div className="mb-2 bg-white dark:bg-[#2a3942] rounded-xl shadow-lg border border-slate-200 dark:border-[#3b4a54] overflow-hidden">
             <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 dark:border-[#3b4a54]">
@@ -338,6 +421,7 @@ export default function ChatWindow() {
         )}
 
         <form onSubmit={handleSend} className="flex items-end gap-2">
+          {/* Botón mensajes rápidos */}
           <button
             type="button"
             onClick={() => { setShowQuickPicker(p => !p); setQuickSearch(''); }}
@@ -351,6 +435,22 @@ export default function ChatWindow() {
             <Zap size={16} />
           </button>
 
+          {/* Botón adjuntar */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors
+                       bg-white dark:bg-[#2a3942] text-[#667781] hover:text-[#00a884] hover:bg-[#e8f5f0]"
+            title="Adjuntar archivo"
+          >
+            <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor">
+              <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+            </svg>
+          </button>
+          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload}
+            accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" />
+
+          {/* Botón módulos */}
           {modules.length > 0 && (
             <div className="relative flex-shrink-0">
               <button
@@ -422,15 +522,85 @@ export default function ChatWindow() {
           </button>
         </form>
 
-        <p className="text-xs text-[#667781] dark:text-[#8696a0] mt-2 flex items-center gap-1.5 pl-1">
-          <span className={`w-2 h-2 rounded-full ${chConfig.color}`} />
-          Respondiendo en {chConfig.label}
-          <span className="text-[#d1d7db] dark:text-[#2a3942]">·</span>
-          <span>Enter para enviar · Shift+Enter nueva línea</span>
-        </p>
+        {/* Barra inferior: canal + finalizar conversación */}
+        <div className="flex items-center justify-between mt-2 pl-1">
+          <p className="text-xs text-[#667781] dark:text-[#8696a0] flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${chConfig.color}`} />
+            Respondiendo en {chConfig.label}
+          </p>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowCloseMenu(p => !p)}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg
+                         bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40
+                         text-red-600 dark:text-red-400 transition-colors"
+            >
+              <svg viewBox="0 0 20 20" className="w-3.5 h-3.5" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+              Finalizar
+            </button>
+            {showCloseMenu && (
+              <div className="absolute bottom-9 right-0 z-30 bg-white dark:bg-[#2a3942] rounded-xl shadow-xl border border-slate-100 dark:border-[#3b4a54] w-48 overflow-hidden">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-3 py-2 border-b border-slate-50 dark:border-[#3b4a54]">Finalizar conversación</p>
+                {[
+                  { label: 'Cerrar ahora', delay: 0 },
+                  { label: 'En 1 minuto', delay: 60 },
+                  { label: 'En 5 minutos', delay: 300 },
+                ].map(opt => (
+                  <button key={opt.delay} type="button"
+                    className="w-full text-left text-sm px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-[#3b4a54] text-slate-700 dark:text-slate-200 transition-colors"
+                    onClick={() => handleCloseConversation(opt.delay)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Modal módulo */}
+      {/* ── Modal de confirmación para resolver ────────── */}
+      {showResolveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowResolveModal(false)}>
+          <div className="bg-white dark:bg-[#202c33] rounded-2xl shadow-xl w-[380px] max-w-[90vw] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="w-12 h-12 bg-[#d9fdd3] dark:bg-[#005c4b] rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg viewBox="0 0 20 20" className="w-6 h-6 text-[#008069] dark:text-[#e9edef]" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <h3 className="text-base font-semibold text-[#111b21] dark:text-[#e9edef] mb-1">
+                Resolver conversación
+              </h3>
+              <p className="text-sm text-[#667781] dark:text-[#8696a0]">
+                ¿Estás seguro de que deseas marcar esta conversación como resuelta?
+                {activeConversation?.ticket_number && (
+                  <span className="block mt-1 font-mono text-[#00a884]">{activeConversation.ticket_number}</span>
+                )}
+              </p>
+            </div>
+            <div className="flex gap-2 px-6 pb-5">
+              <button
+                onClick={() => setShowResolveModal(false)}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-[#54656f] dark:text-[#8696a0] bg-[#f0f2f5] dark:bg-[#2a3942] rounded-xl hover:bg-[#e9edef] dark:hover:bg-[#3b4a54] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmResolve}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-[#00a884] rounded-xl hover:bg-[#06987a] transition-colors"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal módulo ──────────────────────────────── */}
       <ModuleRecordModal
         open={!!moduleModal}
         onClose={() => setModuleModal(null)}
@@ -439,55 +609,80 @@ export default function ChatWindow() {
         contactName={activeConversation?.contact?.name || ''}
         conversationId={activeConversation?.id}
       />
-
-      {/* Modal de confirmación para resolver */}
-      {showResolveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowResolveModal(false)}>
-          <div
-            className="bg-white dark:bg-[#233138] rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="px-6 pt-6 pb-4">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-[#d9fdd3] dark:bg-[#005c4b] flex items-center justify-center">
-                  <svg viewBox="0 0 20 20" className="w-5 h-5 text-[#008069] dark:text-[#25d366]" fill="currentColor">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-[#111b21] dark:text-[#e9edef]">Resolver conversación</h3>
-                  {activeConversation?.ticket_id && (
-                    <span className="text-xs font-mono text-[#667781] dark:text-[#8696a0]">{activeConversation.ticket_id}</span>
-                  )}
-                </div>
-              </div>
-              <p className="text-sm text-[#667781] dark:text-[#8696a0]">
-                Esta conversación con <span className="font-medium text-[#111b21] dark:text-[#e9edef]">{contactName}</span> se marcará como resuelta y se cerrará. Esta acción se puede revertir si el contacto escribe de nuevo.
-              </p>
-            </div>
-            <div className="flex gap-3 px-6 pb-6">
-              <button
-                onClick={() => setShowResolveModal(false)}
-                className="flex-1 py-2.5 text-sm font-medium rounded-xl border border-[#d1d7db] dark:border-[#2a3942] text-[#54656f] dark:text-[#8696a0] hover:bg-[#f5f6f6] dark:hover:bg-white/5 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleResolve}
-                className="flex-1 py-2.5 text-sm font-medium rounded-xl bg-[#00a884] hover:bg-[#06987a] text-white transition-colors"
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
+// ─── Contenido multimedia del mensaje ────────────────────────
+function MessageMedia({ message }) {
+  const type = message.content_type || 'text';
+  const url  = message.media_url;
+
+  if (type === 'image' && url) {
+    return (
+      <div className="mb-1">
+        <img src={url} alt="" className="max-w-full rounded-lg cursor-pointer max-h-64 object-cover"
+          onClick={() => window.open(url, '_blank')} />
+        {message.content && message.content !== '[Imagen]' && (
+          <p className="text-sm whitespace-pre-wrap leading-relaxed mt-1">{message.content}</p>
+        )}
+      </div>
+    );
+  }
+
+  if ((type === 'audio' || type === 'ptt') && url) {
+    return (
+      <div className="mb-1">
+        <audio controls className="max-w-full" style={{ height: 36 }}>
+          <source src={url} />
+        </audio>
+        {message.content && !message.content.startsWith('[') && (
+          <p className="text-sm whitespace-pre-wrap leading-relaxed mt-1">{message.content}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (type === 'video' && url) {
+    return (
+      <div className="mb-1">
+        <video controls className="max-w-full rounded-lg max-h-64">
+          <source src={url} />
+        </video>
+      </div>
+    );
+  }
+
+  if (type === 'document' && url) {
+    const fileName = message.content || 'Documento';
+    return (
+      <div className="mb-1">
+        <a href={url} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+          <svg viewBox="0 0 20 20" className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor">
+            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+          </svg>
+          <span className="text-sm truncate">{fileName}</span>
+        </a>
+      </div>
+    );
+  }
+
+  if (type === 'sticker' && url) {
+    return (
+      <div className="mb-1">
+        <img src={url} alt="Sticker" className="w-24 h-24 object-contain" />
+      </div>
+    );
+  }
+
+  return <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>;
+}
+
+// ─── Burbuja de mensaje ──────────────────────────────────────
 function MessageBubble({ message, currentUserId }) {
   const isBot    = message.sender_type === 'bot';
+  const isAgent  = message.sender_type === 'agent';
   const isOutbound = message.direction === 'outbound';
 
   const time = message.sent_at || message.created_at
@@ -495,8 +690,9 @@ function MessageBubble({ message, currentUserId }) {
     : '';
 
   if (isOutbound) {
+    // Mensajes salientes (agente o bot) → derecha, burbuja verde estilo WhatsApp
     return (
-      <div className="flex justify-end msg-agent">
+      <div className={`flex justify-end ${isBot ? 'msg-agent' : 'msg-agent'}`}>
         <div className="max-w-[65%]">
           {isBot && (
             <p className="text-xs text-[#667781] dark:text-[#8696a0] text-right mb-1 flex items-center justify-end gap-1">
@@ -508,7 +704,7 @@ function MessageBubble({ message, currentUserId }) {
             className="px-3 py-1.5 shadow-sm bg-[#d9fdd3] dark:bg-[#005c4b] text-[#111b21] dark:text-[#e9edef]"
             style={{ borderRadius: '8px 0px 8px 8px' }}
           >
-            <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+            <MessageMedia message={message} />
             <p className="text-[11px] text-[#667781] dark:text-[#8696a0] text-right mt-0.5 flex items-center justify-end gap-1 -mb-0.5">
               {time}
               {message.status === 'read' && (
@@ -530,7 +726,7 @@ function MessageBubble({ message, currentUserId }) {
           className="bg-white dark:bg-[#202c33] text-[#111b21] dark:text-[#e9edef] px-3 py-1.5 shadow-sm"
           style={{ borderRadius: '0px 8px 8px 8px' }}
         >
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+          <MessageMedia message={message} />
           <p className="text-[11px] text-[#667781] dark:text-[#8696a0] text-right mt-0.5 -mb-0.5">{time}</p>
         </div>
       </div>

@@ -368,7 +368,12 @@ class ChatbotService {
       }
 
       const history        = await this.buildConversationHistory(conversation.id, config.max_history_messages);
-      const resolvedPrompt = await this.resolvePromptCatalogs(config.system_prompt, conversation.company_id);
+      let resolvedPrompt   = await this.resolvePromptCatalogs(config.system_prompt, conversation.company_id);
+
+      // Agregar contexto de calendario si está habilitado
+      const calendarCtx = await this.buildCalendarContext(null);
+      if (calendarCtx) resolvedPrompt += '\n\n' + calendarCtx;
+
       const rawResponse    = await this.callAI(
         integration.provider,
         integration.api_key,
@@ -379,7 +384,13 @@ class ChatbotService {
         config.ai_temperature
       );
 
-      const { text: botText, catalogFile } = await this.extractFileCommand(rawResponse);
+      // Procesar comandos: [SCHEDULE:...] → [SEND_FILE:id]
+      const { text: afterSchedule, schedule } = this.extractScheduleCommand(rawResponse);
+      if (schedule) {
+        await this.createAppointmentFromBot(schedule, null, conversation.company_id);
+      }
+
+      const { text: botText, catalogFile } = await this.extractFileCommand(afterSchedule);
       logger.info(`🤖 Bot (${integration.provider}) respondió en conversación ${conversation.id}${catalogFile ? ' + archivo adjunto' : ''}`);
       return { text: botText, catalogFile };
 
