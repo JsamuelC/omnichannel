@@ -30,17 +30,12 @@ export default function InstagramConfig() {
     const popup = window.open(url, 'fb_instagram', `width=${w},height=${h},left=${left},top=${top}`);
 
     const interval = setInterval(() => {
-      try {
-        if (!popup || popup.closed) { clearInterval(interval); setConnecting(false); return; }
-        const popupUrl = popup.location.href;
-        if (popupUrl.includes('access_token=')) {
-          clearInterval(interval);
-          const token = popupUrl.split('access_token=')[1]?.split('&')[0];
-          popup.close();
-          if (token) connectWithToken(token);
-          else setConnecting(false);
-        }
-      } catch (_) {}
+      if (!popup || popup.closed) {
+        clearInterval(interval);
+        const token = localStorage.getItem('ig_oauth_token');
+        if (token) { localStorage.removeItem('ig_oauth_token'); connectWithToken(token); }
+        else setConnecting(false);
+      }
     }, 500);
   };
 
@@ -67,28 +62,8 @@ export default function InstagramConfig() {
   };
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.includes('access_token=')) {
-      const token = hash.split('access_token=')[1]?.split('&')[0];
-      window.location.hash = '';
-      if (window.opener) {
-        window.opener.postMessage({ type: 'ig_token', token }, window.location.origin);
-        window.close();
-        return;
-      }
-      if (token) connectWithToken(token);
-    }
-  }, []);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.origin !== window.location.origin) return;
-      if (e.data?.type === 'ig_token' && e.data.token) {
-        connectWithToken(e.data.token);
-      }
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
+    const token = localStorage.getItem('ig_oauth_token');
+    if (token) { localStorage.removeItem('ig_oauth_token'); connectWithToken(token); }
   }, []);
 
   const handleDisconnect = async () => {
