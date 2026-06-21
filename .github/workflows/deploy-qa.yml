@@ -73,7 +73,6 @@ jobs:
             /usr/local/bin/aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
             docker compose -f /opt/tecnossync/docker-compose.qa.yml pull backend-qa frontend-qa
             docker compose -f /opt/tecnossync/docker-compose.qa.yml up -d --remove-orphans
-            docker system prune -f
 
       - name: Health check QA
         run: |
