@@ -23,42 +23,55 @@ export default function InstagramConfig() {
     setConnecting(true);
     const redirectUri = `${window.location.origin}/config/instagram`;
     const scope = 'instagram_manage_messages,pages_show_list,pages_manage_metadata,instagram_basic';
-    const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=token`;
-    window.location.href = url;
+    const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=token&display=popup`;
+    const w = 600, h = 700;
+    const left = window.screenX + (window.innerWidth - w) / 2;
+    const top = window.screenY + (window.innerHeight - h) / 2;
+    const popup = window.open(url, 'fb_instagram', `width=${w},height=${h},left=${left},top=${top}`);
+
+    const interval = setInterval(() => {
+      try {
+        if (!popup || popup.closed) { clearInterval(interval); setConnecting(false); return; }
+        const popupUrl = popup.location.href;
+        if (popupUrl.includes('access_token=')) {
+          clearInterval(interval);
+          const token = popupUrl.split('access_token=')[1]?.split('&')[0];
+          popup.close();
+          if (token) connectWithToken(token);
+          else setConnecting(false);
+        }
+      } catch (_) {}
+    }, 500);
+  };
+
+  const connectWithToken = async (token) => {
+    setLoading(true);
+    try {
+      const r = await api.get(`/channels/pages?user_token=${token}`);
+      const pages = r.data || [];
+      const pageWithIg = pages.find(p => p.instagram);
+      if (!pageWithIg) { toast.error('No se encontró una cuenta de Instagram Business vinculada a tus páginas'); return; }
+      const res = await api.post('/channels/instagram/connect', {
+        access_token: pageWithIg.page_access_token,
+        ig_id: pageWithIg.instagram.ig_id,
+        ig_username: pageWithIg.instagram.ig_username,
+        page_id: pageWithIg.page_id,
+      });
+      if (res?.success) {
+        toast.success('Instagram conectado');
+        const r2 = await api.get('/channels/instagram/status');
+        setStatus(r2.data);
+      }
+    } catch (e) { toast.error(e.message); }
+    finally { setLoading(false); setConnecting(false); }
   };
 
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.includes('access_token=')) {
       const token = hash.split('access_token=')[1]?.split('&')[0];
-      if (token) {
-        setLoading(true);
-        api.get(`/channels/pages?user_token=${token}`)
-          .then(r => {
-            const pages = r.data || [];
-            const pageWithIg = pages.find(p => p.instagram);
-            if (!pageWithIg) {
-              toast.error('No se encontró una cuenta de Instagram Business vinculada a tus páginas');
-              setLoading(false);
-              return;
-            }
-            return api.post('/channels/instagram/connect', {
-              access_token: pageWithIg.page_access_token,
-              ig_id: pageWithIg.instagram.ig_id,
-              ig_username: pageWithIg.instagram.ig_username,
-              page_id: pageWithIg.page_id,
-            });
-          })
-          .then(r => {
-            if (r?.success) {
-              toast.success('Instagram conectado');
-              window.location.hash = '';
-              api.get('/channels/instagram/status').then(r2 => setStatus(r2.data));
-            }
-          })
-          .catch(e => toast.error(e.message))
-          .finally(() => setLoading(false));
-      }
+      window.location.hash = '';
+      if (token) connectWithToken(token);
     }
   }, []);
 

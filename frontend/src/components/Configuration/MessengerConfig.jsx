@@ -23,41 +23,52 @@ export default function MessengerConfig() {
     setConnecting(true);
     const redirectUri = `${window.location.origin}/config/messenger`;
     const scope = 'pages_messaging,pages_show_list,pages_manage_metadata';
-    const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=token`;
-    window.location.href = url;
+    const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=token&display=popup`;
+    const w = 600, h = 700;
+    const left = window.screenX + (window.innerWidth - w) / 2;
+    const top = window.screenY + (window.innerHeight - h) / 2;
+    const popup = window.open(url, 'fb_messenger', `width=${w},height=${h},left=${left},top=${top}`);
+
+    const interval = setInterval(() => {
+      try {
+        if (!popup || popup.closed) { clearInterval(interval); setConnecting(false); return; }
+        const popupUrl = popup.location.href;
+        if (popupUrl.includes('access_token=')) {
+          clearInterval(interval);
+          const token = popupUrl.split('access_token=')[1]?.split('&')[0];
+          popup.close();
+          if (token) connectWithToken(token);
+          else setConnecting(false);
+        }
+      } catch (_) {}
+    }, 500);
+  };
+
+  const connectWithToken = async (token) => {
+    setLoading(true);
+    try {
+      const r = await api.get(`/channels/pages?user_token=${token}`);
+      const pages = r.data || [];
+      if (pages.length === 0) { toast.error('No se encontraron páginas de Facebook'); return; }
+      const page = pages[0];
+      const res = await api.post('/channels/messenger/connect', {
+        page_access_token: page.page_access_token, page_id: page.page_id, page_name: page.page_name,
+      });
+      if (res?.success) {
+        toast.success('Messenger conectado');
+        const r2 = await api.get('/channels/messenger/status');
+        setStatus(r2.data);
+      }
+    } catch (e) { toast.error(e.message); }
+    finally { setLoading(false); setConnecting(false); }
   };
 
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.includes('access_token=')) {
       const token = hash.split('access_token=')[1]?.split('&')[0];
-      if (token) {
-        setLoading(true);
-        api.get(`/channels/pages?user_token=${token}`)
-          .then(r => {
-            const pages = r.data || [];
-            if (pages.length === 0) {
-              toast.error('No se encontraron páginas de Facebook');
-              setLoading(false);
-              return;
-            }
-            const page = pages[0];
-            return api.post('/channels/messenger/connect', {
-              page_access_token: page.page_access_token,
-              page_id: page.page_id,
-              page_name: page.page_name,
-            });
-          })
-          .then(r => {
-            if (r?.success) {
-              toast.success('Messenger conectado');
-              window.location.hash = '';
-              api.get('/channels/messenger/status').then(r2 => setStatus(r2.data));
-            }
-          })
-          .catch(e => toast.error(e.message))
-          .finally(() => setLoading(false));
-      }
+      window.location.hash = '';
+      if (token) connectWithToken(token);
     }
   }, []);
 
