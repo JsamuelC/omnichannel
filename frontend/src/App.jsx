@@ -67,26 +67,26 @@ const FeatureRoute = ({ feature, children }) => {
   return children;
 };
 
+// Interceptar callback de OAuth en popup ANTES de que React renderice
+(function() {
+  if (window.location.hash.includes('access_token=')) {
+    const hash = window.location.hash;
+    const accessToken = hash.split('access_token=')[1]?.split('&')[0];
+    const path = window.location.pathname;
+    if (accessToken) {
+      let key = 'oauth_token';
+      if (path.includes('instagram')) key = 'ig_oauth_token';
+      else if (path.includes('messenger')) key = 'msg_oauth_token';
+      localStorage.setItem(key, accessToken);
+      window.location.hash = '';
+      window.close();
+    }
+  }
+})();
+
 export default function App() {
   const { token, fetchMe } = useAuthStore();
   useEffect(() => { if (token) fetchMe(); }, []);
-
-  // Interceptar callback de OAuth en popup — guardar token en localStorage y cerrar
-  useEffect(() => {
-    if (window.location.hash.includes('access_token=')) {
-      const hash = window.location.hash;
-      const accessToken = hash.split('access_token=')[1]?.split('&')[0];
-      const path = window.location.pathname;
-      if (accessToken) {
-        let key = 'oauth_token';
-        if (path.includes('instagram')) key = 'ig_oauth_token';
-        else if (path.includes('messenger')) key = 'msg_oauth_token';
-        localStorage.setItem(key, accessToken);
-        window.close();
-        return;
-      }
-    }
-  }, []);
 
   return (
     <Routes>
