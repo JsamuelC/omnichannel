@@ -11,6 +11,14 @@ const Conversation = sequelize.define('conversations', {
     primaryKey: true
   },
 
+  // Identificador legible único (CHAT-000001)
+  ticket_number: {
+    type: DataTypes.STRING(20),
+    unique: true,
+    allowNull: true,
+    comment: 'ID legible con formato CHAT-000001'
+  },
+
   // Relaciones
   contact_id: {
     type: DataTypes.UUID,
@@ -63,14 +71,6 @@ const Conversation = sequelize.define('conversations', {
     defaultValue: 'normal'
   },
 
-  // Identificador legible (CHAT-000001)
-  ticket_id: {
-    type: DataTypes.STRING(20),
-    unique: true,
-    allowNull: true,
-    comment: 'ID legible con formato CHAT-000001'
-  },
-
   // Metadata adicional
   metadata: {
     type: DataTypes.JSONB,
@@ -84,21 +84,21 @@ const Conversation = sequelize.define('conversations', {
     { fields: ['assigned_agent_id'] },
     { fields: ['last_message_at'] },
     { fields: ['company_id'] },
-    { fields: ['ticket_id'], unique: true }
+    { fields: ['ticket_number'], unique: true }
   ]
 });
 
-// Auto-generate ticket_id before creation
-Conversation.addHook('afterCreate', async (conv) => {
-  if (!conv.ticket_id) {
+// Auto-generar ticket_number antes de crear
+Conversation.beforeCreate(async (conv) => {
+  if (!conv.ticket_number) {
     try {
-      const { sequelize } = require('../config/database');
-      const [[{ nextval }]] = await sequelize.query(`SELECT nextval('conversation_ticket_seq')`);
-      const ticketId = `CHAT-${String(nextval).padStart(6, '0')}`;
-      await conv.update({ ticket_id: ticketId }, { hooks: false });
-      conv.ticket_id = ticketId;
-    } catch (e) {
-      // Sequence may not exist yet during first migration
+      const [result] = await sequelize.query(
+        `SELECT MAX(CAST(SUBSTRING(ticket_number FROM 6) AS INTEGER)) AS max_num FROM conversations WHERE ticket_number IS NOT NULL`
+      );
+      const next = (result[0]?.max_num || 0) + 1;
+      conv.ticket_number = 'CHAT-' + String(next).padStart(6, '0');
+    } catch {
+      conv.ticket_number = 'CHAT-' + String(Date.now()).slice(-6);
     }
   }
 });

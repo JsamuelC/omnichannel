@@ -157,6 +157,11 @@ router.delete('/quick-messages/:id',    auth, requireRole('admin'), requireFeatu
 // ─────────────────────────────────────
 // CONVERSACIONES
 // ─────────────────────────────────────
+// Crear conversación desde número de WhatsApp
+router.post('/conversations/new-whatsapp',
+  auth, requireRole('admin'),
+  messageController.createFromWhatsapp.bind(messageController));
+
 router.get('/conversations',
   auth, scopeConversations,
   messageController.getConversations.bind(messageController));
@@ -184,6 +189,10 @@ router.post('/conversations/:id/assign',
 router.post('/conversations/:id/resolve',
   auth, requireConversationAccess,
   messageController.resolveConversation.bind(messageController));
+
+router.delete('/conversations/:id',
+  auth, requireRole('admin'),
+  messageController.deleteConversation.bind(messageController));
 
 // ─────────────────────────────────────
 // CONFIGURACIÓN DEL BOT

@@ -1,15 +1,21 @@
 // frontend/src/components/Inbox/ConversationList.jsx
+// ─────────────────────────────────────────────────────────────
+// Lista de conversaciones con pestañas de canal visuales
+// WA | MS | IG | WEB + contador de no leídos por pestaña
+// ─────────────────────────────────────────────────────────────
 import React, { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useConversationStore, useAuthStore } from '../../store';
-import { Plus, X, Phone } from 'lucide-react';
+import api from '../../services/api';
 import toast from 'react-hot-toast';
 
+// ─── Configuración de canales ────────────────────────────────
 const CHANNELS = [
   {
     key:     '',
     label:   'Todos',
+    color:   '',
     iconBg:  'bg-slate-100',
     iconFg:  'text-slate-600',
     activeBg:'bg-slate-900',
@@ -22,22 +28,9 @@ const CHANNELS = [
     )
   },
   {
-    key:     'whatsapp',
-    label:   'WhatsApp',
-    iconBg:  'bg-green-50',
-    iconFg:  'text-green-600',
-    activeBg:'bg-green-600',
-    activeFg:'text-white',
-    dot:     'bg-green-500',
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
-        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-      </svg>
-    )
-  },
-  {
     key:     'messenger',
     label:   'Messenger',
+    color:   'border-blue-500',
     iconBg:  'bg-blue-50',
     iconFg:  'text-blue-600',
     activeBg:'bg-blue-600',
@@ -52,6 +45,7 @@ const CHANNELS = [
   {
     key:     'instagram',
     label:   'Instagram',
+    color:   'border-pink-500',
     iconBg:  'bg-pink-50',
     iconFg:  'text-pink-600',
     activeBg:'bg-gradient-to-br from-purple-500 to-pink-500',
@@ -66,6 +60,7 @@ const CHANNELS = [
   {
     key:     'web',
     label:   'Web',
+    color:   'border-indigo-500',
     iconBg:  'bg-indigo-50',
     iconFg:  'text-indigo-600',
     activeBg:'bg-indigo-600',
@@ -73,7 +68,7 @@ const CHANNELS = [
     dot:     'bg-indigo-500',
     icon: (
       <svg viewBox="0 0 20 20" className="w-3.5 h-3.5" fill="currentColor">
-        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd"/>
+        <path fillRule="evenodd" d="M4.083 9h1.946c.089-1.546.383-2.97.837-4.118A6.004 6.004 0 004.083 9zM10 2a8 8 0 100 16 8 8 0 000-16zm0 2c-.076 0-.232.032-.465.262-.238.234-.497.623-.737 1.182-.389.907-.673 2.142-.766 3.556h3.936c-.093-1.414-.377-2.649-.766-3.556-.24-.56-.5-.948-.737-1.182C10.232 4.032 10.076 4 10 4zm3.971 5c-.089-1.546-.383-2.97-.837-4.118A6.004 6.004 0 0115.917 9h-1.946zm-2.003 2H8.032c.093 1.414.377 2.649.766 3.556.24.56.5.948.737 1.182.233.23.389.262.465.262.076 0 .232-.032.465-.262.238-.234.498-.623.737-1.182.389-.907.673-2.142.766-3.556zm1.166 4.118c.454-1.147.748-2.572.837-4.118h1.946a6.004 6.004 0 01-2.783 4.118zm-6.268 0C6.412 13.97 6.118 12.546 6.03 11H4.083a6.004 6.004 0 002.783 4.118z" clipRule="evenodd"/>
       </svg>
     )
   },
@@ -93,24 +88,24 @@ const CHANNEL_DOT = {
   web:       'bg-indigo-500',
 };
 
-const SHORT_LABEL = { '': 'Todos', whatsapp: 'WA', messenger: 'MS', instagram: 'IG', web: 'Web' };
-
+// ─────────────────────────────────────────────────────────────
 export default function ConversationList() {
   const {
     conversations, activeConversation,
     selectConversation, filters, setFilters,
     fetchConversations, isLoading,
     channelTab, setChannelTab,
-    unreadByChannel, createFromPhone
+    unreadByChannel
   } = useConversationStore();
 
-  const { user, isAdmin } = useAuthStore();
+  const { user } = useAuthStore();
   const [search, setSearch] = useState('');
-  const [showNewChat, setShowNewChat] = useState(false);
-  const [newPhone, setNewPhone] = useState('');
-  const [newName, setNewName] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [showNewWA, setShowNewWA] = useState(false);
+  const [newWAPhone, setNewWAPhone] = useState('');
+  const [newWAName, setNewWAName] = useState('');
+  const [creatingWA, setCreatingWA] = useState(false);
 
+  // Cargar conversaciones al montar
   useEffect(() => { fetchConversations(); }, []);
 
   const unread = unreadByChannel();
@@ -127,20 +122,26 @@ export default function ConversationList() {
     fetchConversations();
   };
 
-  const handleCreateFromPhone = async (e) => {
-    e.preventDefault();
-    if (!newPhone.trim()) return;
-    setCreating(true);
+  const handleCreateWhatsapp = async () => {
+    if (!newWAPhone.trim()) return;
+    setCreatingWA(true);
     try {
-      await createFromPhone(newPhone.trim(), newName.trim());
-      setShowNewChat(false);
-      setNewPhone('');
-      setNewName('');
-      toast.success('Conversación creada');
+      const res = await api.post('/conversations/new-whatsapp', {
+        phone: newWAPhone.trim(),
+        name: newWAName.trim() || undefined
+      });
+      if (res.data) {
+        await fetchConversations();
+        selectConversation(res.data);
+        toast.success('Conversación creada');
+        setShowNewWA(false);
+        setNewWAPhone('');
+        setNewWAName('');
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al crear conversación');
     } finally {
-      setCreating(false);
+      setCreatingWA(false);
     }
   };
 
@@ -149,7 +150,7 @@ export default function ConversationList() {
   return (
     <div className="flex flex-col h-full bg-white dark:bg-[#111b21] border-r border-[#d1d7db] dark:border-[#2a3942] w-full">
 
-      {/* Header */}
+      {/* ── Header estilo WhatsApp Web ─────────────────── */}
       <div className="px-4 pt-3 pb-2.5 bg-[#f0f2f5] dark:bg-[#202c33] border-b border-[#d1d7db] dark:border-[#2a3942]">
         <div className="flex items-center justify-between mb-2.5">
           <h2 className="font-semibold text-[#111b21] dark:text-[#e9edef] text-base">Bandeja</h2>
@@ -159,56 +160,21 @@ export default function ConversationList() {
                 {totalUnread > 99 ? '99+' : totalUnread}
               </span>
             )}
-            {isAdmin() && (
+            {user?.role === 'admin' && (
               <button
-                onClick={() => setShowNewChat(!showNewChat)}
-                title="Nuevo chat por WhatsApp"
-                className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                  showNewChat
-                    ? 'bg-[#00a884] text-white'
-                    : 'text-[#54656f] dark:text-[#8696a0] hover:bg-[#e8f5f0] dark:hover:bg-white/10'
-                }`}
+                onClick={() => setShowNewWA(true)}
+                title="Nueva conversación WhatsApp"
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-[#25d366] hover:bg-[#1ea855] text-white transition-colors"
               >
-                {showNewChat ? <X size={14} /> : <Plus size={14} />}
+                <svg viewBox="0 0 20 20" className="w-3.5 h-3.5" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                </svg>
               </button>
             )}
           </div>
         </div>
 
-        {/* Formulario nuevo chat por teléfono */}
-        {showNewChat && (
-          <form onSubmit={handleCreateFromPhone} className="mb-2 p-3 bg-white dark:bg-[#2a3942] rounded-xl border border-[#d1d7db] dark:border-[#3b4a54] space-y-2">
-            <p className="text-xs font-semibold text-[#111b21] dark:text-[#e9edef] flex items-center gap-1.5">
-              <Phone size={12} className="text-green-500" />
-              Nueva conversación WhatsApp
-            </p>
-            <input
-              type="tel"
-              placeholder="Número (ej: 18095551234)"
-              value={newPhone}
-              onChange={e => setNewPhone(e.target.value)}
-              className="w-full text-sm px-3 py-2 bg-[#f0f2f5] dark:bg-[#111b21] text-[#111b21] dark:text-[#e9edef] placeholder-[#667781] rounded-lg border border-transparent focus:outline-none focus:ring-1 focus:ring-[#00a884]"
-              required
-              autoFocus
-            />
-            <input
-              type="text"
-              placeholder="Nombre del contacto (opcional)"
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              className="w-full text-sm px-3 py-2 bg-[#f0f2f5] dark:bg-[#111b21] text-[#111b21] dark:text-[#e9edef] placeholder-[#667781] rounded-lg border border-transparent focus:outline-none focus:ring-1 focus:ring-[#00a884]"
-            />
-            <button
-              type="submit"
-              disabled={creating || !newPhone.trim()}
-              className="w-full text-sm font-medium py-2 rounded-lg bg-[#00a884] text-white hover:bg-[#06987a] disabled:opacity-50 transition-colors"
-            >
-              {creating ? 'Creando...' : 'Abrir conversación'}
-            </button>
-          </form>
-        )}
-
-        {/* Buscador */}
+        {/* Buscador estilo WhatsApp (píldora redondeada) */}
         <div className="relative mb-2">
           <svg className="absolute left-3.5 top-2.5 w-3.5 h-3.5 text-[#54656f] dark:text-[#8696a0] pointer-events-none"
             fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -241,7 +207,7 @@ export default function ConversationList() {
         </select>
       </div>
 
-      {/* Pestañas de canal */}
+      {/* ── Pestañas de canal ─────────────────────────── */}
       <div className="flex border-b border-[#d1d7db] dark:border-[#2a3942] bg-white dark:bg-[#111b21]">
         {CHANNELS.map((ch) => {
           const isActive = channelTab === ch.key;
@@ -260,6 +226,7 @@ export default function ConversationList() {
                 }
               `}
             >
+              {/* Icono */}
               <span className={`
                 w-6 h-6 rounded-lg flex items-center justify-center
                 ${isActive
@@ -270,10 +237,12 @@ export default function ConversationList() {
                 {ch.icon}
               </span>
 
+              {/* Label (oculto en pantallas muy pequeñas) */}
               <span className="hidden sm:block leading-none">
-                {SHORT_LABEL[ch.key]}
+                {ch.key === '' ? 'Todos' : ch.key === 'whatsapp' ? 'WA' : ch.key === 'messenger' ? 'MS' : ch.key === 'instagram' ? 'IG' : 'WEB'}
               </span>
 
+              {/* Badge no leídos */}
               {count > 0 && (
                 <span className={`
                   absolute -top-0.5 right-0.5 min-w-[1rem] h-4 px-1 rounded-full
@@ -284,6 +253,7 @@ export default function ConversationList() {
                 </span>
               )}
 
+              {/* Línea indicadora activa */}
               {isActive && (
                 <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-[#00a884] rounded-full" />
               )}
@@ -292,7 +262,7 @@ export default function ConversationList() {
         })}
       </div>
 
-      {/* Lista de conversaciones */}
+      {/* ── Lista de conversaciones ───────────────────── */}
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-32 gap-2">
@@ -325,10 +295,66 @@ export default function ConversationList() {
           ))
         )}
       </div>
+
+      {/* ── Modal nueva conversación WhatsApp ──────── */}
+      {showNewWA && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowNewWA(false)}>
+          <div className="bg-white dark:bg-[#202c33] rounded-2xl shadow-xl w-[360px] max-w-[90vw] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#e9edef] dark:border-[#2a3942]">
+              <h3 className="font-semibold text-[#111b21] dark:text-[#e9edef] text-sm">Nueva conversación WhatsApp</h3>
+              <button onClick={() => setShowNewWA(false)} className="text-[#667781] hover:text-[#111b21] dark:hover:text-[#e9edef]">
+                <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-[#54656f] dark:text-[#8696a0] mb-1">Número de WhatsApp *</label>
+                <input
+                  autoFocus
+                  type="tel"
+                  value={newWAPhone}
+                  onChange={e => setNewWAPhone(e.target.value)}
+                  placeholder="Ej: 18095551234"
+                  className="w-full px-3 py-2 text-sm border border-[#d1d7db] dark:border-[#3b4a54] rounded-lg bg-white dark:bg-[#2a3942] text-[#111b21] dark:text-[#e9edef] placeholder-[#667781] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#54656f] dark:text-[#8696a0] mb-1">Nombre del contacto</label>
+                <input
+                  type="text"
+                  value={newWAName}
+                  onChange={e => setNewWAName(e.target.value)}
+                  placeholder="Opcional"
+                  onKeyDown={e => e.key === 'Enter' && handleCreateWhatsapp()}
+                  className="w-full px-3 py-2 text-sm border border-[#d1d7db] dark:border-[#3b4a54] rounded-lg bg-white dark:bg-[#2a3942] text-[#111b21] dark:text-[#e9edef] placeholder-[#667781] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 px-5 py-3 border-t border-[#e9edef] dark:border-[#2a3942]">
+              <button
+                onClick={() => setShowNewWA(false)}
+                className="flex-1 px-4 py-2 text-sm font-medium text-[#54656f] dark:text-[#8696a0] bg-[#f0f2f5] dark:bg-[#2a3942] rounded-lg hover:bg-[#e9edef] dark:hover:bg-[#3b4a54] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateWhatsapp}
+                disabled={!newWAPhone.trim() || creatingWA}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#00a884] rounded-lg hover:bg-[#06987a] disabled:bg-[#d1d7db] dark:disabled:bg-[#3b4a54] disabled:cursor-not-allowed transition-colors"
+              >
+                {creatingWA ? 'Creando...' : 'Crear conversación'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
+// ─── Item individual de conversación ─────────────────────────
 function ConversationItem({ conversation, isActive, onClick }) {
   const status  = STATUS_CONFIG[conversation.status] || STATUS_CONFIG.open;
   const dotColor= CHANNEL_DOT[conversation.channel] || 'bg-slate-400';
@@ -355,6 +381,7 @@ function ConversationItem({ conversation, isActive, onClick }) {
                         font-semibold text-sm select-none bg-[#dfe5e7] dark:bg-[#2a3942] text-[#54656f] dark:text-[#8696a0]">
           {initials}
         </div>
+        {/* Dot de canal */}
         <span className={`
           absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 ${dotColor}
           rounded-full border-2 border-white dark:border-[#111b21]
@@ -364,19 +391,12 @@ function ConversationItem({ conversation, isActive, onClick }) {
       {/* Contenido */}
       <div className="flex-1 min-w-0 border-b border-transparent">
         <p className="text-[10px] font-mono text-[#00a884] dark:text-[#00a884] opacity-70 mb-0.5">
-          #{(conversation.ticket_id || conversation.id || '').replace(/\D/g, '').slice(0, 6)}
+          {conversation.ticket_number || `#${(conversation.id || '').slice(0, 8)}`}
         </p>
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[15px] truncate text-[#111b21] dark:text-[#e9edef] font-medium">
-              {name}
-            </p>
-            {conversation.ticket_id && (
-              <span className="text-[10px] font-mono text-[#667781] dark:text-[#8696a0]">
-                {conversation.ticket_id}
-              </span>
-            )}
-          </div>
+          <p className="text-[15px] truncate text-[#111b21] dark:text-[#e9edef] font-medium">
+            {name}
+          </p>
           {timeAgo && (
             <span className={`text-xs whitespace-nowrap flex-shrink-0 ${conversation.unread_count > 0 ? 'text-[#00a884] font-medium' : 'text-[#667781] dark:text-[#8696a0]'}`}>
               {timeAgo}

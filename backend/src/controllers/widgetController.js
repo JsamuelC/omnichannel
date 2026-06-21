@@ -15,6 +15,7 @@ exports.init = async (req, res) => {
     if (!company) return res.status(404).json({ success: false, error: 'Empresa no encontrada' });
 
     const webId = session_id || `web_${uuid()}`;
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null;
 
     const [contact] = await Contact.findOrCreate({
       where: { web_id: webId },
@@ -33,15 +34,36 @@ exports.init = async (req, res) => {
     if (visitor_phone && visitor_phone !== contact.phone) updates.phone = visitor_phone;
     if (Object.keys(updates).length) await contact.update(updates);
 
-    const [conversation] = await Conversation.findOrCreate({
+    // Guardar IP y datos del formulario en metadata de la conversación
+
+    const [conversation, convCreated] = await Conversation.findOrCreate({
       where: { contact_id: contact.id, channel: 'web', status: ['open', 'bot', 'assigned'] },
       defaults: {
         contact_id: contact.id,
         channel:    'web',
         status:     'bot',
         company_id: company_id,
+        metadata:   { client_ip: clientIp, form_data: form_data || null },
       },
     });
+
+    if (!convCreated && clientIp) {
+      const meta = conversation.metadata || {};
+      meta.client_ip = clientIp;
+      if (form_data) meta.form_data = form_data;
+      await conversation.update({ metadata: meta });
+    }
+
+    // Emitir a agentes para que la bandeja se actualice en tiempo real
+    const io = req.app.get('io');
+    if (io) {
+      const fullConv = await Conversation.findByPk(conversation.id, {
+        include: [{ model: Contact, as: 'contact' }]
+      });
+      if (fullConv) {
+        io.to('agents').emit(convCreated ? 'conversation:new' : 'conversation:updated', { conversation: fullConv.toJSON() });
+      }
+    }
 
     res.json({
       success: true,
@@ -105,30 +127,44 @@ exports.sendMessage = async (req, res) => {
 
     if (conversation.status === 'bot' && widgetRealtime) {
       try {
-        const result = await chatbotService.handleMessage(conversation, message, io);
-        const botText = result ? (typeof result === 'string' ? result : result.text) : null;
+        // Verificar si el bot tiene habilitadas respuestas en tiempo real para el widget
+        const botConfig = await BotConfig.findOne({
+          where: {
+            company_id: conversation.company_id,
+            is_active: true,
+            channel: ['web', 'all']
+          },
+          order: [['channel', 'ASC']] // prioriza config específica 'web' sobre 'all'
+        });
 
-        if (botText) {
-          await new Promise(r => setTimeout(r, 800));
-          const botMsg = await Message.create({
-            conversation_id,
-            direction:    'outbound',
-            sender_type:  'bot',
-            content_type: 'text',
-            content:      botText,
-            status:       'sent',
-          });
+        const realtimeEnabled = botConfig ? botConfig.widget_realtime_response !== false : true;
 
-          await conversation.update({
-            last_message_at:      new Date(),
-            last_message_preview: `Bot: ${botText.substring(0, 80)}`,
-          });
+        if (realtimeEnabled) {
+          const result = await chatbotService.handleMessage(conversation, message, io);
+          const botText = result ? (typeof result === 'string' ? result : result.text) : null;
 
-          if (io) {
-            io.to('agents').emit('message:sent', { message: botMsg.toJSON(), conversationId: conversation_id });
+          if (botText) {
+            await new Promise(r => setTimeout(r, 800));
+            const botMsg = await Message.create({
+              conversation_id,
+              direction:    'outbound',
+              sender_type:  'bot',
+              content_type: 'text',
+              content:      botText,
+              status:       'sent',
+            });
+
+            await conversation.update({
+              last_message_at:      new Date(),
+              last_message_preview: `Bot: ${botText.substring(0, 80)}`,
+            });
+
+            if (io) {
+              io.to('agents').emit('message:sent', { message: botMsg.toJSON(), conversationId: conversation_id });
+            }
+
+            botReply = botMsg.toJSON();
           }
-
-          botReply = botMsg.toJSON();
         }
       } catch (botErr) {
         logger.warn('Widget bot error:', botErr.message);

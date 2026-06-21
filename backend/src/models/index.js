@@ -261,6 +261,36 @@ const migrate = async () => {
       await sequelize.query(`ALTER TYPE "enum_conversations_channel" ADD VALUE IF NOT EXISTS 'web'`);
     } catch (_) {}
 
+    // ── ticket_number en conversations ──────────────────────────
+    await safeAdd('conversations', 'ticket_number', { type: DT.STRING(20), allowNull: true, unique: true });
+
+    // Poblar ticket_number en conversaciones existentes que no lo tengan
+    try {
+      const [rows] = await sequelize.query(
+        `SELECT id FROM conversations WHERE ticket_number IS NULL ORDER BY created_at ASC`
+      );
+      if (rows.length > 0) {
+        const [maxRow] = await sequelize.query(
+          `SELECT MAX(CAST(SUBSTRING(ticket_number FROM 6) AS INTEGER)) AS max_num FROM conversations WHERE ticket_number IS NOT NULL`
+        );
+        let counter = (maxRow[0]?.max_num || 0);
+        for (const row of rows) {
+          counter++;
+          const tn = 'CHAT-' + String(counter).padStart(6, '0');
+          await sequelize.query(`UPDATE conversations SET ticket_number = '${tn}' WHERE id = '${row.id}'`);
+        }
+        logger.info(`✅ ticket_number asignado a ${rows.length} conversaciones existentes`);
+      }
+    } catch (e) { logger.warn('⚠️  No se pudo poblar ticket_number:', e.message); }
+
+    // ── widget_realtime_response en bot_configs ─────────────────
+    await safeAdd('bot_configs', 'widget_realtime_response', { type: DT.BOOLEAN, defaultValue: true, allowNull: false });
+
+    // Agregar 'web' al ENUM de canales de bot_configs si aún no existe
+    try {
+      await sequelize.query(`ALTER TYPE "enum_bot_configs_channel" ADD VALUE IF NOT EXISTS 'web'`);
+    } catch (_) {}
+
     // Agregar web_id a contacts
     await safeAdd('contacts', 'web_id', { type: DT.STRING, allowNull: true, unique: true });
 

@@ -10,6 +10,74 @@ const logger = require('../config/logger');
 
 class MessageController {
 
+  // POST /conversations/new-whatsapp — crear conversación desde número de WhatsApp
+  async createFromWhatsapp(req, res) {
+    try {
+      const { phone, name } = req.body;
+      if (!phone?.trim()) {
+        return res.status(400).json({ success: false, message: 'El número de teléfono es requerido.' });
+      }
+
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      if (cleanPhone.length < 7) {
+        return res.status(400).json({ success: false, message: 'Número de teléfono inválido.' });
+      }
+
+      const companyId = req.user?.company_id;
+      const { Op } = require('sequelize');
+
+      // Buscar o crear el contacto
+      let contact = await Contact.findOne({
+        where: { whatsapp_id: cleanPhone, ...(companyId ? { company_id: companyId } : {}) }
+      });
+
+      if (!contact) {
+        contact = await Contact.create({
+          whatsapp_id: cleanPhone,
+          name: name?.trim() || `WhatsApp ${cleanPhone}`,
+          phone: cleanPhone,
+          company_id: companyId || null,
+        });
+        logger.info(`👤 Contacto creado desde bandeja: ${contact.id} (${cleanPhone})`);
+      }
+
+      // Buscar conversación activa existente
+      let conversation = await Conversation.findOne({
+        where: {
+          contact_id: contact.id,
+          channel: 'whatsapp',
+          status: { [Op.in]: ['open', 'bot', 'assigned'] }
+        },
+        include: [
+          { model: Contact, as: 'contact' },
+          { model: User, as: 'assigned_agent', attributes: ['id', 'name', 'avatar_url', 'role'] }
+        ]
+      });
+
+      if (!conversation) {
+        conversation = await Conversation.create({
+          contact_id: contact.id,
+          channel: 'whatsapp',
+          status: 'open',
+          company_id: companyId || null,
+          assigned_agent_id: req.user.id,
+        });
+        await conversation.reload({
+          include: [
+            { model: Contact, as: 'contact' },
+            { model: User, as: 'assigned_agent', attributes: ['id', 'name', 'avatar_url', 'role'] }
+          ]
+        });
+        logger.info(`💬 Conversación WhatsApp creada desde bandeja: ${conversation.id}`);
+      }
+
+      res.json({ success: true, data: conversation });
+    } catch (error) {
+      logger.error('Error createFromWhatsapp:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   // GET /conversations
   async getConversations(req, res) {
     try {
@@ -210,6 +278,27 @@ class MessageController {
 
       await conversation.update({ status: 'resolved', assigned_agent_id: null });
       res.json({ success: true, data: conversation });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // DELETE /conversations/:id
+  async deleteConversation(req, res) {
+    try {
+      const conversation = await Conversation.findByPk(req.params.id);
+      if (!conversation) {
+        return res.status(404).json({ success: false, message: 'Conversación no encontrada.' });
+      }
+
+      const { Message } = require('../models');
+      await Message.destroy({ where: { conversation_id: conversation.id } });
+      await conversation.destroy();
+
+      const io = req.app.get('io');
+      if (io) io.to('agents').emit('conversation:deleted', { conversationId: conversation.id });
+
+      res.json({ success: true, message: 'Conversación eliminada.' });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
     }
