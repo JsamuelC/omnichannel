@@ -126,7 +126,7 @@ const ALL_NAV_ITEMS = [
   { to: '/gestion-funcionalidades', icon: <SettingsIcon />, label: 'Funcionalidades', id: 'gestion-func', feature: null, roles: ['superadmin'] },
 ];
 
-const CHANNEL_LABEL = { whatsapp: 'WhatsApp', messenger: 'Messenger', instagram: 'Instagram' };
+const CHANNEL_LABEL = { whatsapp: 'WhatsApp', messenger: 'Messenger', instagram: 'Instagram', web: 'Widget Web' };
 
 export default function Layout() {
   const { user, logout, isAdmin, hasFeature } = useAuthStore();
@@ -178,7 +178,14 @@ export default function Layout() {
       });
     };
 
+    const onNewConversation = (data) => {
+      const ch = CHANNEL_LABEL[data.conversation?.channel] || 'Nuevo chat';
+      toast(`[${ch}] Nueva conversación de ${data.conversation?.contact?.name || 'visitante'}`, { duration: 5000 });
+      fetchConversations();
+    };
+
     socket.on('message:new',               onNewMessage);
+    socket.on('conversation:new',          onNewConversation);
     socket.on('conversation:escalated',    onEscalated);
     socket.on('conversation:assigned',     fetchConversations);
     socket.on('conversation:assigned_to_you', onAssignedToYou);
@@ -186,6 +193,7 @@ export default function Layout() {
 
     return () => {
       socket.off('message:new',               onNewMessage);
+      socket.off('conversation:new',          onNewConversation);
       socket.off('conversation:escalated',    onEscalated);
       socket.off('conversation:assigned',     fetchConversations);
       socket.off('conversation:assigned_to_you', onAssignedToYou);

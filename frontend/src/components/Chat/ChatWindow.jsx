@@ -18,6 +18,7 @@ const CHANNEL_CONFIG = {
   whatsapp:  { label: 'WhatsApp',  color: 'bg-green-500', textColor: 'text-green-700', bgLight: 'bg-green-50', border: 'border-green-200' },
   messenger: { label: 'Messenger', color: 'bg-blue-500',  textColor: 'text-blue-700',  bgLight: 'bg-blue-50',  border: 'border-blue-200'  },
   instagram: { label: 'Instagram', color: 'bg-pink-500',  textColor: 'text-pink-700',  bgLight: 'bg-pink-50',  border: 'border-pink-200'  },
+  web:       { label: 'Widget Web', color: 'bg-indigo-500', textColor: 'text-indigo-700', bgLight: 'bg-indigo-50', border: 'border-indigo-200' },
 };
 
 export default function ChatWindow() {
@@ -36,6 +37,7 @@ export default function ChatWindow() {
   const [quickSearch,     setQuickSearch]     = useState('');
   const [showModulePicker,setShowModulePicker]   = useState(false);
   const [moduleModal,     setModuleModal]       = useState(null);
+  const [showResolveModal, setShowResolveModal] = useState(false);
   const { modules } = useModuleStore();
 
   const messagesEndRef = useRef(null);
@@ -90,11 +92,13 @@ export default function ChatWindow() {
     }
   };
 
-  const handleResolve = async () => {
-    if (!confirm('¿Marcar esta conversación como resuelta?')) return;
+  const handleResolve = () => setShowResolveModal(true);
+
+  const confirmResolve = async () => {
     try {
       await resolveConversation(activeConversation.id);
       toast.success('Conversación resuelta.');
+      setShowResolveModal(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al resolver.');
     }
@@ -149,8 +153,8 @@ export default function ChatWindow() {
               : 'Elige una conversación de la bandeja para ver los mensajes'}
           </p>
         </div>
-        <div className="flex gap-2 mt-2">
-          {['whatsapp', 'messenger', 'instagram'].map(ch => {
+        <div className="flex gap-2 mt-2 flex-wrap justify-center">
+          {['whatsapp', 'messenger', 'instagram', 'web'].map(ch => {
             const c = CHANNEL_CONFIG[ch];
             return (
               <span key={ch} className={`text-xs font-semibold px-2.5 py-1 rounded-full ${c.bgLight} ${c.textColor} border ${c.border}`}>
@@ -180,9 +184,16 @@ export default function ChatWindow() {
             </div>
             <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 ${chConfig.color} rounded-full border-2 border-white dark:border-[#202c33]`} />
           </div>
-          {/* Nombre + canal */}
+          {/* Nombre + canal + ticket */}
           <div className="min-w-0">
-            <p className="font-medium text-[#111b21] dark:text-[#e9edef] text-[15px] truncate">{contactName}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-[#111b21] dark:text-[#e9edef] text-[15px] truncate">{contactName}</p>
+              {activeConversation.ticket_number && (
+                <span className="text-[10px] font-mono bg-[#f0f2f5] dark:bg-[#2a3942] text-[#00a884] px-1.5 py-0.5 rounded-md flex-shrink-0">
+                  {activeConversation.ticket_number}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5">
               <span className={`text-xs font-medium ${chConfig.textColor}`}>{chConfig.label}</span>
               {assignedAgent && (
@@ -439,6 +450,44 @@ export default function ChatWindow() {
           <span>Enter para enviar · Shift+Enter nueva línea</span>
         </p>
       </div>
+
+      {/* ── Modal de confirmación para resolver ────────── */}
+      {showResolveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowResolveModal(false)}>
+          <div className="bg-white dark:bg-[#202c33] rounded-2xl shadow-xl w-[380px] max-w-[90vw] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="w-12 h-12 bg-[#d9fdd3] dark:bg-[#005c4b] rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg viewBox="0 0 20 20" className="w-6 h-6 text-[#008069] dark:text-[#e9edef]" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <h3 className="text-base font-semibold text-[#111b21] dark:text-[#e9edef] mb-1">
+                Resolver conversación
+              </h3>
+              <p className="text-sm text-[#667781] dark:text-[#8696a0]">
+                ¿Estás seguro de que deseas marcar esta conversación como resuelta?
+                {activeConversation?.ticket_number && (
+                  <span className="block mt-1 font-mono text-[#00a884]">{activeConversation.ticket_number}</span>
+                )}
+              </p>
+            </div>
+            <div className="flex gap-2 px-6 pb-5">
+              <button
+                onClick={() => setShowResolveModal(false)}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-[#54656f] dark:text-[#8696a0] bg-[#f0f2f5] dark:bg-[#2a3942] rounded-xl hover:bg-[#e9edef] dark:hover:bg-[#3b4a54] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmResolve}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-[#00a884] rounded-xl hover:bg-[#06987a] transition-colors"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal módulo ──────────────────────────────── */}
       <ModuleRecordModal

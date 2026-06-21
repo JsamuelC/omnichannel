@@ -157,6 +157,11 @@ router.delete('/quick-messages/:id',    auth, requireRole('admin'), requireFeatu
 // ─────────────────────────────────────
 // CONVERSACIONES
 // ─────────────────────────────────────
+// Crear conversación desde número de WhatsApp
+router.post('/conversations/new-whatsapp',
+  auth, requireRole('admin'),
+  messageController.createFromWhatsapp.bind(messageController));
+
 router.get('/conversations',
   auth, scopeConversations,
   messageController.getConversations.bind(messageController));

@@ -1,12 +1,14 @@
 // frontend/src/components/Inbox/ConversationList.jsx
 // ─────────────────────────────────────────────────────────────
 // Lista de conversaciones con pestañas de canal visuales
-// WA | MS | IG + contador de no leídos por pestaña
+// WA | MS | IG | WEB + contador de no leídos por pestaña
 // ─────────────────────────────────────────────────────────────
 import React, { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useConversationStore, useAuthStore } from '../../store';
+import api from '../../services/api';
+import toast from 'react-hot-toast';
 
 // ─── Configuración de canales ────────────────────────────────
 const CHANNELS = [
@@ -55,6 +57,21 @@ const CHANNELS = [
       </svg>
     )
   },
+  {
+    key:     'web',
+    label:   'Web',
+    color:   'border-indigo-500',
+    iconBg:  'bg-indigo-50',
+    iconFg:  'text-indigo-600',
+    activeBg:'bg-indigo-600',
+    activeFg:'text-white',
+    dot:     'bg-indigo-500',
+    icon: (
+      <svg viewBox="0 0 20 20" className="w-3.5 h-3.5" fill="currentColor">
+        <path fillRule="evenodd" d="M4.083 9h1.946c.089-1.546.383-2.97.837-4.118A6.004 6.004 0 004.083 9zM10 2a8 8 0 100 16 8 8 0 000-16zm0 2c-.076 0-.232.032-.465.262-.238.234-.497.623-.737 1.182-.389.907-.673 2.142-.766 3.556h3.936c-.093-1.414-.377-2.649-.766-3.556-.24-.56-.5-.948-.737-1.182C10.232 4.032 10.076 4 10 4zm3.971 5c-.089-1.546-.383-2.97-.837-4.118A6.004 6.004 0 0115.917 9h-1.946zm-2.003 2H8.032c.093 1.414.377 2.649.766 3.556.24.56.5.948.737 1.182.233.23.389.262.465.262.076 0 .232-.032.465-.262.238-.234.498-.623.737-1.182.389-.907.673-2.142.766-3.556zm1.166 4.118c.454-1.147.748-2.572.837-4.118h1.946a6.004 6.004 0 01-2.783 4.118zm-6.268 0C6.412 13.97 6.118 12.546 6.03 11H4.083a6.004 6.004 0 002.783 4.118z" clipRule="evenodd"/>
+      </svg>
+    )
+  },
 ];
 
 const STATUS_CONFIG = {
@@ -68,6 +85,7 @@ const CHANNEL_DOT = {
   whatsapp:  'bg-green-500',
   messenger: 'bg-blue-500',
   instagram: 'bg-pink-500',
+  web:       'bg-indigo-500',
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -82,6 +100,10 @@ export default function ConversationList() {
 
   const { user } = useAuthStore();
   const [search, setSearch] = useState('');
+  const [showNewWA, setShowNewWA] = useState(false);
+  const [newWAPhone, setNewWAPhone] = useState('');
+  const [newWAName, setNewWAName] = useState('');
+  const [creatingWA, setCreatingWA] = useState(false);
 
   // Cargar conversaciones al montar
   useEffect(() => { fetchConversations(); }, []);
@@ -100,6 +122,29 @@ export default function ConversationList() {
     fetchConversations();
   };
 
+  const handleCreateWhatsapp = async () => {
+    if (!newWAPhone.trim()) return;
+    setCreatingWA(true);
+    try {
+      const res = await api.post('/conversations/new-whatsapp', {
+        phone: newWAPhone.trim(),
+        name: newWAName.trim() || undefined
+      });
+      if (res.data) {
+        await fetchConversations();
+        selectConversation(res.data);
+        toast.success('Conversación creada');
+        setShowNewWA(false);
+        setNewWAPhone('');
+        setNewWAName('');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error al crear conversación');
+    } finally {
+      setCreatingWA(false);
+    }
+  };
+
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
 
   return (
@@ -109,11 +154,24 @@ export default function ConversationList() {
       <div className="px-4 pt-3 pb-2.5 bg-[#f0f2f5] dark:bg-[#202c33] border-b border-[#d1d7db] dark:border-[#2a3942]">
         <div className="flex items-center justify-between mb-2.5">
           <h2 className="font-semibold text-[#111b21] dark:text-[#e9edef] text-base">Bandeja</h2>
-          {totalUnread > 0 && (
-            <span className="bg-[#25d366] text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[1.25rem] text-center">
-              {totalUnread > 99 ? '99+' : totalUnread}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {totalUnread > 0 && (
+              <span className="bg-[#25d366] text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[1.25rem] text-center">
+                {totalUnread > 99 ? '99+' : totalUnread}
+              </span>
+            )}
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => setShowNewWA(true)}
+                title="Nueva conversación WhatsApp"
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-[#25d366] hover:bg-[#1ea855] text-white transition-colors"
+              >
+                <svg viewBox="0 0 20 20" className="w-3.5 h-3.5" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Buscador estilo WhatsApp (píldora redondeada) */}
@@ -181,7 +239,7 @@ export default function ConversationList() {
 
               {/* Label (oculto en pantallas muy pequeñas) */}
               <span className="hidden sm:block leading-none">
-                {ch.key === '' ? 'Todos' : ch.key === 'whatsapp' ? 'WA' : ch.key === 'messenger' ? 'MS' : 'IG'}
+                {ch.key === '' ? 'Todos' : ch.key === 'whatsapp' ? 'WA' : ch.key === 'messenger' ? 'MS' : ch.key === 'instagram' ? 'IG' : 'WEB'}
               </span>
 
               {/* Badge no leídos */}
@@ -237,6 +295,61 @@ export default function ConversationList() {
           ))
         )}
       </div>
+
+      {/* ── Modal nueva conversación WhatsApp ──────── */}
+      {showNewWA && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowNewWA(false)}>
+          <div className="bg-white dark:bg-[#202c33] rounded-2xl shadow-xl w-[360px] max-w-[90vw] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#e9edef] dark:border-[#2a3942]">
+              <h3 className="font-semibold text-[#111b21] dark:text-[#e9edef] text-sm">Nueva conversación WhatsApp</h3>
+              <button onClick={() => setShowNewWA(false)} className="text-[#667781] hover:text-[#111b21] dark:hover:text-[#e9edef]">
+                <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-[#54656f] dark:text-[#8696a0] mb-1">Número de WhatsApp *</label>
+                <input
+                  autoFocus
+                  type="tel"
+                  value={newWAPhone}
+                  onChange={e => setNewWAPhone(e.target.value)}
+                  placeholder="Ej: 18095551234"
+                  className="w-full px-3 py-2 text-sm border border-[#d1d7db] dark:border-[#3b4a54] rounded-lg bg-white dark:bg-[#2a3942] text-[#111b21] dark:text-[#e9edef] placeholder-[#667781] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#54656f] dark:text-[#8696a0] mb-1">Nombre del contacto</label>
+                <input
+                  type="text"
+                  value={newWAName}
+                  onChange={e => setNewWAName(e.target.value)}
+                  placeholder="Opcional"
+                  onKeyDown={e => e.key === 'Enter' && handleCreateWhatsapp()}
+                  className="w-full px-3 py-2 text-sm border border-[#d1d7db] dark:border-[#3b4a54] rounded-lg bg-white dark:bg-[#2a3942] text-[#111b21] dark:text-[#e9edef] placeholder-[#667781] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 px-5 py-3 border-t border-[#e9edef] dark:border-[#2a3942]">
+              <button
+                onClick={() => setShowNewWA(false)}
+                className="flex-1 px-4 py-2 text-sm font-medium text-[#54656f] dark:text-[#8696a0] bg-[#f0f2f5] dark:bg-[#2a3942] rounded-lg hover:bg-[#e9edef] dark:hover:bg-[#3b4a54] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateWhatsapp}
+                disabled={!newWAPhone.trim() || creatingWA}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#00a884] rounded-lg hover:bg-[#06987a] disabled:bg-[#d1d7db] dark:disabled:bg-[#3b4a54] disabled:cursor-not-allowed transition-colors"
+              >
+                {creatingWA ? 'Creando...' : 'Crear conversación'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -278,7 +391,7 @@ function ConversationItem({ conversation, isActive, onClick }) {
       {/* Contenido */}
       <div className="flex-1 min-w-0 border-b border-transparent">
         <p className="text-[10px] font-mono text-[#00a884] dark:text-[#00a884] opacity-70 mb-0.5">
-          #{(conversation.ticket_id || conversation.id || '').replace(/\D/g, '').slice(0, 6)}
+          {conversation.ticket_number || `#${(conversation.id || '').slice(0, 8)}`}
         </p>
         <div className="flex items-start justify-between gap-2">
           <p className="text-[15px] truncate text-[#111b21] dark:text-[#e9edef] font-medium">
