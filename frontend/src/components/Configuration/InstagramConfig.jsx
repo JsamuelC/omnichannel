@@ -38,7 +38,7 @@ export default function InstagramConfig() {
   const handleConnect = () => {
     setConnecting(true);
     const redirectUri = `${window.location.origin}/config/instagram`;
-    const scope = 'pages_show_list,pages_read_engagement,instagram_business_basic,instagram_business_manage_messages';
+    const scope = 'pages_show_list,pages_read_engagement,business_management';
     const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=token&display=popup`;
     const w = 600, h = 700;
     const left = window.screenX + (window.innerWidth - w) / 2;
