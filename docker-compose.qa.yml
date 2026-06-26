@@ -1,0 +1,99 @@
+version: '3.9'
+
+services:
+  postgres-qa:
+    image: postgres:15-alpine
+    container_name: tecnossync_qa_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tecnossync_qa
+      POSTGRES_USER: tecnossync_admin
+      POSTGRES_PASSWORD: TecnoSync2024!QA
+    volumes:
+      - qa_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tecnossync_qa_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tecnossync_admin -d tecnossync_qa"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-qa:
+    image: redis:7-alpine
+    container_name: tecnossync_qa_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - qa_redis_data:/data
+    networks:
+      - tecnossync_qa_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend-qa:
+    image: ${ECR_REGISTRY}/tecnossync-backend:${IMAGE_TAG:-qa}
+    container_name: tecnossync_qa_backend
+    restart: unless-stopped
+    env_file: /opt/tecnossync-qa/.env.qa
+    environment:
+      NODE_ENV: staging
+      DB_HOST: postgres-qa
+      DB_PORT: 5432
+      DB_NAME: tecnossync_qa
+      DB_PASSWORD: TecnoSync2024!QA
+      REDIS_HOST: redis-qa
+      REDIS_PORT: 6379
+    ports:
+      - "3002:3001"
+    volumes:
+      - /opt/tecnossync-qa/logs:/app/logs
+      - /opt/tecnossync-qa/sessions:/app/sessions
+      - /opt/tecnossync-qa/uploads:/app/uploads
+    depends_on:
+      postgres-qa:
+        condition: service_healthy
+      redis-qa:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+    networks:
+      - tecnossync_qa_net
+
+  frontend-qa:
+    image: ${ECR_REGISTRY}/tecnossync-frontend:${IMAGE_TAG:-qa}
+    container_name: tecnossync_qa_frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_HOST: tecnossync_qa_backend
+    ports:
+      - "5174:80"
+    depends_on:
+      - backend-qa
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - tecnossync_qa_net
+
+volumes:
+  qa_postgres_data:
+  qa_redis_data:
+
+networks:
+  tecnossync_qa_net:
+    driver: bridge

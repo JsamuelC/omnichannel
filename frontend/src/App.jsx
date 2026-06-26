@@ -1,0 +1,162 @@
+// frontend/src/App.jsx — versión final con TeamPanel
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuthStore } from './store';
+import Layout          from './components/Layout/Layout';
+import Login           from './components/Auth/Login';
+import ForgotPassword     from './components/Auth/ForgotPassword';
+import ResetPassword      from './components/Auth/ResetPassword';
+import ConfirmEmailChange from './components/Auth/ConfirmEmailChange';
+import VerifyEmail        from './components/Auth/VerifyEmail';
+import Inbox           from './components/Inbox/Inbox';
+import BotConfigPanel  from './components/BotConfig/BotConfigPanel';
+import CampaignsPanel  from './components/Campaigns/CampaignsPanel';
+import TeamPanel       from './components/Team/TeamPanel';
+import Dashboard       from './components/Dashboard/Dashboard';
+import Settings        from './components/Configuration/Settings';
+import PerfilEmpresa   from './components/Configuration/PerfilEmpresa';
+import EtiquetasConfig  from './components/Configuration/Etiquetasconfig';
+import PanelInfoConfig  from './components/Configuration/PanelInfoConfig';
+import VouchersPanel    from './components/Vouchers/VouchersPanel';
+import WhatsappConfig  from './components/Configuration/WhatsappConfig';
+import Integraciones   from './components/Configuration/Integraciones';
+import FlowRulesConfig       from './components/Configuration/FlowRulesConfig';
+import MensajesRapidosConfig  from './components/Configuration/MensajesRapidosConfig';
+import WidgetsConfig          from './components/Configuration/WidgetsConfig';
+import ChatRoutingConfig      from './components/Configuration/ChatRoutingConfig';
+import WASharingConfig        from './components/Configuration/WASharingConfig';
+import MessengerConfig        from './components/Configuration/MessengerConfig';
+import InstagramConfig        from './components/Configuration/InstagramConfig';
+import ModulosConfig          from './components/Modules/ModulosConfig';
+import ModuleView             from './components/Modules/ModuleView';
+import CalendarPanel          from './components/Calendar/CalendarPanel';
+import TemplatesPanel         from './components/Templates/TemplatesPanel';
+import SuperAdminPanel        from './components/SuperAdmin/SuperAdminPanel';
+import GestionFuncionalidades from './components/SuperAdmin/GestionFuncionalidades';
+
+
+
+const Placeholder = ({ name }) => (
+  <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+     <span className="ml-2">{name} — próximamente</span>
+  </div>
+);
+
+
+const PrivateRoute = ({ children }) => {
+  const { token } = useAuthStore();
+  return token ? children : <Navigate to="/login" replace />;
+};
+
+const RoleRoute = ({ role, children }) => {
+  const { user } = useAuthStore();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== role && user.role !== 'superadmin') return <Navigate to="/inbox" replace />;
+  return children;
+};
+
+const SuperAdminRoute = ({ children }) => {
+  const { user } = useAuthStore();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'superadmin') return <Navigate to="/inbox" replace />;
+  return children;
+};
+
+const FeatureRoute = ({ feature, children }) => {
+  const { user, hasFeature } = useAuthStore();
+  if (!user) return <Navigate to="/login" replace />;
+  if (!hasFeature(feature)) return <Navigate to="/config" replace />;
+  return children;
+};
+
+// Interceptar callback de OAuth ANTES de que React renderice
+(function() {
+  if (window.location.hash.includes('access_token=')) {
+    var hash = window.location.hash;
+    var accessToken = hash.split('access_token=')[1];
+    if (accessToken) accessToken = accessToken.split('&')[0];
+    var path = window.location.pathname;
+    if (accessToken) {
+      var key = 'oauth_token';
+      if (path.includes('instagram')) key = 'ig_oauth_token';
+      else if (path.includes('messenger')) key = 'msg_oauth_token';
+      localStorage.setItem(key, accessToken);
+      // Reemplazar la página con un mensaje de cierre
+      document.title = 'Conectado';
+      document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0f172a;font-family:system-ui"><div style="text-align:center;color:#e2e8f0"><div style="font-size:48px;margin-bottom:16px">✅</div><h2 style="margin:0 0 8px;font-size:18px">Conexión exitosa</h2><p style="color:#94a3b8;font-size:14px">Puedes cerrar esta ventana.</p></div></div>';
+      try { window.close(); } catch(e) {}
+      return;
+    }
+  }
+})();
+
+export default function App() {
+  const { token, fetchMe } = useAuthStore();
+  useEffect(() => { if (token) fetchMe(); }, []);
+
+  return (
+    <Routes>
+      <Route path="/login"                  element={<Login />} />
+      <Route path="/forgot-password"             element={<ForgotPassword />} />
+      <Route path="/reset-password/:token"       element={<ResetPassword />} />
+      <Route path="/confirm-email-change/:token" element={<ConfirmEmailChange />} />
+      <Route path="/verify-email"                element={<VerifyEmail />} />
+
+      <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
+        <Route index element={<Navigate to="/inbox" replace />} />
+
+         {/* ── Rutas principales ── */}
+        <Route path="inbox"      element={<Inbox />} />
+        <Route path="bot-config" element={<RoleRoute role="admin"><BotConfigPanel /></RoleRoute>} />
+        <Route path="campaigns"  element={<RoleRoute role="admin"><CampaignsPanel /></RoleRoute>} />
+        <Route path="team"       element={<RoleRoute role="admin"><TeamPanel /></RoleRoute>} />
+        <Route path="dashboard"  element={<RoleRoute role="admin"><Dashboard /></RoleRoute>} />
+        <Route path="vouchers"   element={<VouchersPanel />} />
+        <Route path="calendar"   element={<CalendarPanel />} />
+        <Route path="templates"  element={<RoleRoute role="admin"><TemplatesPanel /></RoleRoute>} />
+
+         {/* ── Configuración ── */}
+
+        <Route path="config" element={<Settings />} />
+
+         {/* ── General ── */}
+        <Route path="config/perfilEmpresa"  element={<FeatureRoute feature="config_company_profile"><PerfilEmpresa /></FeatureRoute>} />
+        <Route path="config/upload"         element={<FeatureRoute feature="config_import_contacts"><Placeholder name="Importar" /></FeatureRoute>} />
+        <Route path="config/etiquetas"      element={<FeatureRoute feature="labels"><EtiquetasConfig /></FeatureRoute>} />
+        <Route path="config/panel-info"     element={<FeatureRoute feature="config_info_panel"><PanelInfoConfig /></FeatureRoute>} />
+
+         {/* Canales */}
+        <Route path="config/whatsapp"  element={<RoleRoute role="admin"><FeatureRoute feature="whatsapp_business"><WhatsappConfig /></FeatureRoute></RoleRoute>} />
+        <Route path="config/wa-sharing"  element={<RoleRoute role="admin"><WASharingConfig /></RoleRoute>} />
+        <Route path="config/messenger" element={<RoleRoute role="admin"><FeatureRoute feature="config_messenger"><MessengerConfig /></FeatureRoute></RoleRoute>} />
+        <Route path="config/instagram" element={<RoleRoute role="admin"><FeatureRoute feature="config_instagram"><InstagramConfig /></FeatureRoute></RoleRoute>} />
+        <Route path="config/tiktok"    element={<FeatureRoute feature="config_tiktok"><Placeholder name="TikTok" /></FeatureRoute>} />
+        <Route path="config/telegram"  element={<FeatureRoute feature="config_telegram"><Placeholder name="Telegram" /></FeatureRoute>} />
+
+         {/* Bot */}
+        <Route path="config/bot-respuesta" element={<FeatureRoute feature="config_bot_response"><Placeholder name="Bot de Respuesta" /></FeatureRoute>} />
+        <Route path="config/flow-rules"    element={<RoleRoute role="admin"><FeatureRoute feature="flow_rules"><FlowRulesConfig /></FeatureRoute></RoleRoute>} />
+
+        {/* Automatizaciones */}
+        <Route path="config/enrutamiento"    element={<RoleRoute role="admin"><FeatureRoute feature="config_chat_routing"><ChatRoutingConfig /></FeatureRoute></RoleRoute>} />
+        <Route path="config/informes"        element={<FeatureRoute feature="config_reports"><Placeholder name="Programar Informe" /></FeatureRoute>} />
+        <Route path="config/mensajesRapidos" element={<RoleRoute role="admin"><FeatureRoute feature="quick_messages"><MensajesRapidosConfig /></FeatureRoute></RoleRoute>} />
+
+         {/* Desarrolladores */}
+        <Route path="config/integraciones" element={<RoleRoute role="admin"><FeatureRoute feature="config_integrations"><Integraciones /></FeatureRoute></RoleRoute>} />
+        <Route path="config/widgets"       element={<FeatureRoute feature="config_widgets"><WidgetsConfig /></FeatureRoute>} />
+        <Route path="config/complementos"  element={<FeatureRoute feature="config_plugins"><Placeholder name="Complementos" /></FeatureRoute>} />
+
+        {/* ── Módulos personalizados ── */}
+        <Route path="config/modulos" element={<RoleRoute role="admin"><ModulosConfig /></RoleRoute>} />
+        <Route path="modules/:slug"  element={<ModuleView />} />
+
+        {/* ── Panel SuperAdministrador ── */}
+        <Route path="superadmin"              element={<SuperAdminRoute><SuperAdminPanel /></SuperAdminRoute>} />
+        <Route path="gestion-funcionalidades" element={<SuperAdminRoute><GestionFuncionalidades /></SuperAdminRoute>} />
+
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
