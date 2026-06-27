@@ -139,14 +139,16 @@ class ChatbotService {
       for (const tpl of templates) {
         const manualFields = (tpl.fields || []).filter(f => f.source === 'manual');
         const desc = tpl.description ? ` — ${tpl.description}` : '';
-        lines.push(`- "${tpl.name}"${desc}`);
+        const id   = tpl.identificador || tpl.name;
+        lines.push(`- Identificador: "${id}" | Nombre: "${tpl.name}"${desc}`);
         if (manualFields.length) {
           lines.push(`  Datos que se solicitan al cliente: ${manualFields.map(f => f.label).join(', ')}`);
         }
       }
       lines.push('');
-      lines.push('Cuando el cliente solicite un documento, contrato, acuerdo o formulario formal, responde confirmando que procederás y agrega al final de tu mensaje EXACTAMENTE (sin comillas ni espacios extra):');
-      lines.push('[START_DOC:Nombre exacto de la plantilla]');
+      lines.push('Cuando el cliente solicite un documento, usa el identificador de la plantilla correspondiente:');
+      lines.push('[START_DOC:identificador_de_la_plantilla]');
+      lines.push('Ejemplo: [START_DOC:lista_socios]');
       lines.push('Solo usa [START_DOC:...] cuando el cliente lo pida explícitamente, no en respuestas informativas.');
       lines.push('===========================================');
       return lines.join('\n');

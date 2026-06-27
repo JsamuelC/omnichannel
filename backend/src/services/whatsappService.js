@@ -557,15 +557,16 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
             const { DocumentTemplate, DocumentRequest } = require('../models')
             const { Op } = require('sequelize')
             const companyWhere = chatRecord.company_id ? { company_id: chatRecord.company_id } : {}
-            // Primero buscar coincidencia exacta, luego parcial
+            // Buscar por identificador exacto → nombre exacto → nombre parcial
             let tpl = await DocumentTemplate.findOne({
+              where: { identificador: startDoc.trim().toLowerCase(), ...companyWhere }
+            })
+            if (!tpl) tpl = await DocumentTemplate.findOne({
               where: { name: { [Op.iLike]: startDoc }, ...companyWhere }
             })
-            if (!tpl) {
-              tpl = await DocumentTemplate.findOne({
-                where: { name: { [Op.iLike]: `%${startDoc}%` }, ...companyWhere }
-              })
-            }
+            if (!tpl) tpl = await DocumentTemplate.findOne({
+              where: { name: { [Op.iLike]: `%${startDoc}%` }, ...companyWhere }
+            })
             if (tpl) {
               const manualFields = Object.values(
                 (tpl.fields || []).filter(f => f.source === 'manual')

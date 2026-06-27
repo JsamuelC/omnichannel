@@ -8,6 +8,7 @@ const DocumentTemplate = sequelize.define('document_templates', {
   description:       { type: DataTypes.TEXT, allowNull: true },
   filename_original: { type: DataTypes.STRING(300), allowNull: false },
   filename_stored:   { type: DataTypes.STRING(300), allowNull: false },
+  identificador:     { type: DataTypes.STRING(100), allowNull: true },
   fields:            { type: DataTypes.JSONB, defaultValue: [] },
   trigger_keywords:  { type: DataTypes.JSONB, defaultValue: [] },
   created_by:        { type: DataTypes.UUID, allowNull: true },

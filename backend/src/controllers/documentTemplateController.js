@@ -122,6 +122,14 @@ async function toPdf(docxBuf, baseName) {
 // CONTROLLER ACTIONS
 // ────────────────────────────────────────────────────────────────────────────
 
+// Genera slug a partir del nombre
+function toSlug(str) {
+  return str.toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
 // POST /templates/upload
 const upload = async (req, res) => {
   try {
@@ -135,9 +143,13 @@ const upload = async (req, res) => {
       default_value: null,
     }));
 
+    const name          = req.body.name?.trim() || path.basename(req.file.originalname, path.extname(req.file.originalname));
+    const identificador = req.body.identificador?.trim() ? toSlug(req.body.identificador) : toSlug(name);
+
     const tpl = await DocumentTemplate.create({
       company_id:        req.user?.company_id || null,
-      name:              req.body.name?.trim() || path.basename(req.file.originalname, path.extname(req.file.originalname)),
+      name,
+      identificador,
       description:       req.body.description?.trim() || null,
       filename_original: req.file.originalname,
       filename_stored:   req.file.filename,
@@ -181,11 +193,12 @@ const update = async (req, res) => {
     const where = { id: req.params.id, ...(req.user?.company_id ? { company_id: req.user.company_id } : {}) };
     const tpl   = await DocumentTemplate.findOne({ where });
     if (!tpl) return res.status(404).json({ success: false, message: 'Plantilla no encontrada' });
-    const { name, description, fields } = req.body;
+    const { name, description, fields, identificador } = req.body;
     await tpl.update({
-      ...(name        !== undefined ? { name: name.trim() }        : {}),
-      ...(description !== undefined ? { description }              : {}),
-      ...(fields      !== undefined ? { fields }                   : {}),
+      ...(name           !== undefined ? { name: name.trim() }                  : {}),
+      ...(description    !== undefined ? { description }                         : {}),
+      ...(fields         !== undefined ? { fields }                              : {}),
+      ...(identificador  !== undefined ? { identificador: toSlug(identificador) } : {}),
     });
     res.json({ success: true, data: tpl });
   } catch (err) {

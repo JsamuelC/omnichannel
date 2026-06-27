@@ -397,17 +397,34 @@ function FieldMapperModal({ template, fieldSources, onSave, onClose }) {
 }
 
 // ─── Upload Zone ─────────────────────────────────────────────────────────────
+function toSlugPreview(str) {
+  return str.toLowerCase().trim()
+    .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
+    .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/ñ/g,'n')
+    .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+}
+
 function UploadZone({ onUploaded }) {
-  const [dragging,  setDragging]  = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [name,      setName]      = useState('');
-  const [file,      setFile]      = useState(null);
+  const [dragging,       setDragging]       = useState(false);
+  const [uploading,      setUploading]      = useState(false);
+  const [name,           setName]           = useState('');
+  const [identificador,  setIdentificador]  = useState('');
+  const [file,           setFile]           = useState(null);
   const inputRef = useRef();
 
   const handleFile = (f) => {
     if (!f) return;
     setFile(f);
-    if (!name) setName(f.name.replace(/\.[^.]+$/, '').replace(/_/g,' '));
+    if (!name) {
+      const n = f.name.replace(/\.[^.]+$/, '').replace(/_/g,' ');
+      setName(n);
+      if (!identificador) setIdentificador(toSlugPreview(n));
+    }
+  };
+
+  const handleNameChange = (v) => {
+    setName(v);
+    if (!identificador || identificador === toSlugPreview(name)) setIdentificador(toSlugPreview(v));
   };
 
   const handleDrop = (e) => {
@@ -418,14 +435,16 @@ function UploadZone({ onUploaded }) {
   const handleUpload = async () => {
     if (!file) return toast.error('Selecciona un archivo DOCX');
     if (!name.trim()) return toast.error('Ingresa un nombre para la plantilla');
+    if (!identificador.trim()) return toast.error('Ingresa un identificador');
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append('file', file);
       fd.append('name', name.trim());
+      fd.append('identificador', identificador.trim());
       await api.post('/templates/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.success('Plantilla subida');
-      setFile(null); setName('');
+      setFile(null); setName(''); setIdentificador('');
       onUploaded();
     } catch (err) {
       toast.error(err.message);
@@ -466,16 +485,28 @@ function UploadZone({ onUploaded }) {
       </div>
 
       {file && (
-        <div className="flex gap-2">
+        <div className="space-y-2">
           <input
             value={name}
-            onChange={e => setName(e.target.value)}
+            onChange={e => handleNameChange(e.target.value)}
             placeholder="Nombre de la plantilla"
-            className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
+          <div className="flex gap-2 items-center">
+            <div className="flex-1 relative">
+              <input
+                value={identificador}
+                onChange={e => setIdentificador(toSlugPreview(e.target.value))}
+                placeholder="identificador (ej: lista_socios)"
+                className="w-full px-3 py-2 text-sm border border-indigo-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 font-mono"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">[START_DOC:{identificador || '...'}]</span>
+            </div>
+          </div>
+          <p className="text-xs text-slate-400">El identificador se usa en el prompt del bot: <code className="bg-slate-100 px-1 rounded">[START_DOC:{identificador || 'identificador'}]</code></p>
           <button onClick={handleUpload} disabled={uploading}
-            className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition-colors flex items-center gap-2">
-            {uploading ? 'Subiendo…' : <><Upload size={14} /> Subir</>}
+            className="w-full py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
+            {uploading ? 'Subiendo…' : <><Upload size={14} /> Subir plantilla</>}
           </button>
         </div>
       )}
@@ -498,6 +529,11 @@ function TemplateCard({ template, onEdit, onDelete, onGenerate }) {
           <h3 className="text-sm font-bold text-slate-800 truncate">{template.name}</h3>
           {template.description && (
             <p className="text-xs text-slate-500 mt-0.5 truncate">{template.description}</p>
+          )}
+          {template.identificador && (
+            <code className="text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 px-1.5 py-0.5 rounded font-mono mt-1 inline-block">
+              [START_DOC:{template.identificador}]
+            </code>
           )}
           <p className="text-xs text-slate-400 mt-0.5">{template.filename_original}</p>
         </div>
