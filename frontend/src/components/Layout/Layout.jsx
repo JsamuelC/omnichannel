@@ -210,6 +210,12 @@ export default function Layout() {
       addNotifBadge('WhatsApp', name + ': ' + preview);
     };
 
+    const onHumanNeeded = (data) => {
+      const name = data.jid ? data.jid.split('@')[0] : 'Contacto';
+      addNotifBadge('⚡ Atención requerida', (data.message || 'El bot necesita apoyo humano') + ' — ' + name);
+      fetchConversations();
+    };
+
     const onEscalated = () => {
       addNotifBadge('Conversación escalada', 'Una conversación fue escalada a agente');
       fetchConversations();
@@ -232,6 +238,7 @@ export default function Layout() {
 
     socket.on('message:new',               onNewMessage);
     socket.on('whatsapp:message',          (d) => { if (!d.fromMe) onWhatsappMessage(d); });
+    socket.on('whatsapp:human_needed',     onHumanNeeded);
     socket.on('message:sent',              fetchConversations);
     socket.on('conversation:new',          onNewConversation);
     socket.on('conversation:escalated',    onEscalated);
@@ -245,6 +252,7 @@ export default function Layout() {
     return () => {
       socket.off('message:new',               onNewMessage);
       socket.off('whatsapp:message');
+      socket.off('whatsapp:human_needed',    onHumanNeeded);
       socket.off('message:sent',              fetchConversations);
       socket.off('conversation:new',          onNewConversation);
       socket.off('conversation:escalated',    onEscalated);

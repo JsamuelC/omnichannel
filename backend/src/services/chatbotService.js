@@ -245,8 +245,11 @@ class ChatbotService {
   async evaluateFlowRules({ sessionId, jid, userMessage, botText, catalogFile, handoff, chatRecord, sock }, io) {
     try {
       const { FlowRule, WhatsappChat } = require('../models');
+      const companyId = chatRecord?.company_id || null;
+      const ruleWhere = { is_active: true };
+      if (companyId) ruleWhere.company_id = companyId;
       const rules = await FlowRule.findAll({
-        where: { is_active: true },
+        where: ruleWhere,
         order: [['priority', 'DESC'], ['created_at', 'ASC']]
       });
       if (!rules.length) return;
