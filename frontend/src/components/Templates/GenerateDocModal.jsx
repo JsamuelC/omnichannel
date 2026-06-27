@@ -32,7 +32,6 @@ const SOURCE_LABELS = {
  */
 export default function GenerateDocModal({ template, jid, sessionId, contactId: propContactId, onClose }) {
   const [manualFields, setManualFields] = useState({});
-  const [format,       setFormat]       = useState('docx');
   const [contacts,     setContacts]     = useState([]);
   const [contactId,    setContactId]    = useState(propContactId || '');
   const [generating,   setGenerating]   = useState(false);
@@ -67,7 +66,7 @@ export default function GenerateDocModal({ template, jid, sessionId, contactId: 
     if (!activeTpl) return toast.error('Selecciona una plantilla');
     setGenerating(true);
     try {
-      const body = { manualFields, format, ...(contactId ? { contactId } : {}) };
+      const body = { manualFields, format: 'docx', ...(contactId ? { contactId } : {}) };
       const res = await fetch(
         `${import.meta.env.VITE_API_URL || '/api'}/templates/${activeTpl.id}/generate`,
         {
@@ -84,8 +83,7 @@ export default function GenerateDocModal({ template, jid, sessionId, contactId: 
         throw new Error(err.message || 'Error generando documento');
       }
       const blob     = await res.blob();
-      const ext      = format === 'pdf' ? 'pdf' : 'docx';
-      const filename = `${activeTpl.name}.${ext}`;
+      const filename = `${activeTpl.name}.docx`;
       const url      = URL.createObjectURL(blob);
       const a        = document.createElement('a');
       a.href = url; a.download = filename; a.click();
@@ -108,7 +106,7 @@ export default function GenerateDocModal({ template, jid, sessionId, contactId: 
         jid,
         sessionId,
         manualFields,
-        format,
+        format: 'docx',
         ...(contactId ? { contactId } : {}),
       });
       toast.success('Documento enviado por WhatsApp');
@@ -220,28 +218,6 @@ export default function GenerateDocModal({ template, jid, sessionId, contactId: 
             </div>
           )}
 
-          {/* Format */}
-          {activeTpl && (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-2">Formato de salida</label>
-              <div className="flex gap-2">
-                {['docx','pdf'].map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setFormat(f)}
-                    className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-colors ${
-                      format === f
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    {f.toUpperCase()}
-                    {f === 'pdf' && <span className="block text-[10px] font-normal opacity-70">requiere LibreOffice</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer actions */}
