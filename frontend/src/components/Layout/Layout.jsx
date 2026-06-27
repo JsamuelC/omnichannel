@@ -204,6 +204,12 @@ export default function Layout() {
       addNotifBadge(`${ch}`, `${data.contact?.name || 'Contacto'}: ${data.message?.content?.substring(0, 60) || '...'}`);
     };
 
+    const onWhatsappMessage = (data) => {
+      const name = data.pushName || data.from || 'Contacto';
+      const preview = data.body ? data.body.substring(0, 60) : '...';
+      addNotifBadge('WhatsApp', name + ': ' + preview);
+    };
+
     const onEscalated = () => {
       addNotifBadge('Conversación escalada', 'Una conversación fue escalada a agente');
       fetchConversations();
@@ -225,8 +231,9 @@ export default function Layout() {
     };
 
     socket.on('message:new',               onNewMessage);
+    socket.on('whatsapp:message',          (d) => { if (!d.fromMe) onWhatsappMessage(d); });
     socket.on('message:sent',              fetchConversations);
-    socket.on('conversation:new',          fetchConversations);
+    socket.on('conversation:new',          onNewConversation);
     socket.on('conversation:escalated',    onEscalated);
     socket.on('conversation:assigned',     fetchConversations);
     socket.on('conversation:assigned_to_you', onAssignedToYou);
@@ -237,8 +244,9 @@ export default function Layout() {
 
     return () => {
       socket.off('message:new',               onNewMessage);
+      socket.off('whatsapp:message');
       socket.off('message:sent',              fetchConversations);
-      socket.off('conversation:new',          fetchConversations);
+      socket.off('conversation:new',          onNewConversation);
       socket.off('conversation:escalated',    onEscalated);
       socket.off('conversation:assigned',     fetchConversations);
       socket.off('conversation:assigned_to_you', onAssignedToYou);
