@@ -4,7 +4,6 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff, Bot, Plug, Check, Phone, Globe, Cpu, Lock } from 'lucide-react';
 import { useAuthStore } from '../../store';
-import { useAuthStore } from '../../store';
 
 const PROVIDERS = [
   {
