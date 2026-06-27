@@ -121,7 +121,14 @@ export default function SuperAdminPanel() {
     setLoading(true);
     try {
       const res = await api.get('/company/all');
-      setCompanies(res.data || []);
+      const list = res.data || [];
+      setCompanies(list);
+      // Restaurar empresa seleccionada si había una guardada
+      const savedId = localStorage.getItem('ts-admin-company-id');
+      if (savedId && !selected) {
+        const prev = list.find(c => c.id === savedId);
+        if (prev) selectCompany(prev);
+      }
     } catch {
       toast.error('Error cargando empresas');
     } finally {
@@ -133,6 +140,10 @@ export default function SuperAdminPanel() {
 
   const selectCompany = async (company) => {
     setSelected(company);
+    // Persistir empresa activa para que todos los requests del superadmin
+    // usen el filtro correcto de multi-tenancy (x-company-id header)
+    localStorage.setItem('ts-admin-company-id', company.id);
+    localStorage.setItem('ts-admin-company-name', company.nombre);
     try {
       const res = await api.get(`/company/${company.id}/features`);
       setFeatures({ ...DEFAULT_FEATURES, ...(res.data?.active_features || {}) });
@@ -187,7 +198,11 @@ export default function SuperAdminPanel() {
     try {
       await api.delete(`/company/${deleteTarget.id}`);
       toast.success(`Empresa "${deleteTarget.nombre}" eliminada`);
-      if (selected?.id === deleteTarget.id) { setSelected(null); setFeatures({}); }
+      if (selected?.id === deleteTarget.id) {
+        setSelected(null); setFeatures({});
+        localStorage.removeItem('ts-admin-company-id');
+        localStorage.removeItem('ts-admin-company-name');
+      }
       setDeleteTarget(null);
       fetchCompanies();
     } catch (err) {

@@ -52,6 +52,7 @@ export const useAuthStore = create((set, get) => ({
   logout: async () => {
     try { await api.post('/auth/logout'); } catch (_) {}
     localStorage.removeItem('token');
+    localStorage.removeItem('ts-admin-company-id');
     disconnectSocket();
     set({ user: null, token: null, permissions: null, activeFeatures: null });
     useConversationStore.setState({ conversations: [], activeConversation: null, messages: [], totalConversations: 0 });

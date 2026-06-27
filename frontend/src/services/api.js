@@ -10,10 +10,16 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
-// Interceptor de request: agrega el token JWT automáticamente
+// Interceptor de request: agrega el token JWT y empresa seleccionada por el superadmin
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  // Cuando el superadmin tiene una empresa seleccionada, enviarla en cada request
+  // para que el backend aplique el filtro correcto de multi-tenancy
+  const adminCompanyId = localStorage.getItem('ts-admin-company-id');
+  if (adminCompanyId) config.headers['x-company-id'] = adminCompanyId;
+
   return config;
 });
 

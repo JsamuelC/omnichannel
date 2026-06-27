@@ -58,13 +58,18 @@ const requireSuperAdmin = (req, res, next) => {
 
 // ── 4. Filtro de empresa (multi-tenant) ──────────────────────────────────────
 // Inyecta req.companyFilter:
-//   superadmin → {} (ve todo)
+//   superadmin → requiere x-company-id header (o query/body); sin él: { company_id: null } (nada)
 //   admin/agent → { company_id: req.user.company_id }
 const companyScope = (req, res, next) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Autenticación requerida.' });
-  req.companyFilter = req.user.role === 'superadmin'
-    ? {}
-    : { company_id: req.user.company_id };
+  if (req.user.role === 'superadmin') {
+    // El frontend envía x-company-id cuando el superadmin tiene una empresa seleccionada
+    const explicitId = req.headers['x-company-id'] || req.query?.company_id || req.body?.company_id;
+    // SECURITY: sin empresa explícita, retornar null (nunca exponer datos de todas las empresas)
+    req.companyFilter = { company_id: explicitId || null };
+  } else {
+    req.companyFilter = { company_id: req.user.company_id };
+  }
   next();
 };
 
@@ -72,9 +77,13 @@ const companyScope = (req, res, next) => {
 const scopeConversations = (req, res, next) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Autenticación requerida.' });
 
-  const companyFilter = req.user.role === 'superadmin'
-    ? {}
-    : { company_id: req.user.company_id };
+  let companyFilter;
+  if (req.user.role === 'superadmin') {
+    const explicitId = req.headers['x-company-id'] || req.query?.company_id || req.body?.company_id;
+    companyFilter = { company_id: explicitId || null };
+  } else {
+    companyFilter = { company_id: req.user.company_id };
+  }
 
   if (req.user.role === 'agent') {
     req.conversationFilter = { ...companyFilter, assigned_agent_id: req.user.id };

@@ -141,7 +141,15 @@ export default function Layout() {
   const [unreadCount, setUnreadCount]     = useState(0);
   const [showNotifs, setShowNotifs]       = useState(false);
   const [userAvailability, setUserAvailability] = useState(user?.availability || 'active');
+  const [adminCompanyName, setAdminCompanyName] = useState(() => localStorage.getItem('ts-admin-company-name'));
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const sync = () => setAdminCompanyName(localStorage.getItem('ts-admin-company-name'));
+    const interval = setInterval(sync, 800);
+    window.addEventListener('storage', sync);
+    return () => { clearInterval(interval); window.removeEventListener('storage', sync); };
+  }, []);
 
   const role = user?.role || 'agent';
 
@@ -546,6 +554,23 @@ export default function Layout() {
         </header>
 
         {/* ── Área de contenido ──────────────────────── */}
+        {role === 'superadmin' && adminCompanyName && (
+          <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2 bg-violet-600/15 border-b border-violet-500/30">
+            <span className="text-xs text-violet-300 font-semibold">
+              Gestionando: <span className="text-white">{adminCompanyName}</span>
+            </span>
+            <button
+              onClick={() => {
+                localStorage.removeItem('ts-admin-company-id');
+                localStorage.removeItem('ts-admin-company-name');
+                setAdminCompanyName(null);
+              }}
+              className="text-xs text-violet-400 hover:text-white transition-colors underline"
+            >
+              Quitar selección
+            </button>
+          </div>
+        )}
         <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
