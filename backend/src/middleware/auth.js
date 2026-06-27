@@ -58,15 +58,15 @@ const requireSuperAdmin = (req, res, next) => {
 
 // ── 4. Filtro de empresa (multi-tenant) ──────────────────────────────────────
 // Inyecta req.companyFilter:
-//   superadmin → requiere x-company-id header (o query/body); sin él: { company_id: null } (nada)
+//   superadmin → usa x-company-id header si viene; sin él usa su propio company_id (Tecnossync)
 //   admin/agent → { company_id: req.user.company_id }
 const companyScope = (req, res, next) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Autenticación requerida.' });
   if (req.user.role === 'superadmin') {
-    // El frontend envía x-company-id cuando el superadmin tiene una empresa seleccionada
+    // El frontend envía x-company-id cuando el superadmin gestiona otra empresa
     const explicitId = req.headers['x-company-id'] || req.query?.company_id || req.body?.company_id;
-    // SECURITY: sin empresa explícita, retornar null (nunca exponer datos de todas las empresas)
-    req.companyFilter = { company_id: explicitId || null };
+    // Sin empresa explícita, usar la propia del superadmin (nunca null para evitar ver todo)
+    req.companyFilter = { company_id: explicitId || req.user.company_id || null };
   } else {
     req.companyFilter = { company_id: req.user.company_id };
   }
@@ -80,7 +80,7 @@ const scopeConversations = (req, res, next) => {
   let companyFilter;
   if (req.user.role === 'superadmin') {
     const explicitId = req.headers['x-company-id'] || req.query?.company_id || req.body?.company_id;
-    companyFilter = { company_id: explicitId || null };
+    companyFilter = { company_id: explicitId || req.user.company_id || null };
   } else {
     companyFilter = { company_id: req.user.company_id };
   }
