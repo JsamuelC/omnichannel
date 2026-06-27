@@ -395,10 +395,22 @@ export default function WhatsappBusinessPanel() {
       toast(`📄 Documento listo para revisar: ${data?.templateName || ''}`, { duration: 5000 });
     };
 
+    const onChatUpdated = (data) => {
+      if (!data?.jid) return;
+      setChatList(prev => prev.map(c => {
+        if (c.jid !== data.jid) return c;
+        const updated = { ...c };
+        if (data.labels     !== undefined) updated.labels      = data.labels;
+        if (data.bot_enabled !== undefined) updated.bot_enabled = data.bot_enabled;
+        return updated;
+      }));
+    };
+
     socket.on('whatsapp:qr', onQr);
     socket.on('whatsapp:status', onStatus);
     socket.on('whatsapp:chats_synced', onChatsSync);
     socket.on('whatsapp:message', onMessage);
+    socket.on('whatsapp:chat_updated', onChatUpdated);
     socket.on('reconnect', onSocketReconnect);
     socket.on('document:ready', onDocReady);
 
@@ -407,6 +419,7 @@ export default function WhatsappBusinessPanel() {
       socket.off('whatsapp:status', onStatus);
       socket.off('whatsapp:chats_synced', onChatsSync);
       socket.off('whatsapp:message', onMessage);
+      socket.off('whatsapp:chat_updated', onChatUpdated);
       socket.off('reconnect', onSocketReconnect);
       socket.off('document:ready', onDocReady);
     };
