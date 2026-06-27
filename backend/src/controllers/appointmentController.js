@@ -4,15 +4,7 @@ const outlook  = require('../services/outlookService');
 const gcal     = require('../services/googleCalendarService');
 const logger   = require('../config/logger');
 const { Op }   = require('sequelize');
-
-async function resolveCompanyId(req) {
-  if (req.user?.company_id) return req.user.company_id;
-  if (req.user?.role === 'superadmin') {
-    const first = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['id'] });
-    return first?.id || null;
-  }
-  return null;
-}
+const { resolveCompanyId } = require('../utils/companyResolver');
 
 async function syncToOutlook(companyId, appointment, action = 'create') {
   try {

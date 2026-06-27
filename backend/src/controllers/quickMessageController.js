@@ -2,13 +2,13 @@
 const { QuickMessage } = require('../models');
 
 const { resolveCompanyFilter, resolveCompanyId } = require('../utils/companyResolver');
-const companyFilter = (req) => resolveCompanyFilter(req);
 
 const getAll = async (req, res) => {
   try {
     const { channel } = req.query;
     const { Op } = require('sequelize');
-    const where = { is_active: true, ...(await companyFilter(req)) };
+    const filter = await resolveCompanyFilter(req);
+    const where = { is_active: true, ...filter };
     if (channel && channel !== 'all') {
       where.channel = { [Op.in]: [channel, 'all'] };
     }
@@ -24,8 +24,9 @@ const getAll = async (req, res) => {
 
 const getAllAdmin = async (req, res) => {
   try {
+    const filter = await resolveCompanyFilter(req);
     const messages = await QuickMessage.findAll({
-      where: companyFilter(req),
+      where: filter,
       order: [['sort_order', 'ASC'], ['created_at', 'ASC']]
     });
     res.json({ success: true, data: messages });
@@ -57,7 +58,8 @@ const create = async (req, res) => {
 
 const update = async (req, res) => {
   try {
-    const msg = await QuickMessage.findOne({ where: { id: req.params.id, ...(await companyFilter(req)) } });
+    const filter = await resolveCompanyFilter(req);
+    const msg = await QuickMessage.findOne({ where: { id: req.params.id, ...filter } });
     if (!msg) return res.status(404).json({ success: false, message: 'Mensaje no encontrado' });
     const { title, shortcut, content, category, channel, sort_order, is_active } = req.body;
     await msg.update({
@@ -77,7 +79,8 @@ const update = async (req, res) => {
 
 const remove = async (req, res) => {
   try {
-    const msg = await QuickMessage.findOne({ where: { id: req.params.id, ...(await companyFilter(req)) } });
+    const filter = await resolveCompanyFilter(req);
+    const msg = await QuickMessage.findOne({ where: { id: req.params.id, ...filter } });
     if (!msg) return res.status(404).json({ success: false, message: 'Mensaje no encontrado' });
     await msg.destroy();
     res.json({ success: true });

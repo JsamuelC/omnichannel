@@ -9,13 +9,17 @@ class UserController {
   // GET /users
   async list(req, res) {
     try {
-      const where = req.companyFilter || (req.user.role === 'superadmin'
-        ? {}
-        : { company_id: req.user.company_id });
+      let where;
+      if (req.user.role === 'superadmin') {
+        where = { role: 'admin' };
+      } else {
+        where = req.companyFilter || { company_id: req.user.company_id };
+      }
 
       const users = await User.findAll({
         where,
         attributes: { exclude: ['password_hash', 'reset_token', 'reset_token_expires'] },
+        include: req.user.role === 'superadmin' ? [{ model: Company, as: 'company', attributes: ['id', 'nombre'] }] : [],
         order: [['created_at', 'ASC']]
       });
       res.json({ success: true, data: { users, total: users.length } });
@@ -41,27 +45,22 @@ class UserController {
         return res.status(400).json({ success: false, message: 'La contraseña debe tener al menos 8 caracteres.' });
 
       const allowedRoles = req.user.role === 'superadmin'
-        ? ['superadmin', 'admin', 'agent', 'supervisor']
+        ? ['admin']
         : ['admin', 'agent', 'supervisor'];
 
       if (!allowedRoles.includes(role))
-        return res.status(400).json({ success: false, message: `Rol inválido. Permitidos: ${allowedRoles.join(', ')}` });
+        return res.status(403).json({ success: false, message: req.user.role === 'superadmin'
+          ? 'El superadmin solo puede crear usuarios con rol admin. Los agentes/supervisores los crea el admin de cada empresa.'
+          : `Rol inválido. Permitidos: ${allowedRoles.join(', ')}`
+        });
 
       const existing = await User.findOne({ where: { email: email.toLowerCase() } });
       if (existing)
         return res.status(409).json({ success: false, message: 'Este email ya está registrado.' });
 
-      // Admin asigna usuarios a su propia empresa; superadmin puede indicar otra
       let assignedCompany = req.user.role === 'superadmin'
         ? (company_id || null)
         : req.user.company_id;
-
-      // Superadmin sin company_id: usar la primera empresa
-      if (!assignedCompany && req.user.role === 'superadmin' && role !== 'superadmin') {
-        const Company = require('../models/Company');
-        const first = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['id'] });
-        assignedCompany = first?.id || null;
-      }
 
       if (role !== 'superadmin' && !assignedCompany)
         return res.status(400).json({ success: false, message: 'Se requiere company_id.' });

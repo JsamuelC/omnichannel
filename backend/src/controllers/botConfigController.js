@@ -2,17 +2,7 @@
 const { BotConfig } = require('../models');
 const chatbotService = require('../services/chatbotService');
 const logger = require('../config/logger');
-
-async function resolveCompanyFilter(req) {
-  if (req.companyFilter && Object.keys(req.companyFilter).length > 0) return req.companyFilter;
-  if (req.user?.company_id) return { company_id: req.user.company_id };
-  if (req.user?.role === 'superadmin') {
-    const Company = require('../models/Company');
-    const first = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['id'] });
-    return first ? { company_id: first.id } : {};
-  }
-  return {};
-}
+const { resolveCompanyFilter } = require('../utils/companyResolver');
 
 class BotConfigController {
 

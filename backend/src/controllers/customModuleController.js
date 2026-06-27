@@ -8,12 +8,11 @@ const slugify = (str) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-const companyFilter = (req) => resolveCompanyFilter(req);
-
 const getAll = async (req, res) => {
   try {
+    const filter = await resolveCompanyFilter(req);
     const modules = await CustomModule.findAll({
-      where: { is_active: true, ...companyFilter(req) },
+      where: { is_active: true, ...filter },
       order: [['sort_order', 'ASC'], ['created_at', 'ASC']]
     });
     res.json({ success: true, data: modules });
@@ -24,8 +23,9 @@ const getAll = async (req, res) => {
 
 const getAllAdmin = async (req, res) => {
   try {
+    const filter = await resolveCompanyFilter(req);
     const modules = await CustomModule.findAll({
-      where: companyFilter(req),
+      where: filter,
       order: [['sort_order', 'ASC'], ['created_at', 'ASC']]
     });
     res.json({ success: true, data: modules });
@@ -36,8 +36,9 @@ const getAllAdmin = async (req, res) => {
 
 const getOne = async (req, res) => {
   try {
+    const filter = await resolveCompanyFilter(req);
     const mod = await CustomModule.findOne({
-      where: { slug: req.params.slug, is_active: true, ...companyFilter(req) }
+      where: { slug: req.params.slug, is_active: true, ...filter }
     });
     if (!mod) return res.status(404).json({ success: false, message: 'Módulo no encontrado' });
     res.json({ success: true, data: mod });
@@ -74,7 +75,8 @@ const create = async (req, res) => {
 
 const update = async (req, res) => {
   try {
-    const mod = await CustomModule.findOne({ where: { id: req.params.id, ...companyFilter(req) } });
+    const filter = await resolveCompanyFilter(req);
+    const mod = await CustomModule.findOne({ where: { id: req.params.id, ...filter } });
     if (!mod) return res.status(404).json({ success: false, message: 'Módulo no encontrado' });
     const { name, icon, color, description, fields_schema, daily_limit, sort_order, is_active } = req.body;
     await mod.update({
@@ -95,7 +97,8 @@ const update = async (req, res) => {
 
 const remove = async (req, res) => {
   try {
-    const mod = await CustomModule.findOne({ where: { id: req.params.id, ...companyFilter(req) } });
+    const filter = await resolveCompanyFilter(req);
+    const mod = await CustomModule.findOne({ where: { id: req.params.id, ...filter } });
     if (!mod) return res.status(404).json({ success: false, message: 'Módulo no encontrado' });
     await mod.destroy();
     res.json({ success: true });

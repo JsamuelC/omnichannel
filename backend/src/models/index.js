@@ -43,6 +43,10 @@ Message.belongsTo(Conversation, { foreignKey: 'conversation_id', as: 'conversati
 User.hasMany(Conversation, { foreignKey: 'assigned_agent_id', as: 'assigned_conversations' });
 Conversation.belongsTo(User, { foreignKey: 'assigned_agent_id', as: 'assigned_agent' });
 
+const Company = require('./Company');
+User.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
+Company.hasMany(User, { foreignKey: 'company_id', as: 'users' });
+
 // ============================
 // ASOCIACIONES COMPROBANTES
 // ============================
@@ -106,6 +110,7 @@ const migrate = async () => {
       // OTP de inicio de sesión
       { table: 'users', col: 'login_otp',             def: { type: DT.STRING(6),   allowNull: true } },
       { table: 'users', col: 'login_otp_expires',     def: { type: DT.DATE,        allowNull: true } },
+      { table: 'users', col: 'trusted_devices',       def: { type: DT.JSONB,       allowNull: true, defaultValue: [] } },
       // Google Calendar
       { table: 'company',       col: 'google_calendar_tokens', def: { type: DT.JSONB,       allowNull: true, defaultValue: null } },
       { table: 'appointments',  col: 'google_event_id',        def: { type: DT.STRING(500), allowNull: true } },

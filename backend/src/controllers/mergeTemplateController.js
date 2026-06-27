@@ -3,13 +3,12 @@ const { resolveCompanyFilter, resolveCompanyId } = require('../utils/companyReso
 const mergeService = require('../services/mergeService');
 const logger = require('../config/logger');
 
-const companyFilter = (req) => resolveCompanyFilter(req);
-
 class MergeTemplateController {
 
   async list(req, res) {
     try {
-      const where = { ...companyFilter(req) };
+      const filter = await resolveCompanyFilter(req);
+      const where = { ...filter };
       if (req.query.activo !== undefined) where.activo = req.query.activo === 'true';
       if (req.query.canal && req.query.canal !== 'all') {
         const { Op } = require('sequelize');
@@ -26,7 +25,7 @@ class MergeTemplateController {
 
   async getOne(req, res) {
     try {
-      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...companyFilter(req) } });
+      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...(await resolveCompanyFilter(req)) } });
       if (!template) return res.status(404).json({ success: false, message: 'Plantilla no encontrada.' });
       res.json({ success: true, data: template });
     } catch (error) {
@@ -66,7 +65,7 @@ class MergeTemplateController {
 
   async update(req, res) {
     try {
-      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...companyFilter(req) } });
+      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...(await resolveCompanyFilter(req)) } });
       if (!template) return res.status(404).json({ success: false, message: 'Plantilla no encontrada.' });
 
       const updates = {};
@@ -101,7 +100,7 @@ class MergeTemplateController {
 
   async remove(req, res) {
     try {
-      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...companyFilter(req) } });
+      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...(await resolveCompanyFilter(req)) } });
       if (!template) return res.status(404).json({ success: false, message: 'Plantilla no encontrada.' });
       await template.destroy();
       res.json({ success: true, message: 'Plantilla eliminada.' });
@@ -113,7 +112,7 @@ class MergeTemplateController {
 
   async toggleActive(req, res) {
     try {
-      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...companyFilter(req) } });
+      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...(await resolveCompanyFilter(req)) } });
       if (!template) return res.status(404).json({ success: false, message: 'Plantilla no encontrada.' });
       await template.update({ activo: !template.activo });
       res.json({ success: true, data: template });
@@ -137,7 +136,7 @@ class MergeTemplateController {
 
   async merge(req, res) {
     try {
-      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...companyFilter(req) } });
+      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...(await resolveCompanyFilter(req)) } });
       if (!template) return res.status(404).json({ success: false, message: 'Plantilla no encontrada.' });
 
       const { datos } = req.body;
@@ -170,7 +169,7 @@ class MergeTemplateController {
 
   async useInConversation(req, res) {
     try {
-      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...companyFilter(req) } });
+      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...(await resolveCompanyFilter(req)) } });
       if (!template) return res.status(404).json({ success: false, message: 'Plantilla no encontrada.' });
 
       const conversation = await Conversation.findByPk(req.params.conversationId, {
@@ -308,7 +307,7 @@ class MergeTemplateController {
 
   async updateMapping(req, res) {
     try {
-      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...companyFilter(req) } });
+      const template = await MergeTemplate.findOne({ where: { id: req.params.id, ...(await resolveCompanyFilter(req)) } });
       if (!template) return res.status(404).json({ success: false, message: 'Plantilla no encontrada.' });
 
       const { variable_mapping } = req.body;

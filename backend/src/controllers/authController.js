@@ -55,6 +55,26 @@ class AuthController {
         });
       }
 
+      // ── Dispositivo de confianza — saltar OTP si el token es válido ──
+      const { deviceToken } = req.body;
+      if (deviceToken && user.trusted_devices?.length) {
+        const now = new Date();
+        const trusted = user.trusted_devices.find(d => d.token === deviceToken && new Date(d.expires_at) > now);
+        if (trusted) {
+          await user.update({ is_online: true, online_started_at: new Date() });
+          const token = generateToken(user);
+          const activeFeatures = await loadActiveFeatures(user);
+          logger.info(`✅ Login con dispositivo de confianza: ${email}`);
+          return res.json({
+            success: true,
+            data: {
+              token,
+              user: { ...user.toJSON(), permissions: buildPermissions(user.role), active_features: activeFeatures },
+            },
+          });
+        }
+      }
+
       // ── OTP de segundo factor ────────────────────────────────
       const otp     = String(Math.floor(100000 + Math.random() * 900000));
       const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
@@ -190,12 +210,27 @@ class AuthController {
         return res.status(400).json({ success: false, code: 'OTP_EXPIRED', message: 'El código expiró. Inicia sesión de nuevo para recibir uno nuevo.' });
 
       // OTP válido → completar login
-      await user.update({
+      const updateData = {
         login_otp:         null,
         login_otp_expires: null,
         is_online:         true,
         online_started_at: new Date(),
-      });
+      };
+
+      // Generar device token si el usuario quiere recordar el dispositivo
+      let newDeviceToken = null;
+      if (req.body.rememberDevice) {
+        newDeviceToken = crypto.randomBytes(32).toString('hex');
+        const trustedDevices = (user.trusted_devices || []).filter(d => new Date(d.expires_at) > new Date());
+        trustedDevices.push({
+          token:      newDeviceToken,
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+        updateData.trusted_devices = trustedDevices.slice(-5);
+      }
+
+      await user.update(updateData);
 
       const token = generateToken(user);
       const activeFeatures = await loadActiveFeatures(user);
@@ -206,6 +241,7 @@ class AuthController {
         data: {
           token,
           user: { ...user.toJSON(), permissions: buildPermissions(user.role), active_features: activeFeatures },
+          ...(newDeviceToken ? { deviceToken: newDeviceToken } : {}),
         },
       });
     } catch (error) {

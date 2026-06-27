@@ -2,15 +2,7 @@ const Company     = require('../models/Company');
 const { Appointment } = require('../models');
 const outlook     = require('../services/outlookService');
 const logger      = require('../config/logger');
-
-async function resolveCompanyId(req) {
-  if (req.user.company_id) return req.user.company_id;
-  if (req.user.role === 'superadmin') {
-    const first = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['id'] });
-    return first?.id || null;
-  }
-  return null;
-}
+const { resolveCompanyId } = require('../utils/companyResolver');
 
 // GET /api/outlook/connect
 exports.connect = async (req, res) => {

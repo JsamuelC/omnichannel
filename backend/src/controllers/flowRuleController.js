@@ -2,12 +2,11 @@
 const { FlowRule } = require('../models');
 const { resolveCompanyFilter, resolveCompanyId } = require('../utils/companyResolver');
 
-const companyFilter = (req) => resolveCompanyFilter(req);
-
 const getAll = async (req, res) => {
   try {
+    const filter = await resolveCompanyFilter(req);
     const rules = await FlowRule.findAll({
-      where: await companyFilter(req),
+      where: filter,
       order: [['priority', 'DESC'], ['created_at', 'ASC']]
     });
     res.json({ success: true, data: rules });
@@ -41,7 +40,8 @@ const create = async (req, res) => {
 
 const update = async (req, res) => {
   try {
-    const rule = await FlowRule.findOne({ where: { id: req.params.id, ...(await companyFilter(req)) } });
+    const filter = await resolveCompanyFilter(req);
+    const rule = await FlowRule.findOne({ where: { id: req.params.id, ...filter } });
     if (!rule) return res.status(404).json({ success: false, message: 'Regla no encontrada' });
     const { name, trigger_type, trigger_value, action_type, action_value, channel, priority, is_active } = req.body;
     await rule.update({
@@ -62,7 +62,8 @@ const update = async (req, res) => {
 
 const toggle = async (req, res) => {
   try {
-    const rule = await FlowRule.findOne({ where: { id: req.params.id, ...(await companyFilter(req)) } });
+    const filter = await resolveCompanyFilter(req);
+    const rule = await FlowRule.findOne({ where: { id: req.params.id, ...filter } });
     if (!rule) return res.status(404).json({ success: false, message: 'Regla no encontrada' });
     await rule.update({ is_active: !rule.is_active });
     res.json({ success: true, data: rule });
@@ -73,7 +74,8 @@ const toggle = async (req, res) => {
 
 const remove = async (req, res) => {
   try {
-    const rule = await FlowRule.findOne({ where: { id: req.params.id, ...(await companyFilter(req)) } });
+    const filter = await resolveCompanyFilter(req);
+    const rule = await FlowRule.findOne({ where: { id: req.params.id, ...filter } });
     if (!rule) return res.status(404).json({ success: false, message: 'Regla no encontrada' });
     await rule.destroy();
     res.json({ success: true });

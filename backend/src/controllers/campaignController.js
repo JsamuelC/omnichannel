@@ -4,14 +4,13 @@ const campaignService = require('../services/campaignService');
 const { Campaign } = require('../models');
 const logger = require('../config/logger');
 
-const companyFilter = (req) => resolveCompanyFilter(req);
-
 class CampaignController {
 
   async getAll(req, res) {
     try {
+      const filter = await resolveCompanyFilter(req);
       const campaigns = await Campaign.findAll({
-        where: companyFilter(req),
+        where: filter,
         order: [['created_at', 'DESC']]
       });
       res.json({ success: true, data: campaigns });
@@ -64,7 +63,8 @@ class CampaignController {
 
   async delete(req, res) {
     try {
-      const deleted = await Campaign.destroy({ where: { id: req.params.id, status: 'draft', ...companyFilter(req) } });
+      const filter = await resolveCompanyFilter(req);
+      const deleted = await Campaign.destroy({ where: { id: req.params.id, status: 'draft', ...filter } });
       if (!deleted) return res.status(404).json({ success: false, message: 'Campaña no encontrada o no es borrador' });
       res.json({ success: true, message: 'Campaña eliminada' });
     } catch (error) {

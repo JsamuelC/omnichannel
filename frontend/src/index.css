@@ -23,7 +23,7 @@ html * {
   transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
-/* Variables de color del Dashboard — usa estilos inline, se adapta vía estas vars */
+/* Variables de color — se adaptan automáticamente al modo claro/oscuro */
 :root {
   --db-bg: #f8fafc;
   --db-text: #334155;
@@ -41,6 +41,9 @@ html * {
   --db-error-border: #fecaca;
   --db-error-text: #dc2626;
   --db-skeleton-bg: #e2e8f0;
+  --ts-input-bg: #fafafa;
+  --ts-input-border: #d1d5db;
+  --ts-icon-bg: #f3f4f6;
 }
 html.dark {
   --db-bg: #0f172a;
@@ -59,6 +62,9 @@ html.dark {
   --db-error-border: rgba(239,68,68,0.3);
   --db-error-text: #f87171;
   --db-skeleton-bg: rgba(255,255,255,0.04);
+  --ts-input-bg: #1e293b;
+  --ts-input-border: #334155;
+  --ts-icon-bg: rgba(255,255,255,0.06);
 }
 
 /* ─── Componentes reutilizables ─────────────────────────────── */

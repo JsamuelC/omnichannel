@@ -148,7 +148,7 @@ export default function WidgetsConfig() {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#fff', fontFamily: 'system-ui, sans-serif', color: '#0f172a' }}>
+    <div className="h-full flex flex-col overflow-hidden bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100" style={{ fontFamily: 'system-ui, sans-serif' }}>
 
       {/* Topbar */}
       <div className="flex items-center justify-between px-8 py-4 flex-shrink-0" style={{ borderBottom: '0.5px solid #e2e8f0' }}>
@@ -338,8 +338,11 @@ export default function WidgetsConfig() {
                 {copied ? 'Copiado' : 'Copiar código'}
               </button>
             </div>
-            <p className="text-sm mb-3" style={{ color: '#64748b' }}>
+            <p className="text-sm mb-2" style={{ color: '#64748b' }}>
               Pega este código antes de <code style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: 4, fontSize: 12 }}>&lt;/body&gt;</code> en tu sitio web:
+            </p>
+            <p className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
+              Este script es único para tu empresa. No lo compartas con otras empresas.
             </p>
             <div className="rounded-xl overflow-hidden" style={{ background: '#0f172a', border: '1px solid #334155' }}>
               <pre className="p-4 text-sm overflow-x-auto" style={{ color: '#a5b4fc', fontFamily: 'monospace', margin: 0, lineHeight: 1.6 }}>

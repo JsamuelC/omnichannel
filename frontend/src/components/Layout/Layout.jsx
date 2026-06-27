@@ -152,7 +152,9 @@ export default function Layout() {
     return true;
   });
 
-  useEffect(() => { fetchModules(); }, []);
+  useEffect(() => {
+    if (user?.company_id || user?.role === 'superadmin') fetchModules();
+  }, [user?.company_id]);
 
   // ── Notificaciones ───────────────────────────────────────
   const loadNotifications = async () => {
@@ -183,34 +185,34 @@ export default function Layout() {
     const socket = getSocket();
     if (!socket) return;
 
+    const addNotifBadge = (title, body) => {
+      setNotifications(prev => [{ id: Date.now(), title, body, read: false, created_at: new Date().toISOString(), type: 'message' }, ...prev.slice(0, 19)]);
+      setUnreadCount(prev => prev + 1);
+    };
+
     const onNewMessage = (data) => {
       addIncomingMessage(data);
       const ch = CHANNEL_LABEL[data.conversation?.channel] || 'Mensaje';
-      toast(`[${ch}] ${data.contact?.name || 'Contacto'}: ${data.message?.content?.substring(0, 40) || '...'}`,
-        { duration: 4000 }
-      );
+      addNotifBadge(`${ch}`, `${data.contact?.name || 'Contacto'}: ${data.message?.content?.substring(0, 60) || '...'}`);
     };
 
     const onEscalated = () => {
-      toast('Conversación escalada a agente', { duration: 5000 });
+      addNotifBadge('Conversación escalada', 'Una conversación fue escalada a agente');
       fetchConversations();
     };
 
     const onAssignedToYou = () => {
-      toast('Se te asignó una nueva conversación', { duration: 5000 });
+      addNotifBadge('Nueva asignación', 'Se te asignó una nueva conversación');
       fetchConversations();
     };
 
     const onDocReady = (data) => {
-      toast(`📄 Documento listo para revisar: "${data?.templateName || 'Documento'}"`, {
-        duration: 7000,
-        icon: '📄',
-      });
+      addNotifBadge('Documento listo', data?.templateName || 'Documento listo para revisar');
     };
 
     const onNewConversation = (data) => {
       const ch = CHANNEL_LABEL[data.conversation?.channel] || 'Nuevo chat';
-      toast(`[${ch}] Nueva conversación de ${data.conversation?.contact?.name || 'visitante'}`, { duration: 5000 });
+      addNotifBadge(ch, `Nueva conversación de ${data.conversation?.contact?.name || 'visitante'}`);
       fetchConversations();
     };
 
@@ -385,7 +387,7 @@ export default function Layout() {
             <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center relative">
               <Bell size={17} />
               {unreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}

@@ -26,17 +26,22 @@ export const useAuthStore = create((set, get) => ({
   login: async (email, password) => {
     set({ isLoading: true });
     try {
-      const res = await api.post('/auth/login', { email, password });
+      const deviceToken = localStorage.getItem('ts-device-token');
+      const res = await api.post('/auth/login', { email, password, ...(deviceToken ? { deviceToken } : {}) });
+      // Trusted device — login directo sin OTP
+      if (res.data?.token) {
+        const { token, user } = res.data;
+        localStorage.setItem('token', token);
+        initSocket(user.id);
+        set({ user, token, permissions: user.permissions, activeFeatures: user.active_features ?? null, isLoading: false });
+        return { success: true };
+      }
       // Paso 1: backend envió OTP → necesita segundo factor
       if (res.needs_otp) {
         set({ isLoading: false });
         return { success: true, needs_otp: true, debug_otp: res.debug_otp };
       }
-      // Flujo directo (no debería ocurrir con OTP activo)
-      const { token, user } = res.data;
-      localStorage.setItem('token', token);
-      initSocket(user.id);
-      set({ user, token, permissions: user.permissions, activeFeatures: user.active_features ?? null, isLoading: false });
+      set({ isLoading: false });
       return { success: true };
     } catch (error) {
       set({ isLoading: false });
@@ -49,8 +54,9 @@ export const useAuthStore = create((set, get) => ({
     localStorage.removeItem('token');
     disconnectSocket();
     set({ user: null, token: null, permissions: null, activeFeatures: null });
-    // Limpiar conversation store para evitar datos cruzados entre empresas
     useConversationStore.setState({ conversations: [], activeConversation: null, messages: [], totalConversations: 0 });
+    useModuleStore.setState({ modules: [], loading: false });
+    useLabelStore.setState({ labels: [], loaded: false });
   },
 
   fetchMe: async () => {

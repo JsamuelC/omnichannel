@@ -1,15 +1,7 @@
 const Company = require('../models/Company');
 const logger  = require('../config/logger');
 const axios   = require('axios');
-
-async function resolveCompanyId(req) {
-  if (req.user.company_id) return req.user.company_id;
-  if (req.user.role === 'superadmin') {
-    const first = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['id'] });
-    return first?.id || null;
-  }
-  return null;
-}
+const { resolveCompanyId } = require('../utils/companyResolver');
 
 // GET /api/channels/messenger/status
 exports.messengerStatus = async (req, res) => {

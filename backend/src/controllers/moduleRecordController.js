@@ -3,14 +3,13 @@ const { resolveCompanyFilter, resolveCompanyId } = require('../utils/companyReso
 const { ModuleRecord, CustomModule } = require('../models');
 const { Op } = require('sequelize');
 
-const companyFilter = (req) => resolveCompanyFilter(req);
-
 const getAll = async (req, res) => {
   try {
     const { module_id, status, search, page = 1, limit = 50 } = req.query;
     if (!module_id) return res.status(400).json({ success: false, message: 'module_id requerido' });
 
-    const where = { module_id: Number(module_id), ...companyFilter(req) };
+    const filter = await resolveCompanyFilter(req);
+    const where = { module_id: Number(module_id), ...filter };
     if (status) where.status = status;
     if (search) {
       where.contact_name = { [Op.iLike]: `%${search}%` };
@@ -112,7 +111,8 @@ const create = async (req, res) => {
 
 const update = async (req, res) => {
   try {
-    const record = await ModuleRecord.findOne({ where: { id: req.params.id, ...companyFilter(req) } });
+    const filter = await resolveCompanyFilter(req);
+    const record = await ModuleRecord.findOne({ where: { id: req.params.id, ...filter } });
     if (!record) return res.status(404).json({ success: false, message: 'Registro no encontrado' });
     const { data, status, notes, contact_name } = req.body;
     await record.update({
@@ -129,7 +129,8 @@ const update = async (req, res) => {
 
 const remove = async (req, res) => {
   try {
-    const record = await ModuleRecord.findOne({ where: { id: req.params.id, ...companyFilter(req) } });
+    const filter = await resolveCompanyFilter(req);
+    const record = await ModuleRecord.findOne({ where: { id: req.params.id, ...filter } });
     if (!record) return res.status(404).json({ success: false, message: 'Registro no encontrado' });
     await record.destroy();
     res.json({ success: true });
@@ -144,7 +145,7 @@ const getDailyStats = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const count = await ModuleRecord.count({
-      where: { module_id: Number(module_id), created_at: { [Op.gte]: today }, ...companyFilter(req) }
+      where: { module_id: Number(module_id), created_at: { [Op.gte]: today }, ...(await resolveCompanyFilter(req)) }
     });
     const cidStat = await resolveCompanyId(req);
     const modWhereStat = cidStat ? { id: Number(module_id), company_id: cidStat } : { id: Number(module_id) };

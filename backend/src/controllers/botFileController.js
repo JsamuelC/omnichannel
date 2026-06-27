@@ -19,14 +19,13 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB
 
-const cf = (req) => resolveCompanyFilter(req);
-
 class BotFileController {
 
   async getAll(req, res) {
     try {
       const { category } = req.query;
-      const where = { ...cf(req) };
+      const filter = await resolveCompanyFilter(req);
+      const where = { ...filter };
       if (category) where.category = category;
       const files = await BotFile.findAll({
         where,
@@ -69,7 +68,8 @@ class BotFileController {
 
   async update(req, res) {
     try {
-      const botFile = await BotFile.findOne({ where: { id: req.params.id, ...cf(req) } });
+      const filter = await resolveCompanyFilter(req);
+      const botFile = await BotFile.findOne({ where: { id: req.params.id, ...filter } });
       if (!botFile) return res.status(404).json({ success: false, message: 'No encontrado' });
 
       const updates = { ...req.body };
@@ -94,7 +94,8 @@ class BotFileController {
 
   async remove(req, res) {
     try {
-      const botFile = await BotFile.findOne({ where: { id: req.params.id, ...cf(req) } });
+      const filter = await resolveCompanyFilter(req);
+      const botFile = await BotFile.findOne({ where: { id: req.params.id, ...filter } });
       if (!botFile) return res.status(404).json({ success: false, message: 'No encontrado' });
       const filePath = path.join(__dirname, '../..', botFile.file_path);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);

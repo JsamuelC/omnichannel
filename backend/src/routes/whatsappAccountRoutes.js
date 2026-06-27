@@ -2,18 +2,8 @@
 const express = require('express');
 const router  = express.Router();
 const { auth, requireRole } = require('../middleware/auth');
-const { WhatsappAccount, Company } = require('../models');
-
-// Resuelve el company_id para el usuario actual.
-// Superadmin sin company_id propio → usa la primera empresa del sistema.
-const resolveCompanyId = async (req) => {
-  if (req.user.company_id) return req.user.company_id;
-  if (req.user.role === 'superadmin') {
-    const first = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['id'] });
-    return first?.id || null;
-  }
-  return null;
-};
+const { WhatsappAccount } = require('../models');
+const { resolveCompanyId } = require('../utils/companyResolver');
 
 // ── Obtener cuenta WA de la empresa ──────────────────────────
 router.get('/', auth, async (req, res) => {
