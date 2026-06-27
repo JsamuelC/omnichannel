@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff, Bot, Plug, Check, Phone, Globe, Cpu, Lock } from 'lucide-react';
+import { useAuthStore } from '../../store';
+import { useAuthStore } from '../../store';
 
 const PROVIDERS = [
   {
@@ -83,6 +85,10 @@ function ComingSoonCard({ item }) {
 }
 
 export default function Integraciones() {
+  const { user } = useAuthStore();
+  const isSuperAdmin = user?.role === 'superadmin';
+  const hasCompanySelected = !!localStorage.getItem('ts-admin-company-id');
+  const isGlobalMode = isSuperAdmin && !hasCompanySelected;
   const [integrations, setIntegrations]     = useState([]);
   const [selectedProvider, setProvider]     = useState(null);
   const [apiKey,           setApiKey]       = useState('');
@@ -145,6 +151,20 @@ export default function Integraciones() {
 
   return (
     <div className="h-full overflow-y-auto p-8" style={{ fontFamily: 'system-ui, sans-serif', background: '#f8fafc' }}>
+
+      {/* Banner integración global para superadmin sin empresa seleccionada */}
+      {isGlobalMode && (
+        <div className="mb-4 flex items-start gap-3 px-4 py-3 rounded-xl bg-violet-50 border border-violet-200 dark:bg-violet-900/20 dark:border-violet-700">
+          <span className="text-violet-500 flex-shrink-0">🌐</span>
+          <div>
+            <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">Integración global de Tecnossync</p>
+            <p className="text-xs text-violet-600 dark:text-violet-400 mt-0.5">
+              No tienes ninguna empresa seleccionada. La API Key que configures aquí será la <strong>integración global</strong>:
+              todas las empresas sin integración propia la usarán automáticamente.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="mb-6">

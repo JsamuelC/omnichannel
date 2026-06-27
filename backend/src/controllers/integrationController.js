@@ -26,12 +26,15 @@ class IntegrationController {
       if (!provider || !api_key)
         return res.status(400).json({ success: false, message: 'provider y api_key son requeridos' });
 
-      const company_id = await resolveCompanyId(req);
-      const filter = await resolveCompanyFilter(req);
+      // Superadmin sin empresa seleccionada → integración global (company_id=null)
+      // Superadmin con empresa seleccionada (x-company-id) → integración de esa empresa
+      // Admin normal → integración de su propia empresa
+      const company_id = await resolveCompanyId(req) || null;
+      const filter = company_id ? { company_id } : { company_id: null };
 
       await Integration.update({ is_active: false }, { where: filter });
       const integration = await Integration.create({ provider, api_key, label, is_active: true, company_id });
-      logger.info(`✅ Integración creada: ${provider}`);
+      logger.info(`✅ Integración ${company_id ? `empresa ${company_id}` : 'GLOBAL'} creada: ${provider}`);
       res.status(201).json({ success: true, data: { ...integration.toJSON(), api_key: `${api_key.slice(0,6)}${'•'.repeat(20)}` } });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });

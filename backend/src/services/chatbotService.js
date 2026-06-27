@@ -69,7 +69,9 @@ class ChatbotService {
       const integration = await Integration.findOne({ where: { is_active: true, company_id: companyId } });
       if (integration) return integration;
     }
-    return Integration.findOne({ where: { is_active: true } });
+    // Fallback: integración global del superadmin (company_id IS NULL)
+    // Nunca devolvemos la integración de otra empresa (evita fuga multi-tenant)
+    return Integration.findOne({ where: { is_active: true, company_id: null } });
   }
 
   async generateResponse(prompt, userMessage, provider, apiKey, model) {
