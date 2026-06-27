@@ -689,10 +689,17 @@ class ChatbotService {
         // ── Fase de confirmación ─────────────────────────────────────────────
         if (collectedSoFar.__awaiting_confirmation) {
           const CONFIRM_WORDS = ['si', 'sí', 'yes', 'correcto', 'confirmar', 'confirmo', 'ok', 'listo', 'exacto'];
+          const CANCEL_CONFIRM = ['no', 'cancelar', 'cancel', 'empezar de nuevo', 'reiniciar'];
           const bodyLow = body.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-          const confirmed = CONFIRM_WORDS.some(w => bodyLow === w || bodyLow.startsWith(w + ' '));
+          // Acepta: "sí", "sí,", "sí.", "sí todo bien", "ok!", etc.
+          const confirmed = CONFIRM_WORDS.some(w => bodyLow === w || bodyLow.startsWith(w + ' ') || bodyLow.startsWith(w + ',') || bodyLow.startsWith(w + '.') || bodyLow.startsWith(w + '!'));
+          const cancelled = CANCEL_CONFIRM.some(w => bodyLow === w || bodyLow.startsWith(w + ' ') || bodyLow.startsWith(w + ','));
 
-          if (!confirmed) {
+          if (cancelled || (!confirmed && !cancelled)) {
+            // Si es ambiguo o negativo, pedir que confirme de nuevo en lugar de cancelar
+            if (!cancelled) {
+              return { handled: true, reply: 'Por favor responde *sí* para confirmar y generar el documento, o *cancelar* para salir.' };
+            }
             await activeReq.update({ status: 'rejected' });
             return { handled: true, reply: 'Solicitud cancelada. Si deseas volver a intentarlo, escríbeme cuando gustes.' };
           }
