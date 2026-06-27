@@ -19,6 +19,21 @@ fs.mkdirSync(MEDIA_DIR,   { recursive: true })
 let _io = null
 const setSocketIO = (io) => { _io = io }
 
+// Caché en memoria para no hacer DB por cada mensaje
+const _sessionCompanyCache = {}
+
+async function resolveSessionCompanyId(sessionId) {
+  if (_sessionCompanyCache[sessionId] !== undefined) return _sessionCompanyCache[sessionId]
+  if (!sessionId?.startsWith('business_')) { _sessionCompanyCache[sessionId] = null; return null }
+  const userId = sessionId.replace('business_', '')
+  try {
+    const { User } = require('../models')
+    const user = await User.findByPk(userId, { attributes: ['company_id'] })
+    _sessionCompanyCache[sessionId] = user?.company_id || null
+  } catch (_) { _sessionCompanyCache[sessionId] = null }
+  return _sessionCompanyCache[sessionId]
+}
+
 // Mapa LID→JID autoritativo: { sessionId: { 'X@lid': 'Y@s.whatsapp.net' } }
 // Se construye SOLO desde contacts.set / contacts.upsert / messaging-history.set
 const lidToJid = {}
@@ -148,9 +163,10 @@ async function syncChat(sessionId, chat, sessionType = 'personal', sock = null) 
   if (jid.endsWith('@g.us')) return
   if (jid.endsWith('@lid'))  return
 
-  const name    = resolveContactName(chat, jid, sock)
-  const ts      = toUnixTs(chat.conversationTimestamp)
-  const lastMsg = extractLastMsgBody(chat)
+  const name      = resolveContactName(chat, jid, sock)
+  const ts        = toUnixTs(chat.conversationTimestamp)
+  const lastMsg   = extractLastMsgBody(chat)
+  const companyId = await resolveSessionCompanyId(sessionId)
 
   try {
     const [record, created] = await WhatsappChat.findOrCreate({
@@ -162,7 +178,8 @@ async function syncChat(sessionId, chat, sessionType = 'personal', sock = null) 
         contact_name:    name,
         last_message:    lastMsg,
         last_message_at: ts,
-        unread_count:    chat.unreadCount || 0
+        unread_count:    chat.unreadCount || 0,
+        company_id:      companyId
       }
     })
     if (!created) {
@@ -173,6 +190,7 @@ async function syncChat(sessionId, chat, sessionType = 'personal', sock = null) 
       if (chat.unreadCount !== undefined && chat.unreadCount !== record.unread_count) {
         updates.unread_count = chat.unreadCount
       }
+      if (companyId && !record.company_id)       updates.company_id = companyId
       if (Object.keys(updates).length > 0) await record.update(updates)
     }
   } catch (_) {}
@@ -210,13 +228,15 @@ async function saveHistoryMessage(sessionId, sessionType, msg) {
     })
 
     // Actualizar metadata del chat si este mensaje es más reciente
+    const companyId2 = await resolveSessionCompanyId(sessionId)
     const [chatRecord] = await WhatsappChat.findOrCreate({
       where:    { session_id: sessionId, jid },
-      defaults: { session_id: sessionId, jid, contact_name: pushName, session_type: sessionType, last_message_at: timestamp, last_message: body }
+      defaults: { session_id: sessionId, jid, contact_name: pushName, session_type: sessionType, last_message_at: timestamp, last_message: body, company_id: companyId2 }
     })
-    if (timestamp > (chatRecord.last_message_at || 0)) {
-      await chatRecord.update({ last_message: body, last_message_at: timestamp, contact_name: chatRecord.contact_name || pushName })
-    }
+    const histUpdates = {}
+    if (timestamp > (chatRecord.last_message_at || 0)) { histUpdates.last_message = body; histUpdates.last_message_at = timestamp; histUpdates.contact_name = chatRecord.contact_name || pushName }
+    if (companyId2 && !chatRecord.company_id) histUpdates.company_id = companyId2
+    if (Object.keys(histUpdates).length > 0) await chatRecord.update(histUpdates)
   } catch (e) {
     logger.warn(`⚠️  saveHistoryMessage error [${sessionId}]: ${e.message}`)
   }
@@ -398,17 +418,20 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
   } catch (_) {}
 
   try {
+    const companyId = await resolveSessionCompanyId(sessionId)
     const [chatRecord] = await WhatsappChat.findOrCreate({
       where:    { session_id: sessionId, jid },
-      defaults: { session_id: sessionId, jid, contact_name: pushName, session_type: sessionType }
+      defaults: { session_id: sessionId, jid, contact_name: pushName, session_type: sessionType, company_id: companyId }
     })
     const nameToKeep = chatRecord.contact_name || pushName || ''
-    await chatRecord.update({
+    const liveUpdate = {
       contact_name:    nameToKeep,
       last_message:    body,
       last_message_at: timestamp,
       unread_count:    fromMe ? 0 : (chatRecord.unread_count || 0) + 1
-    })
+    }
+    if (companyId && !chatRecord.company_id) liveUpdate.company_id = companyId
+    await chatRecord.update(liveUpdate)
 
     const isOldMessage = (Date.now() / 1000 - timestamp) > 86400
     const botEnabled = chatRecord.bot_enabled === true || chatRecord.bot_enabled === 1

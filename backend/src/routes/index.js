@@ -398,7 +398,7 @@ router.post('/bot-catalogs', auth, companyScope, requireRole('admin'), requireFe
     if (!nombre?.trim())        return res.status(400).json({ success: false, message: 'El nombre es obligatorio' });
     if (!identificador?.trim()) return res.status(400).json({ success: false, message: 'El identificador es obligatorio' });
     const slug       = identificador.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-    const company_id = req.user?.role === 'superadmin' ? null : req.user?.company_id;
+    const company_id = req.companyFilter?.company_id || req.user?.company_id || null;
     const catalog = await BotCatalog.create({
       nombre: nombre.trim(),
       identificador: slug,
@@ -547,7 +547,7 @@ router.post('/labels', auth, requireRole('admin'), requireFeature('labels'), com
       nombre:      nombre.trim(),
       descripcion: descripcion?.trim() || null,
       color:       color || '#6366f1',
-      company_id:  req.user.role === 'superadmin' ? null : req.user.company_id,
+      company_id:  req.companyFilter?.company_id || req.user?.company_id || null,
       updated_by:  req.user?.name || req.user?.email || 'Sistema'
     });
     res.json({ success: true, data: label });
