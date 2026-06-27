@@ -125,6 +125,8 @@ const migrate = async () => {
       { table: 'users', col: 'availability', def: { type: DT.STRING(20), allowNull: false, defaultValue: 'active' } },
       // Blocked IPs for widget spam
       { table: 'company',       col: 'blocked_ips',            def: { type: DT.JSONB,       allowNull: true, defaultValue: [] } },
+      // Dispositivos de confianza para OTP (15 días sin pedir código)
+      { table: 'users', col: 'trusted_devices', def: { type: DT.JSONB, allowNull: true, defaultValue: [] } },
     ];
     for (const { table, col, def } of preCols) {
       await safeAdd(table, col, def);
