@@ -466,8 +466,25 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
       }
     }
 
-    logger.info(`🤖 Bot check [${jid}]: fromMe=${fromMe} type=${contentType} botEnabled=${botEnabled} isOld=${isOldMessage} realtime=${isRealtime}`)
-    if (!fromMe && (contentType === 'text' || transcribedText) && body.trim() && botEnabled && !isOldMessage && isRealtime) {
+    // Verificar que el BotConfig global de la empresa esté activo
+    let globalBotActive = true
+    if (botEnabled && chatRecord.company_id) {
+      try {
+        const { BotConfig } = require('../models')
+        const { Op } = require('sequelize')
+        const cfg = await BotConfig.findOne({
+          where: { company_id: chatRecord.company_id, channel: { [Op.in]: ['whatsapp', 'all'] } },
+          order: [['updated_at', 'DESC']]
+        })
+        if (cfg && !cfg.is_active) {
+          globalBotActive = false
+          logger.info(`🤖 Bot global desactivado para company ${chatRecord.company_id} — omitiendo respuesta`)
+        }
+      } catch (_) {}
+    }
+
+    logger.info(`🤖 Bot check [${jid}]: fromMe=${fromMe} type=${contentType} botEnabled=${botEnabled} globalActive=${globalBotActive} isOld=${isOldMessage} realtime=${isRealtime}`)
+    if (!fromMe && (contentType === 'text' || transcribedText) && body.trim() && botEnabled && globalBotActive && !isOldMessage && isRealtime) {
       try {
         const chatbotService = require('./chatbotService')
 
