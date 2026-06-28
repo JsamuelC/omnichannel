@@ -854,9 +854,9 @@ async function createSession(sessionId, sessionType = 'personal') {
       // fetchStatus('@all') eliminado — causa bloqueo de 60+ segundos innecesariamente.
       // Los nombres de contactos llegan via contacts.set / contacts.upsert / messaging-history.
 
-      // ── Keep-alive: verificar WebSocket cada 5 min ──────────────────────────
-      // Usa readyState del WS (sin llamadas API) → no genera tráfico innecesario.
-      // Si el WS está cerrado pero el session map dice 'connected' → reconectar.
+      // ── Keep-alive: Baileys maneja reconexión internamente; solo detectamos zombie ──
+      // Un socket zombie es uno donde status='connected' pero WS lleva CERRADO (state 2/3).
+      // state=undefined significa que Baileys usa otro transporte → ignorar, no es fallo.
       if (sessions[sessionId]) sessions[sessionId].reconnectAttempts = 0  // reset en conexión exitosa
       let keepAliveFails = 0
       const keepAliveTimer = setInterval(() => {
@@ -865,12 +865,13 @@ async function createSession(sessionId, sessionType = 'personal') {
           return
         }
         if (sessions[sessionId].status !== 'connected') return
-        const wsState = sock.ws?.readyState  // 1 = OPEN, 0 = CONNECTING, 2/3 = CLOSING/CLOSED
-        if (wsState === 1) {
-          keepAliveFails = 0
-        } else {
+        // sock.ws puede ser un objeto Baileys propio — readyState solo existe en WS nativo
+        const wsState = sock.ws?.readyState
+        // Solo fallar si el WS está EXPLÍCITAMENTE cerrado (2=CLOSING, 3=CLOSED)
+        // undefined o 0 (CONNECTING) no son fallos — Baileys puede estar reconectando
+        if (wsState === 2 || wsState === 3) {
           keepAliveFails++
-          logger.warn(`💓 [${sessionId}] WS no está OPEN (state=${wsState}) — fallo ${keepAliveFails}/3`)
+          logger.warn(`💓 [${sessionId}] WS cerrado (state=${wsState}) — fallo ${keepAliveFails}/3`)
           if (keepAliveFails >= 3) {
             logger.warn(`💀 [${sessionId}] Conexión zombie detectada — forzando reconexión`)
             clearInterval(keepAliveTimer)
@@ -878,6 +879,8 @@ async function createSession(sessionId, sessionType = 'personal') {
             _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'disconnected', sessionType })
             try { sock.end(undefined) } catch (_) {}
           }
+        } else {
+          if (keepAliveFails > 0) keepAliveFails = 0  // reset si vuelve a estar OK
         }
       }, 5 * 60 * 1000) // cada 5 minutos
     }
@@ -893,9 +896,10 @@ async function createSession(sessionId, sessionType = 'personal') {
 
       // ── Clasificar el código de desconexión ────────────────────────────────
       const FATAL_CODES = [
-        DisconnectReason.loggedOut,   // 401 — sesión cerrada por el usuario en el teléfono
-        DisconnectReason.badSession,  // 500 — credenciales corruptas
-        DisconnectReason.multideviceMismatch, // 411 — cuenta no tiene multi-device
+        DisconnectReason.loggedOut,           // 401 — sesión cerrada por el usuario en el teléfono
+        DisconnectReason.multideviceMismatch, // 411 — cuenta no tiene multi-device habilitado
+        // 500 (badSession) NO es fatal — puede ser error transitorio del servidor de WA
+        // Solo reconectar, no borrar credenciales
       ]
       // 440 = connectionReplaced → otro cliente WA Web abierto, reconectamos para tomar el turno de vuelta
       const isFatal  = FATAL_CODES.includes(code)
