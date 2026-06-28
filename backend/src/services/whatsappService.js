@@ -981,9 +981,15 @@ async function createSession(sessionId, sessionType = 'personal') {
 
     logger.info(`📋 messaging-history [batch ${batchNum}]: chats=${chats?.length || 0} contacts=${contacts?.length || 0} msgs=${messages?.length || 0} para ${sessionId}`)
 
-    // Batches 5+: ignorar — los primeros 4 cubren la última semana aprox.
-    if (batchNum > 4) {
-      logger.info(`⏭️  [${sessionId}] Batch ${batchNum}: ignorado — solo procesar primeros 4 batches`)
+    // Batches vacíos: ignorar (WA a veces envía batches de relleno sin datos)
+    const hasData = (chats?.length || 0) + (messages?.length || 0) > 0
+    if (!hasData) {
+      logger.info(`⏭️  [${sessionId}] Batch ${batchNum}: vacío — ignorado`)
+      return
+    }
+    // Batch 15+: corte de seguridad para no procesar historial muy antiguo
+    if (batchNum > 15) {
+      logger.info(`⏭️  [${sessionId}] Batch ${batchNum}: límite de seguridad alcanzado`)
       return
     }
 
