@@ -396,7 +396,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
     : {}
 
   try {
-    await WhatsappMessage.findOrCreate({
+    const [msgRecord, msgCreated] = await WhatsappMessage.findOrCreate({
       where:    { external_id: extId },
       defaults: {
         session_id:   sessionId,
@@ -410,6 +410,13 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
         metadata
       }
     })
+    // Si el mensaje ya existía pre-guardado bajo otro JID (caso eco @lid de mensaje fromMe),
+    // usar el JID real del registro existente para no crear un chat duplicado con @lid
+    if (!msgCreated && msgRecord.jid && msgRecord.jid !== jid) {
+      logger.info(`🔄 [${sessionId}] eco @lid corregido: ${jid} → ${msgRecord.jid} (pre-guardado)`)
+      jid = msgRecord.jid
+      origLid = origLid || (jid !== msgRecord.jid ? jid : null)
+    }
     const { Op } = require('sequelize')
     const cutoff = await WhatsappMessage.findOne({
       where:  { session_id: sessionId, jid },
