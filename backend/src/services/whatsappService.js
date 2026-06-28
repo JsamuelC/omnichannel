@@ -317,30 +317,21 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
   if (jid.includes('@broadcast'))  { logger.info(`🚫 [${sessionId}] filtrado: @broadcast ${jid}`); return }
 
   // ── Manejo @lid: resolver al JID real ──────────────────────
+  // Si contacts.set/upsert dio el mapeo autoritativo → usarlo.
+  // Si NO hay mapeo → mantener el @lid como JID (Baileys tiene la sesión Signal
+  // para ese LID y puede entregar mensajes aunque no conozcamos el número).
+  // NUNCA inventar un número de teléfono a partir del prefijo del @lid.
   let origLid = null
   if (jid.endsWith('@lid')) {
     origLid = jid
-    // 1. Intentar resolver por mapa en memoria (contacts.set)
     const resolvedJid = resolveLidJid(msg, sock, sessionId)
     if (resolvedJid && !resolvedJid.endsWith('@lid')) {
-      logger.info(`🔄 [${sessionId}] @lid resuelto (memoria): ${origLid} → ${resolvedJid}`)
+      logger.info(`🔄 [${sessionId}] @lid resuelto: ${origLid} → ${resolvedJid}`)
       jid = resolvedJid
       msg.key.remoteJid = resolvedJid
     } else {
-      // 2. Intentar resolver por columna lid en BD (persiste entre reinicios)
-      try {
-        const { WhatsappChat: WC } = require('../models')
-        const realChat = await WC.findOne({ where: { session_id: sessionId, lid: origLid } })
-        if (realChat && !realChat.jid.endsWith('@lid')) {
-          logger.info(`🔄 [${sessionId}] @lid resuelto (BD): ${origLid} → ${realChat.jid}`)
-          jid = realChat.jid
-          msg.key.remoteJid = realChat.jid
-          if (!lidToJid[sessionId]) lidToJid[sessionId] = {}
-          lidToJid[sessionId][origLid] = realChat.jid
-        } else {
-          logger.info(`🆔 [${sessionId}] @lid sin mapeo — usando @lid: ${jid}`)
-        }
-      } catch (_) {}
+      // Sin mapeo: usar el @lid tal cual — Baileys lo entrega internamente
+      logger.info(`🆔 [${sessionId}] @lid sin mapeo autoritativo — usando @lid directo: ${jid}`)
     }
   }
 
@@ -405,7 +396,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
     : {}
 
   try {
-    const [msgRecord, msgCreated] = await WhatsappMessage.findOrCreate({
+    await WhatsappMessage.findOrCreate({
       where:    { external_id: extId },
       defaults: {
         session_id:   sessionId,
@@ -419,17 +410,6 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
         metadata
       }
     })
-    // Si el mensaje ya existía pre-guardado bajo otro JID (eco @lid de fromMe),
-    // usar el JID real del registro existente
-    if (!msgCreated && msgRecord.jid && msgRecord.jid !== jid) {
-      logger.info(`🔄 [${sessionId}] eco @lid corregido: ${jid} → ${msgRecord.jid} (pre-guardado)`)
-      origLid = origLid || jid
-      jid = msgRecord.jid
-    }
-    // Si el mensaje fue creado con @lid pero ya resolvimos el JID real, corregir el jid en BD
-    if (msgCreated && msgRecord.jid !== jid) {
-      await WhatsappMessage.update({ jid }, { where: { id: msgRecord.id } }).catch(() => {})
-    }
     const { Op } = require('sequelize')
     const cutoff = await WhatsappMessage.findOne({
       where:  { session_id: sessionId, jid },
@@ -446,35 +426,12 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
 
   try {
     const companyId = await resolveSessionCompanyId(sessionId)
-
-    // Si el JID es @lid, intentar encontrar el chat real en BD por la columna lid
-    if (jid.endsWith('@lid')) {
-      try {
-        const realChat = await WhatsappChat.findOne({ where: { session_id: sessionId, lid: jid } })
-        if (realChat && !realChat.jid.endsWith('@lid')) {
-          logger.info(`🔍 [${sessionId}] @lid resuelto por BD: ${jid} → ${realChat.jid}`)
-          jid = realChat.jid
-          msg.key.remoteJid = realChat.jid
-          // Actualizar mapa en memoria para futuras resoluciones
-          if (!lidToJid[sessionId]) lidToJid[sessionId] = {}
-          lidToJid[sessionId][origLid || jid] = realChat.jid
-        }
-      } catch (_) {}
-    }
-
     // contact_name siempre es el nombre del contacto (destinatario), nunca el del remitente
-    const contactName = fromMe ? '' : (pushName || '')
+    const contactName = fromMe ? (chatRecord?.contact_name || '') : (pushName || chatRecord?.contact_name || '')
     const [chatRecord] = await WhatsappChat.findOrCreate({
       where:    { session_id: sessionId, jid },
       defaults: { session_id: sessionId, jid, contact_name: contactName, session_type: sessionType, company_id: companyId }
     })
-
-    // Si este chat tiene un @lid que no habíamos mapeado, guardar la columna lid
-    if (origLid && !jid.endsWith('@lid') && !chatRecord.lid) {
-      await chatRecord.update({ lid: origLid }).catch(() => {})
-      if (!lidToJid[sessionId]) lidToJid[sessionId] = {}
-      lidToJid[sessionId][origLid] = jid
-    }
     const nameToKeep = chatRecord.contact_name || (!fromMe ? pushName : '') || ''
     const liveUpdate = {
       last_message:    body,
@@ -1025,28 +982,25 @@ async function createSession(sessionId, sessionType = 'personal') {
             const realChat = await WhatsappChat.findOne({ where: { session_id: sessionId, jid } })
             if (lidChat) {
               if (!realChat) {
-                // No existe el real aún: renombrar el @lid al JID real y guardar columna lid
-                await lidChat.update({ jid, lid })
+                // No existe el real aún: simplemente renombrar el @lid al JID real
+                await lidChat.update({ jid })
                 await WhatsappMessage.update({ jid }, { where: { session_id: sessionId, jid: lid } })
                 logger.info(`🔀 [${sessionId}] Chat @lid renombrado: ${lid} → ${jid}`)
               } else {
                 // Existen ambos: mover mensajes del @lid al real y eliminar el duplicado
                 await WhatsappMessage.update({ jid }, { where: { session_id: sessionId, jid: lid } })
                 // Actualizar last_message del real si el @lid era más reciente
-                const upd = { lid }
                 if ((lidChat.last_message_at || 0) > (realChat.last_message_at || 0)) {
-                  upd.last_message    = lidChat.last_message
-                  upd.last_message_at = lidChat.last_message_at
-                  upd.unread_count    = (realChat.unread_count || 0) + (lidChat.unread_count || 0)
-                  upd.contact_name    = realChat.contact_name || lidChat.contact_name || name
+                  await realChat.update({
+                    last_message:    lidChat.last_message,
+                    last_message_at: lidChat.last_message_at,
+                    unread_count:    (realChat.unread_count || 0) + (lidChat.unread_count || 0),
+                    contact_name:    realChat.contact_name || lidChat.contact_name || name
+                  })
                 }
-                await realChat.update(upd)
                 await lidChat.destroy()
                 logger.info(`🔀 [${sessionId}] Chats unificados: ${lid} → ${jid} (mensajes migrados, @lid eliminado)`)
               }
-            } else if (realChat && !realChat.lid) {
-              // El chat real existe pero no tiene lid — persistir el mapeo
-              await realChat.update({ lid }).catch(() => {})
             }
           } catch (mergeErr) {
             logger.warn(`⚠️  [${sessionId}] Error unificando @lid ${lid}: ${mergeErr.message}`)
