@@ -222,19 +222,26 @@ async function saveHistoryMessage(sessionId, sessionType, msg) {
     else if (innerMessage.stickerMessage)      { body = '[Sticker]'; contentType = 'image' }
     else return // tipo desconocido, ignorar
 
+    // contact_name es siempre del contacto, no del remitente (fromMe)
+    const histContactName = fromMe ? '' : pushName
     await WhatsappMessage.findOrCreate({
       where:    { external_id: extId },
-      defaults: { session_id: sessionId, jid, contact_name: pushName, body, from_me: fromMe, timestamp, external_id: extId, content_type: contentType, metadata: {} }
+      defaults: { session_id: sessionId, jid, contact_name: histContactName, body, from_me: fromMe, timestamp, external_id: extId, content_type: contentType, metadata: {} }
     })
 
     // Actualizar metadata del chat si este mensaje es más reciente
     const companyId2 = await resolveSessionCompanyId(sessionId)
     const [chatRecord] = await WhatsappChat.findOrCreate({
       where:    { session_id: sessionId, jid },
-      defaults: { session_id: sessionId, jid, contact_name: pushName, session_type: sessionType, last_message_at: timestamp, last_message: body, company_id: companyId2 }
+      defaults: { session_id: sessionId, jid, contact_name: histContactName, session_type: sessionType, last_message_at: timestamp, last_message: body, company_id: companyId2 }
     })
     const histUpdates = {}
-    if (timestamp > (chatRecord.last_message_at || 0)) { histUpdates.last_message = body; histUpdates.last_message_at = timestamp; histUpdates.contact_name = chatRecord.contact_name || pushName }
+    if (timestamp > (chatRecord.last_message_at || 0)) {
+      histUpdates.last_message = body
+      histUpdates.last_message_at = timestamp
+      // Solo actualizar nombre si el mensaje es del contacto y trae nombre
+      if (!fromMe && pushName) histUpdates.contact_name = chatRecord.contact_name || pushName
+    }
     if (companyId2 && !chatRecord.company_id) histUpdates.company_id = companyId2
     if (Object.keys(histUpdates).length > 0) await chatRecord.update(histUpdates)
   } catch (e) {
@@ -419,17 +426,20 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
 
   try {
     const companyId = await resolveSessionCompanyId(sessionId)
+    // contact_name siempre es el nombre del contacto (destinatario), nunca el del remitente
+    const contactName = fromMe ? (chatRecord?.contact_name || '') : (pushName || chatRecord?.contact_name || '')
     const [chatRecord] = await WhatsappChat.findOrCreate({
       where:    { session_id: sessionId, jid },
-      defaults: { session_id: sessionId, jid, contact_name: pushName, session_type: sessionType, company_id: companyId }
+      defaults: { session_id: sessionId, jid, contact_name: contactName, session_type: sessionType, company_id: companyId }
     })
-    const nameToKeep = chatRecord.contact_name || pushName || ''
+    const nameToKeep = chatRecord.contact_name || (!fromMe ? pushName : '') || ''
     const liveUpdate = {
-      contact_name:    nameToKeep,
       last_message:    body,
       last_message_at: timestamp,
       unread_count:    fromMe ? 0 : (chatRecord.unread_count || 0) + 1
     }
+    // Solo actualizar nombre si el mensaje es del contacto (no fromMe) y trae un nombre nuevo
+    if (!fromMe && pushName && pushName !== chatRecord.contact_name) liveUpdate.contact_name = pushName
     if (companyId && !chatRecord.company_id) liveUpdate.company_id = companyId
     await chatRecord.update(liveUpdate)
 
