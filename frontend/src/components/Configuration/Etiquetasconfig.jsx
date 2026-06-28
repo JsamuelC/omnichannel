@@ -110,13 +110,13 @@ const LabelModal = ({ label, onSave, onClose }) => {
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="w-full max-w-md rounded-2xl overflow-hidden"
-           style={{ background: '#fff', border: '0.5px solid #e2e8f0',
+           style={{ background: 'var(--db-card-bg)', border: '0.5px solid var(--db-card-border)',
                     boxShadow: '0 20px 60px rgba(15,23,42,0.15)' }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4"
-             style={{ borderBottom: '0.5px solid #e2e8f0' }}>
-          <div className="flex items-center gap-2" style={{ color: '#0f172a' }}>
+             style={{ borderBottom: '0.5px solid var(--db-card-border)' }}>
+          <div className="flex items-center gap-2" style={{ color: 'var(--db-text-strong)' }}>
             <TagIcon />
             <h3 className="text-sm font-semibold">
               {label ? 'Editar etiqueta' : 'Nueva etiqueta'}
@@ -124,9 +124,9 @@ const LabelModal = ({ label, onSave, onClose }) => {
           </div>
           <button onClick={onClose}
             className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
-            style={{ color: '#94a3b8', border: '0.5px solid #e2e8f0' }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f172a'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}>
+            style={{ color: 'var(--db-text-muted)', border: '0.5px solid var(--db-card-border)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--db-bg)'; e.currentTarget.style.color = 'var(--db-text-strong)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--db-text-muted)'; }}>
             <CloseIcon />
           </button>
         </div>
@@ -134,8 +134,8 @@ const LabelModal = ({ label, onSave, onClose }) => {
         <div className="px-6 py-5 flex flex-col gap-5">
 
           {/* Preview */}
-          <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: '#f8fafc' }}>
-            <span className="text-xs" style={{ color: '#94a3b8' }}>Vista previa:</span>
+          <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--db-bg)' }}>
+            <span className="text-xs" style={{ color: 'var(--db-text-muted)' }}>Vista previa:</span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-white"
                   style={{ background: color }}>
               {nombre || 'Etiqueta'}
@@ -144,7 +144,7 @@ const LabelModal = ({ label, onSave, onClose }) => {
 
           {/* Nombre */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium" style={{ color: '#64748b' }}>Nombre *</label>
+            <label className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>Nombre *</label>
             <input
               ref={inputRef}
               value={nombre}
@@ -152,17 +152,17 @@ const LabelModal = ({ label, onSave, onClose }) => {
               placeholder="Ej: Urgente, Soporte, VIP..."
               maxLength={40}
               className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all"
-              style={{ background: '#f8fafc', border: `0.5px solid ${err ? '#ef4444' : '#e2e8f0'}`, color: '#0f172a' }}
-              onFocus={e => { e.target.style.borderColor = '#6366f1'; e.target.style.background = '#fff'; }}
-              onBlur={e => { e.target.style.borderColor = err ? '#ef4444' : '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
+              style={{ background: 'var(--ts-input-bg)', border: `0.5px solid ${err ? '#ef4444' : 'var(--ts-input-border)'}`, color: 'var(--db-text-strong)' }}
+              onFocus={e => { e.target.style.borderColor = '#6366f1'; }}
+              onBlur={e => { e.target.style.borderColor = err ? '#ef4444' : 'var(--ts-input-border)'; }}
             />
             {err && <p className="text-xs" style={{ color: '#ef4444' }}>{err}</p>}
           </div>
 
           {/* Descripción */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium" style={{ color: '#64748b' }}>
-              Descripción <span style={{ color: '#cbd5e1' }}>(opcional)</span>
+            <label className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>
+              Descripción <span style={{ color: 'var(--db-text-muted)' }}>(opcional)</span>
             </label>
             <input
               value={desc}
@@ -170,15 +170,15 @@ const LabelModal = ({ label, onSave, onClose }) => {
               placeholder="Para qué se usa esta etiqueta..."
               maxLength={100}
               className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all"
-              style={{ background: '#f8fafc', border: '0.5px solid #e2e8f0', color: '#0f172a' }}
-              onFocus={e => { e.target.style.borderColor = '#6366f1'; e.target.style.background = '#fff'; }}
-              onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
+              style={{ background: 'var(--ts-input-bg)', border: '0.5px solid var(--ts-input-border)', color: 'var(--db-text-strong)' }}
+              onFocus={e => { e.target.style.borderColor = '#6366f1'; }}
+              onBlur={e => { e.target.style.borderColor = 'var(--ts-input-border)'; }}
             />
           </div>
 
           {/* Color */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-medium" style={{ color: '#64748b' }}>Color</label>
+            <label className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>Color</label>
             <div className="flex flex-wrap gap-2">
               {COLORS.map(c => (
                 <button
@@ -199,11 +199,11 @@ const LabelModal = ({ label, onSave, onClose }) => {
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4"
-             style={{ borderTop: '0.5px solid #e2e8f0' }}>
+             style={{ borderTop: '0.5px solid var(--db-card-border)' }}>
           <button onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm transition-colors"
-            style={{ color: '#64748b', border: '0.5px solid #e2e8f0' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+            style={{ color: 'var(--db-text)', border: '0.5px solid var(--db-card-border)' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--db-bg)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
             Cancelar
           </button>
@@ -232,7 +232,7 @@ const ConfirmModal = ({ label, onConfirm, onClose }) => {
          style={{ background: 'rgba(15,23,42,0.35)', backdropFilter: 'blur(4px)' }}
          onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full max-w-sm rounded-2xl overflow-hidden"
-           style={{ background: '#fff', border: '0.5px solid #e2e8f0',
+           style={{ background: 'var(--db-card-bg)', border: '0.5px solid var(--db-card-border)',
                     boxShadow: '0 20px 60px rgba(15,23,42,0.15)' }}>
         <div className="px-6 py-6 flex flex-col items-center gap-4 text-center">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
@@ -240,10 +240,10 @@ const ConfirmModal = ({ label, onConfirm, onClose }) => {
             <TrashIcon />
           </div>
           <div>
-            <h3 className="text-sm font-semibold" style={{ color: '#0f172a' }}>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--db-text-strong)' }}>
               ¿Eliminar etiqueta?
             </h3>
-            <p className="text-sm mt-1" style={{ color: '#64748b' }}>
+            <p className="text-sm mt-1" style={{ color: 'var(--db-text)' }}>
               Se eliminará <strong>"{label.nombre}"</strong> de todas las conversaciones donde esté aplicada.
             </p>
           </div>
@@ -251,8 +251,8 @@ const ConfirmModal = ({ label, onConfirm, onClose }) => {
         <div className="flex gap-3 px-6 pb-6">
           <button onClick={onClose}
             className="flex-1 px-4 py-2 rounded-lg text-sm transition-colors"
-            style={{ border: '0.5px solid #e2e8f0', color: '#64748b' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+            style={{ border: '0.5px solid var(--db-card-border)', color: 'var(--db-text)' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--db-bg)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
             Cancelar
           </button>
@@ -275,10 +275,10 @@ const LabelRow = ({ label, onEdit, onDelete, onToggle }) => {
     <tr
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ background: hovered ? '#f8fafc' : '#fff', transition: 'background 0.1s' }}
+      style={{ background: hovered ? 'var(--db-bg)' : 'var(--db-card-bg)', transition: 'background 0.1s' }}
     >
       {/* Nombre */}
-      <td className="px-6 py-3.5" style={{ borderBottom: '0.5px solid #f1f5f9' }}>
+      <td className="px-6 py-3.5" style={{ borderBottom: '0.5px solid var(--db-row-border)' }}>
         <div className="flex items-center gap-3">
           <span
             className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold text-white"
@@ -287,7 +287,7 @@ const LabelRow = ({ label, onEdit, onDelete, onToggle }) => {
             {label.nombre}
           </span>
           {label.descripcion && (
-            <span className="text-xs truncate max-w-xs" style={{ color: '#94a3b8' }}>
+            <span className="text-xs truncate max-w-xs" style={{ color: 'var(--db-text-muted)' }}>
               {label.descripcion}
             </span>
           )}
@@ -295,29 +295,29 @@ const LabelRow = ({ label, onEdit, onDelete, onToggle }) => {
       </td>
 
       {/* Color */}
-      <td className="px-6 py-3.5" style={{ borderBottom: '0.5px solid #f1f5f9' }}>
+      <td className="px-6 py-3.5" style={{ borderBottom: '0.5px solid var(--db-row-border)' }}>
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 rounded" style={{ background: label.color || '#6366f1' }} />
-          <span className="text-xs font-mono" style={{ color: '#94a3b8' }}>
+          <span className="text-xs font-mono" style={{ color: 'var(--db-text-muted)' }}>
             {label.color || '#6366f1'}
           </span>
         </div>
       </td>
 
       {/* Última actualización */}
-      <td className="px-6 py-3.5" style={{ borderBottom: '0.5px solid #f1f5f9' }}>
+      <td className="px-6 py-3.5" style={{ borderBottom: '0.5px solid var(--db-row-border)' }}>
         <div>
-          <p className="text-xs font-medium" style={{ color: '#334155' }}>
+          <p className="text-xs font-medium" style={{ color: 'var(--db-text)' }}>
             {label.updated_by || '—'}
           </p>
-          <p className="text-xs" style={{ color: '#94a3b8' }}>
+          <p className="text-xs" style={{ color: 'var(--db-text-muted)' }}>
             {formatDate(label.updated_at)}
           </p>
         </div>
       </td>
 
       {/* Acciones */}
-      <td className="px-6 py-3.5" style={{ borderBottom: '0.5px solid #f1f5f9' }}>
+      <td className="px-6 py-3.5" style={{ borderBottom: '0.5px solid var(--db-row-border)' }}>
         <div className="flex items-center justify-end gap-3">
           {/* Editar / Eliminar (solo visible en hover) */}
           <div className="flex items-center gap-1"
@@ -325,19 +325,19 @@ const LabelRow = ({ label, onEdit, onDelete, onToggle }) => {
             <button
               onClick={() => onEdit(label)}
               className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
-              style={{ color: '#94a3b8' }}
+              style={{ color: 'var(--db-text-muted)' }}
               title="Editar"
-              onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#6366f1'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}>
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--db-bg)'; e.currentTarget.style.color = '#6366f1'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--db-text-muted)'; }}>
               <EditIcon />
             </button>
             <button
               onClick={() => onDelete(label)}
               className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
-              style={{ color: '#94a3b8' }}
+              style={{ color: 'var(--db-text-muted)' }}
               title="Eliminar"
               onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.color = '#ef4444'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}>
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--db-text-muted)'; }}>
               <TrashIcon />
             </button>
           </div>
@@ -434,30 +434,30 @@ export default function EtiquetasConfig() {
   );
 
   return (
-    <div className="h-full flex flex-col overflow-hidden"
-         style={{ background: '#ffffff', fontFamily: 'system-ui, sans-serif', color: '#0f172a' }}>
+    <div className="ts-config-panel h-full flex flex-col overflow-hidden"
+         style={{ fontFamily: 'system-ui, sans-serif' }}>
 
       {/* ── Topbar ── */}
       <div className="flex items-center justify-between px-8 py-4 flex-shrink-0"
-           style={{ borderBottom: '0.5px solid #e2e8f0' }}>
+           style={{ borderBottom: '0.5px solid var(--db-card-border)' }}>
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/config')}
             className="flex items-center gap-1.5 text-sm transition-colors"
-            style={{ color: '#94a3b8' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#0f172a'}
-            onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>
+            style={{ color: 'var(--db-text-muted)' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--db-text-strong)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--db-text-muted)'}>
             <BackIcon /> Configuración
           </button>
-          <span style={{ color: '#cbd5e1' }}>›</span>
-          <span className="text-sm font-medium" style={{ color: '#0f172a' }}>Etiquetas</span>
+          <span style={{ color: 'var(--db-text-muted)' }}>›</span>
+          <span className="text-sm font-medium" style={{ color: 'var(--db-text-strong)' }}>Etiquetas</span>
         </div>
         <button
           onClick={() => navigate(-1)}
           className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
-          style={{ border: '0.5px solid #e2e8f0', color: '#94a3b8' }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f172a'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}>
+          style={{ border: '0.5px solid var(--db-card-border)', color: 'var(--db-text-muted)' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--db-bg)'; e.currentTarget.style.color = 'var(--db-text-strong)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--db-text-muted)'; }}>
           <CloseIcon />
         </button>
       </div>
@@ -480,29 +480,29 @@ export default function EtiquetasConfig() {
 
       {/* ── Toolbar ── */}
       <div className="flex items-center gap-3 px-8 py-4 flex-shrink-0"
-           style={{ borderBottom: '0.5px solid #e2e8f0' }}>
+           style={{ borderBottom: '0.5px solid var(--db-card-border)' }}>
         {/* Count + info */}
         <div className="flex items-center gap-1.5 mr-1">
-          <span className="text-sm font-semibold" style={{ color: '#0f172a' }}>
+          <span className="text-sm font-semibold" style={{ color: 'var(--db-text-strong)' }}>
             Etiquetas
           </span>
           <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{ background: '#f1f5f9', color: '#64748b' }}>
+                style={{ background: 'var(--db-bg)', color: 'var(--db-text)' }}>
             {filtered.length}
           </span>
-          <button className="ml-0.5" style={{ color: '#cbd5e1' }} title="Las etiquetas se aplican a conversaciones para organizarlas.">
+          <button className="ml-0.5" style={{ color: 'var(--db-text-muted)' }} title="Las etiquetas se aplican a conversaciones para organizarlas.">
             <InfoIcon />
           </button>
         </div>
 
-        <div className="w-px h-5" style={{ background: '#e2e8f0' }} />
+        <div className="w-px h-5" style={{ background: 'var(--db-card-border)' }} />
 
         {/* Filter dropdown */}
         <div className="relative">
           <button
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
-            style={{ border: '0.5px solid #e2e8f0', color: '#334155' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+            style={{ border: '0.5px solid var(--db-card-border)', color: 'var(--db-text)' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--db-bg)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
             {filter}
             <ChevronDown />
@@ -511,7 +511,7 @@ export default function EtiquetasConfig() {
 
         {/* Search */}
         <div className="relative flex-1 max-w-xs">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#94a3b8' }}>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--db-text-muted)' }}>
             <SearchIcon />
           </span>
           <input
@@ -519,9 +519,9 @@ export default function EtiquetasConfig() {
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar..."
             className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none transition-all"
-            style={{ background: '#f8fafc', border: '0.5px solid #e2e8f0', color: '#0f172a' }}
-            onFocus={e => { e.target.style.borderColor = '#6366f1'; e.target.style.background = '#fff'; }}
-            onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
+            style={{ background: 'var(--ts-input-bg)', border: '0.5px solid var(--ts-input-border)', color: 'var(--db-text-strong)' }}
+            onFocus={e => { e.target.style.borderColor = '#6366f1'; }}
+            onBlur={e => { e.target.style.borderColor = 'var(--ts-input-border)'; }}
           />
         </div>
 
@@ -542,7 +542,7 @@ export default function EtiquetasConfig() {
       {/* ── Body / Tabla ── */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center h-48 gap-3" style={{ color: '#94a3b8' }}>
+          <div className="flex items-center justify-center h-48 gap-3" style={{ color: 'var(--db-text-muted)' }}>
             <SpinnerIcon />
             <span className="text-sm">Cargando etiquetas...</span>
           </div>
@@ -551,17 +551,17 @@ export default function EtiquetasConfig() {
             <p className="text-sm" style={{ color: '#dc2626' }}>{error}</p>
             <button onClick={fetchLabels}
               className="text-xs px-4 py-2 rounded-lg"
-              style={{ background: '#f1f5f9', color: '#64748b', border: '0.5px solid #e2e8f0' }}>
+              style={{ background: 'var(--db-bg)', color: 'var(--db-text)', border: '0.5px solid var(--db-card-border)' }}>
               Reintentar
             </button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-3">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                 style={{ background: '#f1f5f9', color: '#cbd5e1' }}>
+                 style={{ background: 'var(--db-bg)', color: 'var(--db-text-muted)' }}>
               <TagIcon />
             </div>
-            <p className="text-sm" style={{ color: '#94a3b8' }}>
+            <p className="text-sm" style={{ color: 'var(--db-text-muted)' }}>
               {search ? 'Sin resultados para tu búsqueda.' : 'Aún no hay etiquetas. ¡Crea la primera!'}
             </p>
             {!search && (
@@ -575,11 +575,11 @@ export default function EtiquetasConfig() {
         ) : (
           <table className="w-full border-collapse">
             <thead>
-              <tr style={{ background: '#f8fafc' }}>
+              <tr style={{ background: 'var(--db-bg)' }}>
                 {['Etiquetas', 'Color', 'Última actualización', ''].map((h, i) => (
                   <th key={i}
                     className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider"
-                    style={{ color: '#94a3b8', borderBottom: '0.5px solid #e2e8f0',
+                    style={{ color: 'var(--db-text-muted)', borderBottom: '0.5px solid var(--db-card-border)',
                              width: i === 3 ? '140px' : 'auto' }}>
                     {h}
                   </th>

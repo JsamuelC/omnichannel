@@ -73,18 +73,19 @@ function Modal({ open, onClose, onSave, initial, saving }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden"
+        className="rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden"
+        style={{ background: 'var(--db-card-bg)' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '0.5px solid var(--db-card-border)' }}>
           <div className="flex items-center gap-2">
             <Zap size={16} className="text-indigo-500" />
-            <span className="text-sm font-semibold text-slate-800">
+            <span className="text-sm font-semibold" style={{ color: 'var(--db-text-strong)' }}>
               {initial?.id ? 'Editar mensaje rápido' : 'Nuevo mensaje rápido'}
             </span>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--db-text-muted)' }}>
             <X size={15} />
           </button>
         </div>
@@ -93,58 +94,58 @@ function Modal({ open, onClose, onSave, initial, saving }) {
         <form onSubmit={handleSubmit} className="px-6 py-5 flex flex-col gap-4 overflow-y-auto max-h-[70vh]">
           {/* Título */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-slate-500">Título <span className="text-red-400">*</span></label>
+            <label className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>Título <span className="text-red-400">*</span></label>
             <input
               ref={titleRef}
               value={form.title}
               onChange={e => set('title', e.target.value)}
               placeholder="Ej: Saludo inicial"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+              className="ts-config-input w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 transition-colors"
             />
           </div>
 
           {/* Atajo (opcional) */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-slate-500">
-              Atajo <span className="text-slate-400 font-normal">(opcional, ej: /saludo)</span>
+            <label className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>
+              Atajo <span className="font-normal" style={{ color: 'var(--db-text-muted)' }}>(opcional, ej: /saludo)</span>
             </label>
             <input
               value={form.shortcut}
               onChange={e => set('shortcut', e.target.value)}
               placeholder="/atajo"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+              className="ts-config-input w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 transition-colors"
             />
           </div>
 
           {/* Contenido */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-slate-500">Contenido <span className="text-red-400">*</span></label>
+            <label className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>Contenido <span className="text-red-400">*</span></label>
             <textarea
               value={form.content}
               onChange={e => set('content', e.target.value)}
               placeholder="Escribe aquí el texto del mensaje rápido..."
               rows={4}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:bg-white transition-colors resize-none"
+              className="ts-config-input w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 transition-colors resize-none"
             />
           </div>
 
           {/* Categoría + Canal */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-slate-500">Categoría</label>
+              <label className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>Categoría</label>
               <input
                 value={form.category}
                 onChange={e => set('category', e.target.value)}
                 placeholder="General"
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+                className="ts-config-input w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 transition-colors"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-slate-500">Canal</label>
+              <label className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>Canal</label>
               <select
                 value={form.channel}
                 onChange={e => set('channel', e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+                className="ts-config-input w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 transition-colors"
               >
                 {CHANNELS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
@@ -154,16 +155,16 @@ function Modal({ open, onClose, onSave, initial, saving }) {
           {/* Orden + Activo */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-slate-500">Orden</label>
+              <label className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>Orden</label>
               <input
                 type="number"
                 value={form.sort_order}
                 onChange={e => set('sort_order', parseInt(e.target.value) || 0)}
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+                className="ts-config-input w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 transition-colors"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-slate-500">Estado</label>
+              <label className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>Estado</label>
               <button
                 type="button"
                 onClick={() => set('is_active', !form.is_active)}
@@ -180,11 +181,12 @@ function Modal({ open, onClose, onSave, initial, saving }) {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-2 pt-2" style={{ borderTop: '0.5px solid var(--db-card-border)' }}>
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors"
+              className="px-4 py-2 rounded-lg text-sm transition-colors"
+              style={{ color: 'var(--db-text)', border: '0.5px solid var(--db-card-border)' }}
             >
               Cancelar
             </button>
@@ -276,25 +278,25 @@ export default function MensajesRapidosConfig() {
   });
 
   return (
-    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#ffffff', fontFamily: 'system-ui, sans-serif', color: '#0f172a' }}>
+    <div className="ts-config-panel h-full flex flex-col overflow-hidden" style={{ fontFamily: 'system-ui, sans-serif' }}>
 
       {/* Topbar */}
-      <div className="flex items-center justify-between px-8 py-4 flex-shrink-0" style={{ borderBottom: '0.5px solid #e2e8f0' }}>
+      <div className="flex items-center justify-between px-8 py-4 flex-shrink-0" style={{ borderBottom: '0.5px solid var(--db-card-border)' }}>
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/config')}
             className="flex items-center gap-1.5 text-sm transition-colors"
-            style={{ color: '#94a3b8' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#0f172a'}
-            onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+            style={{ color: 'var(--db-text-muted)' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--db-text-strong)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--db-text-muted)'}
           >
             <BackIcon />
             Configuración
           </button>
-          <span style={{ color: '#cbd5e1' }}>›</span>
+          <span style={{ color: 'var(--db-text-muted)' }}>›</span>
           <div className="flex items-center gap-2">
             <Zap size={16} className="text-indigo-500" />
-            <span className="text-sm font-medium">Mensajes rápidos</span>
+            <span className="text-sm font-medium" style={{ color: 'var(--db-text-strong)' }}>Mensajes rápidos</span>
           </div>
         </div>
         <button
@@ -310,17 +312,17 @@ export default function MensajesRapidosConfig() {
       </div>
 
       {/* Filters bar */}
-      <div className="flex items-center gap-3 px-8 py-3 flex-shrink-0" style={{ borderBottom: '0.5px solid #f1f5f9', background: '#fafbfc' }}>
+      <div className="flex items-center gap-3 px-8 py-3 flex-shrink-0" style={{ borderBottom: '0.5px solid var(--db-row-border)', background: 'var(--db-bg)' }}>
         <div className="relative flex-1 max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--db-text-muted)' }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar mensajes..."
-            className="w-full pl-8 pr-3 py-1.5 rounded-lg text-sm border border-slate-200 bg-white outline-none focus:border-indigo-400 transition-colors"
+            className="ts-config-input w-full pl-8 pr-3 py-1.5 rounded-lg text-sm outline-none focus:border-indigo-400 transition-colors"
           />
           {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: 'var(--db-text-muted)' }}>
               <X size={13} />
             </button>
           )}
@@ -333,25 +335,26 @@ export default function MensajesRapidosConfig() {
               className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                 filter === ch.value
                   ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
-                  : 'text-slate-500 hover:bg-slate-100 border border-transparent'
+                  : 'border border-transparent'
               }`}
+              style={filter !== ch.value ? { color: 'var(--db-text-muted)' } : {}}
             >
               {ch.label}
             </button>
           ))}
         </div>
-        <span className="text-xs text-slate-400 ml-auto">{filtered.length} mensaje{filtered.length !== 1 ? 's' : ''}</span>
+        <span className="text-xs ml-auto" style={{ color: 'var(--db-text-muted)' }}>{filtered.length} mensaje{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
         {loading ? (
-          <div className="flex items-center justify-center h-40 gap-3 text-slate-400">
+          <div className="flex items-center justify-center h-40 gap-3" style={{ color: 'var(--db-text-muted)' }}>
             <SpinnerIcon />
             <span className="text-sm">Cargando...</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 gap-3 text-slate-400">
+          <div className="flex flex-col items-center justify-center h-48 gap-3" style={{ color: 'var(--db-text-muted)' }}>
             <Zap size={36} strokeWidth={1.5} />
             <p className="text-sm font-medium">
               {search || filter !== 'all' ? 'Sin resultados para esta búsqueda' : 'No hay mensajes rápidos aún'}
@@ -372,9 +375,9 @@ export default function MensajesRapidosConfig() {
               <div
                 key={item.id}
                 className="flex items-start gap-4 px-5 py-4 rounded-xl border transition-all"
-                style={{ borderColor: '#e2e8f0', background: item.is_active ? '#ffffff' : '#f8fafc' }}
+                style={{ borderColor: 'var(--db-card-border)', background: 'var(--db-card-bg)' }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = '#c7d2fe'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--db-card-border)'}
               >
                 {/* Icon */}
                 <div className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${item.is_active ? 'bg-indigo-50' : 'bg-slate-100'}`}>
@@ -384,9 +387,9 @@ export default function MensajesRapidosConfig() {
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className={`text-sm font-semibold ${item.is_active ? 'text-slate-800' : 'text-slate-400'}`}>{item.title}</span>
+                    <span className="text-sm font-semibold" style={{ color: item.is_active ? 'var(--db-text-strong)' : 'var(--db-text-muted)' }}>{item.title}</span>
                     {item.shortcut && (
-                      <code className="text-[11px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">{item.shortcut}</code>
+                      <code className="text-[11px] px-1.5 py-0.5 rounded font-mono" style={{ background: 'var(--db-bg)', color: 'var(--db-text)' }}>{item.shortcut}</code>
                     )}
                     {item.category && item.category !== 'General' && (
                       <span className="text-[11px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-medium">{item.category}</span>
@@ -396,14 +399,15 @@ export default function MensajesRapidosConfig() {
                       <span className="text-[11px] bg-red-50 text-red-500 px-2 py-0.5 rounded font-medium">Inactivo</span>
                     )}
                   </div>
-                  <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">{item.content}</p>
+                  <p className="text-sm line-clamp-2 leading-relaxed" style={{ color: 'var(--db-text)' }}>{item.content}</p>
                 </div>
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     onClick={() => handleOpen(item)}
-                    className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                    className="p-2 rounded-lg hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                    style={{ color: 'var(--db-text-muted)' }}
                     title="Editar"
                   >
                     <Pencil size={14} />
@@ -411,7 +415,8 @@ export default function MensajesRapidosConfig() {
                   <button
                     onClick={() => handleDelete(item.id)}
                     disabled={deleting === item.id}
-                    className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                    className="p-2 rounded-lg hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                    style={{ color: 'var(--db-text-muted)' }}
                     title="Eliminar"
                   >
                     {deleting === item.id ? <SpinnerIcon /> : <Trash2 size={14} />}

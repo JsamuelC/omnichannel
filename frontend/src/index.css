@@ -216,55 +216,51 @@ html.dark {
 .typing-dot:nth-child(2) { animation-delay: -0.16s; }
 
 /* ─────────────────────────────────────────────────────────────
-   DARK MODE — overrides para paneles sin clases dark:
-   Aplica a componentes que usan bg-white / text-slate-X hardcoded
+   DARK MODE — clase utilitaria para paneles de configuración
+   Usar .ts-config-panel en el wrapper del componente
    ───────────────────────────────────────────────────────────── */
-html.dark .ts-panel-bg {
-  background: #0f172a !important;
-  color: #e2e8f0;
+.ts-config-panel {
+  background: var(--db-bg);
+  color: var(--db-text);
 }
-/* Tarjetas blancas */
-html.dark .bg-white {
-  background-color: #1e293b !important;
+.ts-config-card {
+  background: var(--db-card-bg);
+  border: 1px solid var(--db-card-border);
+  border-radius: 12px;
 }
-/* Bordes claros */
-html.dark .border-slate-100 { border-color: rgba(255,255,255,0.07) !important; }
-html.dark .border-slate-200 { border-color: rgba(255,255,255,0.09) !important; }
-html.dark .border-gray-100  { border-color: rgba(255,255,255,0.07) !important; }
-html.dark .border-gray-200  { border-color: rgba(255,255,255,0.09) !important; }
-/* Fondos de sección */
-html.dark .bg-slate-50  { background-color: #1e293b !important; }
-html.dark .bg-slate-100 { background-color: #1e293b !important; }
-html.dark .bg-gray-50   { background-color: #1e293b !important; }
-html.dark .bg-gray-100  { background-color: #1e293b !important; }
-/* Texto oscuro → claro */
-html.dark .text-slate-800 { color: #e2e8f0 !important; }
-html.dark .text-slate-900 { color: #f1f5f9 !important; }
-html.dark .text-gray-800  { color: #e2e8f0 !important; }
-html.dark .text-gray-900  { color: #f1f5f9 !important; }
-html.dark .text-gray-700  { color: #cbd5e1 !important; }
-html.dark .text-slate-700 { color: #cbd5e1 !important; }
-/* Inputs */
-html.dark input:not([class*="bg-"]),
-html.dark textarea:not([class*="bg-"]),
-html.dark select:not([class*="bg-"]) {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
-  color: #e2e8f0 !important;
+.ts-config-header {
+  background: var(--db-card-bg);
+  border-bottom: 1px solid var(--db-card-border);
 }
-html.dark input::placeholder,
-html.dark textarea::placeholder { color: #64748b !important; }
-/* Hover sobre filas */
-html.dark .hover\:bg-gray-50:hover  { background-color: rgba(255,255,255,0.04) !important; }
-html.dark .hover\:bg-slate-50:hover { background-color: rgba(255,255,255,0.04) !important; }
-/* Inline style bg override para paneles que usan style={{background}} */
-html.dark [style*="background: #f8fafc"],
-html.dark [style*="background:#f8fafc"],
-html.dark [style*="background-color: #f8fafc"],
-html.dark [style*="background: rgb(248"],
-html.dark [style*="background-color: white"],
-html.dark [style*="background: white"] {
-  background: #0f172a !important;
+.ts-config-label {
+  color: var(--db-text-muted);
+}
+.ts-config-text {
+  color: var(--db-text-strong);
+}
+.ts-config-input {
+  background: var(--ts-input-bg);
+  border: 1px solid var(--ts-input-border);
+  color: var(--db-text-strong);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.ts-config-input:focus {
+  border-color: #6366f1;
+}
+.ts-config-input::placeholder {
+  color: var(--db-text-muted);
+}
+.ts-config-row {
+  border-bottom: 1px solid var(--db-row-border);
+}
+.ts-config-row:hover {
+  background: rgba(99,102,241,0.04);
 }
 
 /* ─────────────────────────────────────────────────────────────

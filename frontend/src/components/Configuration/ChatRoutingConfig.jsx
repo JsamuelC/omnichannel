@@ -65,15 +65,15 @@ export default function ChatRoutingConfig() {
   };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#fff', fontFamily: 'system-ui', color: '#0f172a' }}>
-      <div className="flex items-center justify-between px-8 py-4" style={{ borderBottom: '0.5px solid #e2e8f0' }}>
+    <div className="ts-config-panel h-full flex flex-col overflow-hidden" style={{ fontFamily: 'system-ui' }}>
+      <div className="flex items-center justify-between px-8 py-4" style={{ borderBottom: '0.5px solid var(--db-card-border)' }}>
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/config')} className="text-sm" style={{ color: '#94a3b8' }}>
+          <button onClick={() => navigate('/config')} className="text-sm" style={{ color: 'var(--db-text-muted)' }}>
             <svg viewBox="0 0 24 24" className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
             Configuración
           </button>
-          <span style={{ color: '#cbd5e1' }}>›</span>
-          <span className="text-sm font-medium">Enrutamiento de chat</span>
+          <span style={{ color: 'var(--db-text-muted)' }}>›</span>
+          <span className="text-sm font-medium" style={{ color: 'var(--db-text-strong)' }}>Enrutamiento de chat</span>
         </div>
         <button onClick={handleSave} disabled={saving}
           className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white transition-all"
@@ -89,8 +89,8 @@ export default function ChatRoutingConfig() {
               <Shuffle size={20} style={{ color: '#6366f1' }} />
             </div>
             <div>
-              <h2 className="text-lg font-bold">Enrutamiento de chat</h2>
-              <p className="text-sm" style={{ color: '#94a3b8' }}>Define cómo se distribuyen las conversaciones cuando el bot redirige a un humano.</p>
+              <h2 className="text-lg font-bold" style={{ color: 'var(--db-text-strong)' }}>Enrutamiento de chat</h2>
+              <p className="text-sm" style={{ color: 'var(--db-text-muted)' }}>Define cómo se distribuyen las conversaciones cuando el bot redirige a un humano.</p>
             </div>
           </div>
 
@@ -104,19 +104,19 @@ export default function ChatRoutingConfig() {
 
           {/* Modo de enrutamiento */}
           <div className="mb-8">
-            <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#94a3b8' }}>Modo de distribución</p>
+            <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--db-text-muted)' }}>Modo de distribución</p>
             <div className="flex flex-col gap-3">
               {ROUTING_MODES.map(m => (
                 <button key={m.key} onClick={() => setMode(m.key)}
                   className="flex items-center gap-4 p-4 rounded-xl text-left transition-all"
                   style={{
-                    background: mode === m.key ? '#eef2ff' : '#f8fafc',
-                    border: `1.5px solid ${mode === m.key ? '#6366f1' : '#e2e8f0'}`,
+                    background: mode === m.key ? '#eef2ff' : 'var(--db-bg)',
+                    border: `1.5px solid ${mode === m.key ? '#6366f1' : 'var(--db-card-border)'}`,
                   }}>
                   <span className="text-2xl">{m.icon}</span>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold" style={{ color: '#0f172a' }}>{m.label}</p>
-                    <p className="text-xs" style={{ color: '#94a3b8' }}>{m.desc}</p>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--db-text-strong)' }}>{m.label}</p>
+                    <p className="text-xs" style={{ color: 'var(--db-text-muted)' }}>{m.desc}</p>
                   </div>
                   {mode === m.key && <Check size={18} style={{ color: '#6366f1' }} />}
                 </button>
@@ -128,7 +128,7 @@ export default function ChatRoutingConfig() {
           {mode === 'round_robin' && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#94a3b8' }}>
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--db-text-muted)' }}>
                   <Users size={12} className="inline mr-1" />
                   Operadores en la rotación
                 </p>
@@ -138,9 +138,9 @@ export default function ChatRoutingConfig() {
               </div>
 
               {loading ? (
-                <p className="text-sm" style={{ color: '#94a3b8' }}>Cargando...</p>
+                <p className="text-sm" style={{ color: 'var(--db-text-muted)' }}>Cargando...</p>
               ) : (
-                <div className="rounded-xl overflow-hidden" style={{ border: '0.5px solid #e2e8f0' }}>
+                <div className="rounded-xl overflow-hidden" style={{ border: '0.5px solid var(--db-card-border)' }}>
                   {agents.filter(a => a.is_active).map(agent => {
                     const av = AVAILABILITY_LABELS[agent.availability || 'active'];
                     const isSelected = selectedAgents.includes(agent.id);
@@ -148,15 +148,15 @@ export default function ChatRoutingConfig() {
                       <div key={agent.id}
                         className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors"
                         style={{
-                          borderBottom: '0.5px solid #f1f5f9',
+                          borderBottom: '0.5px solid var(--db-row-border)',
                           background: isSelected ? '#eef2ff' : 'transparent',
                         }}
                         onClick={() => toggleAgent(agent.id)}>
                         {/* Checkbox */}
                         <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
                           style={{
-                            background: isSelected ? '#6366f1' : '#fff',
-                            border: `1.5px solid ${isSelected ? '#6366f1' : '#d1d5db'}`,
+                            background: isSelected ? '#6366f1' : 'var(--ts-input-bg)',
+                            border: `1.5px solid ${isSelected ? '#6366f1' : 'var(--ts-input-border)'}`,
                           }}>
                           {isSelected && <Check size={12} color="#fff" />}
                         </div>
@@ -167,8 +167,8 @@ export default function ChatRoutingConfig() {
                         </div>
                         {/* Info */}
                         <div className="flex-1">
-                          <p className="text-sm font-medium" style={{ color: '#0f172a' }}>{agent.name}</p>
-                          <p className="text-xs" style={{ color: '#94a3b8' }}>{agent.email} · {agent.role === 'admin' ? 'Admin' : 'Operador'}</p>
+                          <p className="text-sm font-medium" style={{ color: 'var(--db-text-strong)' }}>{agent.name}</p>
+                          <p className="text-xs" style={{ color: 'var(--db-text-muted)' }}>{agent.email} · {agent.role === 'admin' ? 'Admin' : 'Operador'}</p>
                         </div>
                         {/* Estado */}
                         <div className="flex items-center gap-1.5">
@@ -187,7 +187,7 @@ export default function ChatRoutingConfig() {
                 </p>
               )}
 
-              <p className="text-xs mt-3" style={{ color: '#94a3b8' }}>
+              <p className="text-xs mt-3" style={{ color: 'var(--db-text-muted)' }}>
                 {selectedAgents.length} operador{selectedAgents.length !== 1 ? 'es' : ''} seleccionado{selectedAgents.length !== 1 ? 's' : ''}.
                 Solo los que tengan estado <strong>Activo</strong> recibirán chats.
               </p>
@@ -196,24 +196,24 @@ export default function ChatRoutingConfig() {
 
           {/* Estado actual de todos los agentes */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#94a3b8' }}>
+            <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--db-text-muted)' }}>
               Estado actual del equipo
             </p>
             {loading ? (
-              <p className="text-sm" style={{ color: '#94a3b8' }}>Cargando...</p>
+              <p className="text-sm" style={{ color: 'var(--db-text-muted)' }}>Cargando...</p>
             ) : (
-              <div className="rounded-xl overflow-hidden" style={{ border: '0.5px solid #e2e8f0' }}>
+              <div className="rounded-xl overflow-hidden" style={{ border: '0.5px solid var(--db-card-border)' }}>
                 {agents.map(agent => {
                   const av = AVAILABILITY_LABELS[agent.availability || 'active'];
                   return (
-                    <div key={agent.id} className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '0.5px solid #f1f5f9' }}>
+                    <div key={agent.id} className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '0.5px solid var(--db-row-border)' }}>
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                        style={{ background: agent.is_active ? '#6366f1' : '#94a3b8' }}>
+                        style={{ background: agent.is_active ? '#6366f1' : 'var(--db-text-muted)' }}>
                         {agent.name?.[0]?.toUpperCase() || '?'}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium" style={{ color: '#0f172a' }}>{agent.name}</p>
-                        <p className="text-xs" style={{ color: '#94a3b8' }}>{agent.role === 'admin' ? 'Admin' : 'Operador'} {!agent.is_active ? '(desactivado)' : ''}</p>
+                        <p className="text-sm font-medium" style={{ color: 'var(--db-text-strong)' }}>{agent.name}</p>
+                        <p className="text-xs" style={{ color: 'var(--db-text-muted)' }}>{agent.role === 'admin' ? 'Admin' : 'Operador'} {!agent.is_active ? '(desactivado)' : ''}</p>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className={`w-2.5 h-2.5 rounded-full ${av.color}`} />

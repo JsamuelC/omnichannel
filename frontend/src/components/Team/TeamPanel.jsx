@@ -50,12 +50,12 @@ const ROLES = [
 function Field({ label, icon, required, children, hint }) {
   return (
     <div>
-      <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+      <label className="flex items-center gap-1.5 text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--db-text)' }}>
         {icon && React.cloneElement(icon, { size: 11 })}
         {label}{required && <span className="text-red-500">*</span>}
       </label>
       {children}
-      {hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
+      {hint && <p className="text-xs mt-1" style={{ color: 'var(--db-text-muted)' }}>{hint}</p>}
     </div>
   );
 }
@@ -64,13 +64,14 @@ function Input({ icon, ...props }) {
   return (
     <div className="relative">
       {icon && (
-        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none" style={{ color: 'var(--db-text-muted)' }}>
           {React.cloneElement(icon, { size: 14 })}
         </div>
       )}
       <input
         {...props}
-        className={`w-full border border-slate-200 bg-white text-slate-900 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all placeholder:text-slate-300 ${icon ? 'pl-9' : ''}`}
+        className={`w-full text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all ${icon ? 'pl-9' : ''}`}
+        style={{ background: 'var(--ts-input-bg)', border: '1px solid var(--ts-input-border)', color: 'var(--db-text-strong)' }}
       />
     </div>
   );
@@ -80,13 +81,14 @@ function Select({ icon, children, ...props }) {
   return (
     <div className="relative">
       {icon && (
-        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none" style={{ color: 'var(--db-text-muted)' }}>
           {React.cloneElement(icon, { size: 14 })}
         </div>
       )}
       <select
         {...props}
-        className={`w-full border border-slate-200 bg-white text-slate-900 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all appearance-none ${icon ? 'pl-9' : ''}`}
+        className={`w-full text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all appearance-none ${icon ? 'pl-9' : ''}`}
+        style={{ background: 'var(--ts-input-bg)', border: '1px solid var(--ts-input-border)', color: 'var(--db-text-strong)' }}
       >
         {children}
       </select>
@@ -98,14 +100,15 @@ function Select({ icon, children, ...props }) {
 function Section({ title, icon, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden">
+    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--db-card-border)' }}>
       <button type="button" onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors">
-        <span className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase tracking-wider">
+        className="w-full flex items-center justify-between px-4 py-3 transition-colors"
+        style={{ background: 'var(--db-bg)' }}>
+        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--db-text)' }}>
           {React.cloneElement(icon, { size: 13, className: 'text-indigo-500' })}
           {title}
         </span>
-        {open ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+        {open ? <ChevronUp size={14} style={{ color: 'var(--db-text-muted)' }} /> : <ChevronDown size={14} style={{ color: 'var(--db-text-muted)' }} />}
       </button>
       {open && <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>}
     </div>
@@ -117,11 +120,12 @@ function Modal({ title, onClose, wide = false, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-md'} mb-10`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
-          <h3 className="font-bold text-slate-900 text-base">{title}</h3>
+      <div className={`relative rounded-2xl shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-md'} mb-10`} style={{ background: 'var(--db-card-bg)' }}>
+        <div className="flex items-center justify-between px-6 py-4 sticky top-0 rounded-t-2xl z-10" style={{ borderBottom: '0.5px solid var(--db-card-border)', background: 'var(--db-card-bg)' }}>
+          <h3 className="font-bold text-base" style={{ color: 'var(--db-text-strong)' }}>{title}</h3>
           <button onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+            style={{ color: 'var(--db-text-muted)' }}>
             <X size={16} />
           </button>
         </div>
@@ -172,7 +176,7 @@ function UserForm({ initial = {}, onSave, onCancel, isNew }) {
     <form onSubmit={handleSubmit} className="space-y-4">
 
       {/* ── Sección: Cuenta ─────────────────────────── */}
-      <div className="border border-indigo-100 rounded-xl overflow-hidden">
+      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #c7d2fe' }}>
         <div className="px-4 py-3 bg-indigo-50 flex items-center gap-2">
           <Shield size={13} className="text-indigo-500" />
           <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Datos de acceso</span>
@@ -198,12 +202,14 @@ function UserForm({ initial = {}, onSave, onCancel, isNew }) {
                     className={`p-3 rounded-xl border-2 text-left transition-all ${
                       form.role === r.value
                         ? 'border-indigo-500 bg-indigo-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}>
-                    <p className={`text-xs font-bold ${form.role === r.value ? 'text-indigo-700' : 'text-slate-700'}`}>
+                        : ''
+                    }`}
+                    style={form.role !== r.value ? { border: '2px solid var(--db-card-border)' } : {}}>
+                    <p className={`text-xs font-bold ${form.role === r.value ? 'text-indigo-700' : ''}`}
+                       style={form.role !== r.value ? { color: 'var(--db-text)' } : {}}>
                       {r.label}
                     </p>
-                    <p className="text-xs text-slate-400 mt-0.5 leading-tight">{r.desc}</p>
+                    <p className="text-xs mt-0.5 leading-tight" style={{ color: 'var(--db-text-muted)' }}>{r.desc}</p>
                   </button>
                 ))}
               </div>
@@ -284,9 +290,10 @@ function UserForm({ initial = {}, onSave, onCancel, isNew }) {
       </Section>
 
       {/* Acciones */}
-      <div className="flex gap-3 pt-2 sticky bottom-0 bg-white pb-1">
+      <div className="flex gap-3 pt-2 sticky bottom-0 pb-1" style={{ background: 'var(--db-card-bg)' }}>
         <button type="button" onClick={onCancel} disabled={saving}
-          className="flex-1 py-2.5 text-sm text-slate-600 border border-slate-200 bg-slate-50 hover:bg-slate-100 disabled:opacity-50 rounded-xl font-semibold transition-colors">
+          className="flex-1 py-2.5 text-sm disabled:opacity-50 rounded-xl font-semibold transition-colors"
+          style={{ color: 'var(--db-text)', border: '1px solid var(--db-card-border)', background: 'var(--db-bg)' }}>
           Cancelar
         </button>
         <button type="submit" disabled={saving}
@@ -315,21 +322,24 @@ function PasswordForm({ userName, onSave, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <p className="text-sm text-slate-500">Nueva contraseña para <strong className="text-slate-700">{userName}</strong>.</p>
+      <p className="text-sm" style={{ color: 'var(--db-text)' }}>Nueva contraseña para <strong style={{ color: 'var(--db-text-strong)' }}>{userName}</strong>.</p>
       <div>
-        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Nueva contraseña</label>
+        <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--db-text)' }}>Nueva contraseña</label>
         <input type="password" value={form.newPassword} onChange={e => setForm(f => ({ ...f, newPassword: e.target.value }))}
           placeholder="Mínimo 8 caracteres" minLength={8} required
-          className="w-full border border-slate-200 text-slate-900 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500" />
+          className="w-full text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500"
+          style={{ background: 'var(--ts-input-bg)', border: '1px solid var(--ts-input-border)', color: 'var(--db-text-strong)' }} />
       </div>
       <div>
-        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Confirmar contraseña</label>
+        <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--db-text)' }}>Confirmar contraseña</label>
         <input type="password" value={form.confirm} onChange={e => setForm(f => ({ ...f, confirm: e.target.value }))}
           placeholder="Repetir contraseña" required
-          className="w-full border border-slate-200 text-slate-900 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500" />
+          className="w-full text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500"
+          style={{ background: 'var(--ts-input-bg)', border: '1px solid var(--ts-input-border)', color: 'var(--db-text-strong)' }} />
       </div>
       <div className="flex gap-3">
-        <button type="button" onClick={onCancel} className="flex-1 py-2.5 text-sm text-slate-600 border border-slate-200 rounded-xl font-semibold">Cancelar</button>
+        <button type="button" onClick={onCancel} className="flex-1 py-2.5 text-sm rounded-xl font-semibold"
+          style={{ color: 'var(--db-text)', border: '1px solid var(--db-card-border)' }}>Cancelar</button>
         <button type="submit" disabled={saving}
           className="flex-1 py-2.5 text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 rounded-xl font-semibold flex items-center justify-center gap-2">
           {saving && <Loader2 size={14} className="animate-spin" />}
@@ -352,7 +362,7 @@ function UserCard({ user, isCurrentUser, onEdit, onToggle, onDelete, onPassword 
   };
 
   return (
-    <div className={`bg-white rounded-2xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center gap-4 transition-all ${!user.is_active ? 'opacity-55' : ''}`}>
+    <div className={`rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 transition-all ${!user.is_active ? 'opacity-55' : ''}`} style={{ background: 'var(--db-card-bg)', border: '1px solid var(--db-card-border)' }}>
       {/* Avatar */}
       <div className={`flex-shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
         {ini}
@@ -361,7 +371,7 @@ function UserCard({ user, isCurrentUser, onEdit, onToggle, onDelete, onPassword 
       {/* Info principal */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-bold text-slate-900 text-sm">{user.name}</p>
+          <p className="font-bold text-sm" style={{ color: 'var(--db-text-strong)' }}>{user.name}</p>
           {isCurrentUser && (
             <span className="bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">Tú</span>
           )}
@@ -375,36 +385,40 @@ function UserCard({ user, isCurrentUser, onEdit, onToggle, onDelete, onPassword 
             <span className="bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full">Sin verificar</span>
           )}
         </div>
-        <p className="text-xs text-slate-400 mt-0.5">{user.email}</p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--db-text-muted)' }}>{user.email}</p>
         <div className="flex items-center gap-3 mt-1 flex-wrap">
-          {user.movil    && <span className="text-xs text-slate-400 flex items-center gap-1"><Smartphone size={10} />{user.movil}</span>}
-          {user.telefono && <span className="text-xs text-slate-400 flex items-center gap-1"><Phone size={10} />{user.telefono}{user.extension_telefono ? ` ext. ${user.extension_telefono}` : ''}</span>}
-          {user.fecha_incorporacion && <span className="text-xs text-slate-400 flex items-center gap-1"><Calendar size={10} />Ingresó {user.fecha_incorporacion}</span>}
+          {user.movil    && <span className="text-xs flex items-center gap-1" style={{ color: 'var(--db-text-muted)' }}><Smartphone size={10} />{user.movil}</span>}
+          {user.telefono && <span className="text-xs flex items-center gap-1" style={{ color: 'var(--db-text-muted)' }}><Phone size={10} />{user.telefono}{user.extension_telefono ? ` ext. ${user.extension_telefono}` : ''}</span>}
+          {user.fecha_incorporacion && <span className="text-xs flex items-center gap-1" style={{ color: 'var(--db-text-muted)' }}><Calendar size={10} />Ingresó {user.fecha_incorporacion}</span>}
         </div>
       </div>
 
       {/* Acciones */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <button onClick={onEdit} title="Editar"
-          className="w-8 h-8 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors">
+          className="w-8 h-8 rounded-lg hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors"
+          style={{ color: 'var(--db-text-muted)' }}>
           <Edit2 size={14} />
         </button>
         <button onClick={onPassword} title="Cambiar contraseña"
-          className="w-8 h-8 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 flex items-center justify-center transition-colors">
+          className="w-8 h-8 rounded-lg hover:text-amber-600 hover:bg-amber-50 flex items-center justify-center transition-colors"
+          style={{ color: 'var(--db-text-muted)' }}>
           <KeyRound size={14} />
         </button>
         {!isCurrentUser && (
           <button onClick={onToggle} title={user.is_active ? 'Desactivar' : 'Activar'}
             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors
               ${user.is_active
-                ? 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}>
+                ? 'hover:text-emerald-600 hover:bg-emerald-50'
+                : 'hover:text-slate-600 hover:bg-slate-100'}`}
+            style={{ color: 'var(--db-text-muted)' }}>
             {user.is_active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
           </button>
         )}
         {!isCurrentUser && (
           <button onClick={onDelete} title="Eliminar"
-            className="w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors">
+            className="w-8 h-8 rounded-lg hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors"
+            style={{ color: 'var(--db-text-muted)' }}>
             <Trash2 size={14} />
           </button>
         )}
@@ -485,7 +499,7 @@ export default function TeamPanel() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full gap-3 text-slate-400 text-sm">
+      <div className="flex items-center justify-center h-full gap-3 text-sm" style={{ color: 'var(--db-text-muted)' }}>
         <Loader2 size={18} className="animate-spin" /> Cargando equipo...
       </div>
     );
@@ -493,9 +507,9 @@ export default function TeamPanel() {
 
   const UserGroup = ({ title, list }) => list.length === 0 ? null : (
     <section>
-      <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
+      <h2 className="text-xs font-bold uppercase tracking-wider mb-3 px-1 flex items-center gap-2" style={{ color: 'var(--db-text-muted)' }}>
         {title}
-        <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">{list.length}</span>
+        <span className="px-2 py-0.5 rounded-full" style={{ background: 'var(--db-card-border)', color: 'var(--db-text)' }}>{list.length}</span>
       </h2>
       <div className="space-y-2">
         {list.map(u => (
@@ -508,14 +522,14 @@ export default function TeamPanel() {
   );
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto bg-slate-50">
+    <div className="flex flex-col h-full overflow-y-auto" style={{ background: 'var(--db-bg)' }}>
       <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-black text-slate-900">Equipo de trabajo</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <h1 className="text-xl font-black" style={{ color: 'var(--db-text-strong)' }}>Equipo de trabajo</h1>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--db-text-muted)' }}>
               {total} miembro{total !== 1 ? 's' : ''} activo{total !== 1 ? 's' : ''} ·
               {admins.length} admin · {supervisors.length} supervisor · {agents.length} agente{agents.length !== 1 ? 's' : ''}
             </p>
@@ -536,9 +550,9 @@ export default function TeamPanel() {
         <UserGroup title="Agentes"          list={agents} />
 
         {users.length === 0 && (
-          <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
-            <User size={32} className="mx-auto text-slate-300 mb-3" />
-            <p className="text-slate-400 text-sm">No hay empleados registrados.</p>
+          <div className="rounded-2xl border border-dashed p-12 text-center" style={{ background: 'var(--db-card-bg)', borderColor: 'var(--db-card-border)' }}>
+            <User size={32} className="mx-auto mb-3" style={{ color: 'var(--db-text-muted)' }} />
+            <p className="text-sm" style={{ color: 'var(--db-text-muted)' }}>No hay empleados registrados.</p>
             <button onClick={() => setModalCreate(true)}
               className="mt-3 text-indigo-600 text-sm font-semibold hover:underline">
               + Añadir el primer empleado
@@ -578,7 +592,8 @@ export default function TeamPanel() {
             </div>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDelete(null)} disabled={deleting}
-                className="flex-1 py-2.5 text-sm text-slate-600 border border-slate-200 rounded-xl font-semibold">
+                className="flex-1 py-2.5 text-sm rounded-xl font-semibold"
+                style={{ color: 'var(--db-text)', border: '1px solid var(--db-card-border)' }}>
                 Cancelar
               </button>
               <button onClick={handleDelete} disabled={deleting}

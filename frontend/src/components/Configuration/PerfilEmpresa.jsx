@@ -30,7 +30,7 @@ const SpinnerIcon = () => (
 
 const Field = ({ label, id, value, onChange, placeholder, type = 'text', disabled = false }) => (
   <div className="flex flex-col gap-1.5">
-    <label htmlFor={id} className="text-xs font-medium" style={{ color: '#64748b' }}>
+    <label htmlFor={id} className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>
       {label}
     </label>
     <input
@@ -42,20 +42,20 @@ const Field = ({ label, id, value, onChange, placeholder, type = 'text', disable
       disabled={disabled}
       className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all duration-150"
       style={{
-        background: '#f8fafc',
-        border: '0.5px solid #e2e8f0',
-        color: disabled ? '#94a3b8' : '#0f172a',
+        background: 'var(--ts-input-bg)',
+        border: '0.5px solid var(--ts-input-border)',
+        color: disabled ? 'var(--db-text-muted)' : 'var(--db-text-strong)',
         cursor: disabled ? 'not-allowed' : 'text',
       }}
-      onFocus={e => { e.target.style.borderColor = '#6366f1'; e.target.style.background = '#fff'; }}
-      onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
+      onFocus={e => { e.target.style.borderColor = '#6366f1'; }}
+      onBlur={e => { e.target.style.borderColor = 'var(--ts-input-border)'; }}
     />
   </div>
 );
 
 const Section = ({ title, children }) => (
   <div className="mb-8">
-    <h3 className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: '#94a3b8' }}>
+    <h3 className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: 'var(--db-text-muted)' }}>
       {title}
     </h3>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -170,34 +170,34 @@ export default function PerfilEmpresa() {
     .toUpperCase();
 
   return (
-    <div className="h-full flex flex-col overflow-hidden"
-         style={{ background: '#ffffff', fontFamily: 'system-ui, sans-serif', color: '#0f172a' }}>
+    <div className="ts-config-panel h-full flex flex-col overflow-hidden"
+         style={{ fontFamily: 'system-ui, sans-serif' }}>
 
       {/* Topbar */}
       <div className="flex items-center justify-between px-8 py-4 flex-shrink-0"
-           style={{ borderBottom: '0.5px solid #e2e8f0', background: '#ffffff' }}>
+           style={{ borderBottom: '0.5px solid var(--db-card-border)', background: 'var(--db-card-bg)' }}>
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/config')}
             className="flex items-center gap-1.5 text-sm transition-colors"
-            style={{ color: '#94a3b8' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#0f172a'}
-            onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+            style={{ color: 'var(--db-text-muted)' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--db-text-strong)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--db-text-muted)'}
           >
             <BackIcon />
             Configuración
           </button>
-          <span style={{ color: '#cbd5e1' }}>›</span>
-          <span className="text-sm font-medium" style={{ color: '#0f172a' }}>
+          <span style={{ color: 'var(--db-text-muted)' }}>›</span>
+          <span className="text-sm font-medium" style={{ color: 'var(--db-text-strong)' }}>
             Perfil de la empresa
           </span>
         </div>
         <button
           onClick={() => navigate(-1)}
           className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
-          style={{ border: '0.5px solid #e2e8f0', color: '#94a3b8' }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f172a'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}
+          style={{ border: '0.5px solid var(--db-card-border)', color: 'var(--db-text-muted)' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--db-bg)'; e.currentTarget.style.color = 'var(--db-text-strong)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--db-text-muted)'; }}
         >
           <CloseIcon />
         </button>
@@ -224,7 +224,7 @@ export default function PerfilEmpresa() {
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-8 py-8">
         {loading ? (
-          <div className="flex items-center justify-center h-48 gap-3" style={{ color: '#94a3b8' }}>
+          <div className="flex items-center justify-center h-48 gap-3" style={{ color: 'var(--db-text-muted)' }}>
             <SpinnerIcon />
             <span className="text-sm">Cargando datos...</span>
           </div>
@@ -234,7 +234,7 @@ export default function PerfilEmpresa() {
             <button
               onClick={() => window.location.reload()}
               className="text-xs px-4 py-2 rounded-lg"
-              style={{ background: '#f1f5f9', color: '#64748b', border: '0.5px solid #e2e8f0' }}
+              style={{ background: 'var(--db-bg)', color: 'var(--db-text)', border: '0.5px solid var(--db-card-border)' }}
             >
               Reintentar
             </button>
@@ -243,13 +243,13 @@ export default function PerfilEmpresa() {
           <>
             {/* Avatar */}
             <div className="flex items-center gap-5 mb-10 pb-8"
-                 style={{ borderBottom: '0.5px solid #e2e8f0' }}>
+                 style={{ borderBottom: '0.5px solid var(--db-card-border)' }}>
               <div className="relative w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold flex-shrink-0"
                    style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff' }}>
                 {initials}
                 <button
                   className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center"
-                  style={{ background: '#ffffff', border: '0.5px solid #e2e8f0', color: '#94a3b8' }}
+                  style={{ background: 'var(--db-card-bg)', border: '0.5px solid var(--db-card-border)', color: 'var(--db-text-muted)' }}
                   title="Cambiar logo (próximamente)"
                 >
                   <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5}>
@@ -258,10 +258,10 @@ export default function PerfilEmpresa() {
                 </button>
               </div>
               <div>
-                <h2 className="text-lg font-semibold" style={{ color: '#0f172a' }}>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--db-text-strong)' }}>
                   {form.nombre || 'Sin nombre'}
                 </h2>
-                <p className="text-sm mt-0.5" style={{ color: '#94a3b8' }}>
+                <p className="text-sm mt-0.5" style={{ color: 'var(--db-text-muted)' }}>
                   {form.sitio_web || 'Sin sitio web'}
                 </p>
               </div>
@@ -285,7 +285,7 @@ export default function PerfilEmpresa() {
             </Section>
 
             <div className="mb-8">
-              <h3 className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: '#94a3b8' }}>
+              <h3 className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: 'var(--db-text-muted)' }}>
                 Sobre la empresa
               </h3>
               <textarea
@@ -296,20 +296,20 @@ export default function PerfilEmpresa() {
                 rows={4}
                 className="w-full rounded-lg px-3 py-2.5 text-sm outline-none resize-none transition-all duration-150"
                 style={{
-                  background: '#f8fafc',
-                  border: '0.5px solid #e2e8f0',
-                  color: '#0f172a',
+                  background: 'var(--ts-input-bg)',
+                  border: '0.5px solid var(--ts-input-border)',
+                  color: 'var(--db-text-strong)',
                   maxWidth: '600px',
                 }}
-                onFocus={e => { e.target.style.borderColor = '#6366f1'; e.target.style.background = '#fff'; }}
-                onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
+                onFocus={e => { e.target.style.borderColor = '#6366f1'; }}
+                onBlur={e => { e.target.style.borderColor = 'var(--ts-input-border)'; }}
               />
             </div>
 
             {/* ── Horarios de atención ── */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#94a3b8' }}>
+                <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--db-text-muted)' }}>
                   Horarios de atención
                 </h3>
                 {!form.horarios && (
@@ -339,18 +339,18 @@ export default function PerfilEmpresa() {
               </div>
 
               {!form.horarios ? (
-                <p className="text-sm" style={{ color: '#94a3b8' }}>
+                <p className="text-sm" style={{ color: 'var(--db-text-muted)' }}>
                   Sin horarios configurados — el bot de IA no informará sobre disponibilidad horaria.
                 </p>
               ) : (
-                <div className="rounded-xl overflow-hidden" style={{ border: '0.5px solid #e2e8f0', maxWidth: '560px' }}>
+                <div className="rounded-xl overflow-hidden" style={{ border: '0.5px solid var(--db-card-border)', maxWidth: '560px' }}>
                   {/* Header */}
                   <div className="grid grid-cols-[120px_1fr_1fr_60px] gap-0 px-4 py-2"
-                       style={{ background: '#f8fafc', borderBottom: '0.5px solid #e2e8f0' }}>
-                    <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>Día</span>
-                    <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>Apertura</span>
-                    <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>Cierre</span>
-                    <span className="text-xs font-medium text-center" style={{ color: '#94a3b8' }}>Abierto</span>
+                       style={{ background: 'var(--db-bg)', borderBottom: '0.5px solid var(--db-card-border)' }}>
+                    <span className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>Día</span>
+                    <span className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>Apertura</span>
+                    <span className="text-xs font-medium" style={{ color: 'var(--db-text-muted)' }}>Cierre</span>
+                    <span className="text-xs font-medium text-center" style={{ color: 'var(--db-text-muted)' }}>Abierto</span>
                   </div>
                   {DIAS.map(({ key, label }) => {
                     const h = form.horarios[key] || { abierto: false, desde: '', hasta: '' };
@@ -361,8 +361,8 @@ export default function PerfilEmpresa() {
                     return (
                       <div key={key}
                            className="grid grid-cols-[120px_1fr_1fr_60px] gap-0 px-4 py-2.5 items-center"
-                           style={{ borderBottom: '0.5px solid #f1f5f9' }}>
-                        <span className="text-sm font-medium" style={{ color: h.abierto ? '#0f172a' : '#94a3b8' }}>
+                           style={{ borderBottom: '0.5px solid var(--db-row-border)' }}>
+                        <span className="text-sm font-medium" style={{ color: h.abierto ? 'var(--db-text-strong)' : 'var(--db-text-muted)' }}>
                           {label}
                         </span>
                         <input
@@ -372,13 +372,13 @@ export default function PerfilEmpresa() {
                           onChange={e => setH('desde', e.target.value)}
                           className="w-28 rounded-lg px-2 py-1 text-sm outline-none transition-all"
                           style={{
-                            background: h.abierto ? '#f8fafc' : '#f1f5f9',
-                            border: '0.5px solid #e2e8f0',
-                            color: h.abierto ? '#0f172a' : '#cbd5e1',
+                            background: 'var(--ts-input-bg)',
+                            border: '0.5px solid var(--ts-input-border)',
+                            color: h.abierto ? 'var(--db-text-strong)' : 'var(--db-text-muted)',
                             cursor: h.abierto ? 'text' : 'not-allowed',
                           }}
-                          onFocus={e => { if (h.abierto) { e.target.style.borderColor = '#6366f1'; e.target.style.background = '#fff'; } }}
-                          onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = h.abierto ? '#f8fafc' : '#f1f5f9'; }}
+                          onFocus={e => { if (h.abierto) { e.target.style.borderColor = '#6366f1'; } }}
+                          onBlur={e => { e.target.style.borderColor = 'var(--ts-input-border)'; }}
                         />
                         <input
                           type="time"
@@ -387,13 +387,13 @@ export default function PerfilEmpresa() {
                           onChange={e => setH('hasta', e.target.value)}
                           className="w-28 rounded-lg px-2 py-1 text-sm outline-none transition-all"
                           style={{
-                            background: h.abierto ? '#f8fafc' : '#f1f5f9',
-                            border: '0.5px solid #e2e8f0',
-                            color: h.abierto ? '#0f172a' : '#cbd5e1',
+                            background: 'var(--ts-input-bg)',
+                            border: '0.5px solid var(--ts-input-border)',
+                            color: h.abierto ? 'var(--db-text-strong)' : 'var(--db-text-muted)',
                             cursor: h.abierto ? 'text' : 'not-allowed',
                           }}
-                          onFocus={e => { if (h.abierto) { e.target.style.borderColor = '#6366f1'; e.target.style.background = '#fff'; } }}
-                          onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = h.abierto ? '#f8fafc' : '#f1f5f9'; }}
+                          onFocus={e => { if (h.abierto) { e.target.style.borderColor = '#6366f1'; } }}
+                          onBlur={e => { e.target.style.borderColor = 'var(--ts-input-border)'; }}
                         />
                         <div className="flex items-center justify-center">
                           <button
@@ -414,7 +414,7 @@ export default function PerfilEmpresa() {
                 </div>
               )}
 
-              <p className="text-xs mt-3" style={{ color: '#94a3b8' }}>
+              <p className="text-xs mt-3" style={{ color: 'var(--db-text-muted)' }}>
                 El bot de IA usará esta información automáticamente al responder preguntas sobre disponibilidad.
               </p>
             </div>
@@ -425,8 +425,8 @@ export default function PerfilEmpresa() {
       {/* Footer */}
       {!loading && !error && (
         <div className="flex items-center justify-between px-8 py-4 flex-shrink-0"
-             style={{ borderTop: '0.5px solid #e2e8f0', background: '#ffffff' }}>
-          <p className="text-xs" style={{ color: hasChanges ? '#f59e0b' : '#94a3b8' }}>
+             style={{ borderTop: '0.5px solid var(--db-card-border)', background: 'var(--db-card-bg)' }}>
+          <p className="text-xs" style={{ color: hasChanges ? '#f59e0b' : 'var(--db-text-muted)' }}>
             {hasChanges ? '● Tienes cambios sin guardar' : 'Todo guardado'}
           </p>
           <div className="flex items-center gap-3">
@@ -434,8 +434,8 @@ export default function PerfilEmpresa() {
               <button
                 onClick={handleCancel}
                 className="px-4 py-2 rounded-lg text-sm transition-colors"
-                style={{ color: '#64748b', border: '0.5px solid #e2e8f0' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                style={{ color: 'var(--db-text)', border: '0.5px solid var(--db-card-border)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--db-bg)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 Cancelar

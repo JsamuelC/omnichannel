@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store';
+import { Search, X, ChevronRight, Settings2 } from 'lucide-react';
 
 const SECTIONS = [
   {
@@ -17,12 +18,12 @@ const SECTIONS = [
   {
     title: 'Canales',
     items: [
-      { label: 'WhatsApp API (Meta)',   to: '/config/whatsapp',  badge: 'Meta', feature: 'whatsapp_business' },
-      { label: 'Compartir WhatsApp',   to: '/config/wa-sharing', feature: 'whatsapp_personal' },
-      { label: 'Messenger',             to: '/config/messenger',  feature: 'config_messenger' },
-      { label: 'Instagram',             to: '/config/instagram',  feature: 'config_instagram' },
-      { label: 'TikTok',               to: '/config/tiktok',     feature: 'config_tiktok' },
-      { label: 'Telegram',             to: '/config/telegram',   feature: 'config_telegram' },
+      { label: 'WhatsApp API (Meta)',   to: '/config/whatsapp',   badge: 'Meta', feature: 'whatsapp_business' },
+      { label: 'Compartir WhatsApp',   to: '/config/wa-sharing',  feature: 'whatsapp_personal' },
+      { label: 'Messenger',             to: '/config/messenger',   feature: 'config_messenger' },
+      { label: 'Instagram',             to: '/config/instagram',   feature: 'config_instagram' },
+      { label: 'TikTok',               to: '/config/tiktok',      feature: 'config_tiktok' },
+      { label: 'Telegram',             to: '/config/telegram',    feature: 'config_telegram' },
     ],
   },
   {
@@ -51,9 +52,9 @@ const SECTIONS = [
   {
     title: 'Desarrolladores',
     items: [
-      { label: 'Integraciones',         to: '/config/integraciones',   feature: 'config_integrations' },
-      { label: 'Widgets',               to: '/config/widgets',         feature: 'config_widgets' },
-      { label: 'Complementos',          to: '/config/complementos',    feature: 'config_plugins' },
+      { label: 'Integraciones',  to: '/config/integraciones', feature: 'config_integrations' },
+      { label: 'Widgets',        to: '/config/widgets',       feature: 'config_widgets' },
+      { label: 'Complementos',   to: '/config/complementos',  feature: 'config_plugins' },
     ],
   },
 ];
@@ -61,8 +62,7 @@ const SECTIONS = [
 export default function Settings() {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
-  const { user, hasFeature } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
+  const { hasFeature } = useAuthStore();
 
   const filtered = SECTIONS
     .map(section => ({
@@ -75,92 +75,91 @@ export default function Settings() {
     .filter(section => section.items.length > 0);
 
   return (
-    <div className="h-full overflow-y-auto" style={{ background: '#f8fafc', fontFamily: 'system-ui, sans-serif' }}>
+    <div className="ts-config-panel h-full overflow-y-auto">
 
       {/* ── Header ──────────────────────────────────────────── */}
-      <div className="bg-white border-b border-slate-100 px-8 py-5 flex items-center justify-between sticky top-0 z-10">
-        <div>
-          <h1 className="text-base font-semibold text-slate-800">Configuración</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Administra tu cuenta y preferencias</p>
+      <div className="ts-config-header sticky top-0 z-10 px-8 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--ts-icon-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Settings2 size={16} style={{ color: '#6366f1' }} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: 'var(--db-text-strong)' }}>Configuración</h1>
+            <p style={{ fontSize: 12, color: 'var(--db-text-muted)', margin: '2px 0 0' }}>Administra tu cuenta y preferencias</p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Buscador */}
-          <div className="relative">
-            <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
-            </svg>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--db-text-muted)' }} />
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Buscar opción..."
-              className="pl-8 pr-8 py-1.5 text-sm bg-slate-100 rounded-lg border border-transparent outline-none focus:border-indigo-300 focus:bg-white transition-colors w-48"
-              style={{ color: '#374151' }}
+              placeholder="Buscar..."
+              className="ts-config-input"
+              style={{ paddingLeft: 30, paddingRight: query ? 30 : 10, width: 180, fontSize: 12 }}
             />
             {query && (
-              <button onClick={() => setQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
+              <button onClick={() => setQuery('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--db-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
+                <X size={12} />
               </button>
             )}
           </div>
-
           <button
             onClick={() => navigate(-1)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--ts-icon-bg)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--db-text-muted)' }}
           >
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
+            <X size={14} />
           </button>
         </div>
       </div>
 
       {/* ── Contenido ───────────────────────────────────────── */}
-      <div className="px-8 py-6 max-w-5xl">
+      <div style={{ padding: '1.5rem 2rem', maxWidth: 1100 }}>
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-slate-400">
-            <svg viewBox="0 0 24 24" className="w-8 h-8 mb-3" fill="none" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
-            </svg>
-            <p className="text-sm">Sin resultados para "<span className="text-slate-600">{query}</span>"</p>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '5rem 0', color: 'var(--db-text-muted)' }}>
+            <Search size={28} style={{ marginBottom: 12, opacity: 0.5 }} />
+            <p style={{ fontSize: 13, margin: 0 }}>Sin resultados para "<span style={{ color: 'var(--db-text)' }}>{query}</span>"</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
             {filtered.map(section => (
-              <div key={section.title} className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-                {/* Section header */}
-                <div className="px-4 py-3 border-b border-slate-50">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+              <div key={section.title} className="ts-config-card" style={{ overflow: 'hidden' }}>
+                <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--db-card-border)' }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--db-text-muted)', margin: 0 }}>
                     {section.title}
                   </p>
                 </div>
-                {/* Items */}
-                <div className="p-2">
+                <div style={{ padding: '4px 6px' }}>
                   {section.items.map(item => (
                     <NavLink
                       key={item.label}
                       to={item.to}
-                      className={({ isActive }) =>
-                        `flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-150 group
-                        ${isActive
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                        }`
-                      }
+                      style={({ isActive }) => ({
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        gap: 8, padding: '8px 10px', borderRadius: 8, fontSize: 13,
+                        textDecoration: 'none', transition: 'all 0.15s',
+                        background: isActive ? 'rgba(99,102,241,0.1)' : 'transparent',
+                        color: isActive ? '#6366f1' : 'var(--db-text)',
+                        fontWeight: isActive ? 600 : 400,
+                      })}
+                      className="ts-config-nav-item"
                     >
-                      <span className="truncate">{item.label}</span>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {item.badge && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600">
-                            {item.badge}
+                      {({ isActive }) => (
+                        <>
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.label}
                           </span>
-                        )}
-                        <svg viewBox="0 0 24 24" className="w-3 h-3 text-slate-300 group-hover:text-slate-400 transition-colors" fill="none" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-                        </svg>
-                      </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            {item.badge && (
+                              <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 20, background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
+                                {item.badge}
+                              </span>
+                            )}
+                            <ChevronRight size={12} style={{ color: isActive ? '#6366f1' : 'var(--db-text-muted)', opacity: 0.6 }} />
+                          </div>
+                        </>
+                      )}
                     </NavLink>
                   ))}
                 </div>

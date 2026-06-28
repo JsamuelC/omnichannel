@@ -19,34 +19,33 @@ const Field = ({ label, value, onChange, placeholder, hint, secret, readOnly }) 
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
+      <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--db-text-muted)' }}>{label}</label>
       <div className="flex items-center gap-2">
-        <div className={`flex-1 flex items-center border rounded-xl overflow-hidden transition-all
-          ${readOnly
-            ? 'bg-slate-50 border-slate-200'
-            : 'bg-white border-slate-200 focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400'
-          }`}>
+        <div className="flex-1 flex items-center rounded-xl overflow-hidden transition-all focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400"
+          style={{ background: 'var(--ts-input-bg)', border: '1px solid var(--ts-input-border)' }}>
           <input
             type={secret && !show ? 'password' : 'text'}
             value={value}
             onChange={e => onChange?.(e.target.value)}
             placeholder={placeholder}
             readOnly={readOnly}
-            className="flex-1 px-4 py-2.5 text-sm text-slate-700 outline-none bg-transparent"
+            className="flex-1 px-4 py-2.5 text-sm outline-none bg-transparent"
+            style={{ color: 'var(--db-text)' }}
           />
           {secret && !readOnly && (
-            <button onClick={() => setShow(!show)} className="px-3 text-slate-400 hover:text-slate-600">
+            <button onClick={() => setShow(!show)} className="px-3" style={{ color: 'var(--db-text-muted)' }}>
               {show ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
           )}
         </div>
         {value && (
-          <button onClick={handleCopy} className="p-2.5 rounded-xl border border-slate-200 text-slate-400 hover:text-indigo-500 hover:border-indigo-300 transition-all">
+          <button onClick={handleCopy} className="p-2.5 rounded-xl transition-all hover:text-indigo-500 hover:border-indigo-300"
+            style={{ border: '1px solid var(--ts-input-border)', color: 'var(--db-text-muted)' }}>
             {copied ? <Check size={15} className="text-green-500" /> : <Copy size={15} />}
           </button>
         )}
       </div>
-      {hint && <p className="text-xs text-slate-400">{hint}</p>}
+      {hint && <p className="text-xs" style={{ color: 'var(--db-text-muted)' }}>{hint}</p>}
     </div>
   );
 };
@@ -242,7 +241,7 @@ export default function WhatsappConfig() {
   );
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50">
+    <div className="h-full overflow-y-auto" style={{ background: 'var(--db-bg)' }}>
       <div className="max-w-2xl mx-auto px-6 py-10 flex flex-col gap-8">
 
         {/* Banner: Meta App no configurada */}
@@ -269,10 +268,10 @@ export default function WhatsappConfig() {
           </div>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-slate-800">WhatsApp Business API</h1>
+              <h1 className="text-xl font-bold" style={{ color: 'var(--db-text-strong)' }}>WhatsApp Business API</h1>
               {account && <StatusBadge ok={true} label="Conectado" />}
             </div>
-            <p className="text-sm text-slate-400 mt-0.5">Conecta el número general de tu empresa con Meta</p>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--db-text-muted)' }}>Conecta el número general de tu empresa con Meta</p>
           </div>
         </div>
 
@@ -313,31 +312,32 @@ export default function WhatsappConfig() {
         )}
 
         {/* Webhook URL */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col gap-4">
+        <div className="rounded-2xl p-6 flex flex-col gap-4" style={{ background: 'var(--db-card-bg)', border: '0.5px solid var(--db-card-border)' }}>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-700">URL del Webhook</h2>
+            <h2 className="text-sm font-semibold" style={{ color: 'var(--db-text)' }}>URL del Webhook</h2>
             <span className="text-xs bg-blue-50 text-blue-500 px-2 py-1 rounded-full font-medium">
               Copiar en Meta Developers
             </span>
           </div>
-          <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-3 border border-slate-200">
-            <code className="flex-1 text-xs text-slate-600 break-all">{webhookUrl}</code>
-            <button onClick={handleCopyWebhook} className="flex-shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-indigo-500">
+          <div className="flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: 'var(--db-bg)', border: '1px solid var(--ts-input-border)' }}>
+            <code className="flex-1 text-xs break-all" style={{ color: 'var(--db-text)' }}>{webhookUrl}</code>
+            <button onClick={handleCopyWebhook} className="flex-shrink-0 p-1.5 rounded-lg hover:text-indigo-500" style={{ color: 'var(--db-text-muted)' }}>
               {copied ? <Check size={15} className="text-green-500" /> : <Copy size={15} />}
             </button>
           </div>
         </div>
 
         {/* Tabs de conexión */}
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="flex border-b border-slate-200">
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--db-card-bg)', border: '0.5px solid var(--db-card-border)' }}>
+          <div className="flex" style={{ borderBottom: '0.5px solid var(--db-card-border)' }}>
             <button
               onClick={() => setTab('signup')}
               className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-medium transition-all ${
                 tab === 'signup'
                   ? 'text-indigo-600 bg-indigo-50/50 border-b-2 border-indigo-500'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  : ''
               }`}
+              style={tab !== 'signup' ? { color: 'var(--db-text-muted)' } : {}}
             >
               <Zap size={15} />
               Conectar con Meta
@@ -347,8 +347,9 @@ export default function WhatsappConfig() {
               className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-medium transition-all ${
                 tab === 'manual'
                   ? 'text-indigo-600 bg-indigo-50/50 border-b-2 border-indigo-500'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  : ''
               }`}
+              style={tab !== 'manual' ? { color: 'var(--db-text-muted)' } : {}}
             >
               <Settings size={15} />
               Configuración manual
@@ -360,10 +361,10 @@ export default function WhatsappConfig() {
             {tab === 'signup' && (
               <div className="flex flex-col items-center gap-6 py-4">
                 <div className="text-center">
-                  <p className="text-sm font-medium text-slate-700 mb-1">
+                  <p className="text-sm font-medium mb-1" style={{ color: 'var(--db-text)' }}>
                     Conecta tu WhatsApp Business en segundos
                   </p>
-                  <p className="text-xs text-slate-400 max-w-sm">
+                  <p className="text-xs max-w-sm" style={{ color: 'var(--db-text-muted)' }}>
                     Inicia sesión con tu cuenta de Meta Business y selecciona el número que quieres conectar. No necesitas copiar ningún token.
                   </p>
                 </div>
@@ -380,7 +381,7 @@ export default function WhatsappConfig() {
                   {sdkReady ? 'Continuar con Meta' : 'Cargando SDK...'}
                 </button>
 
-                <div className="flex items-center gap-2 text-xs text-slate-400">
+                <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--db-text-muted)' }}>
                   <CheckCircle size={13} className="text-green-400" />
                   <span>Proceso seguro y oficial de Meta</span>
                 </div>
