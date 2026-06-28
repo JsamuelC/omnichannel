@@ -338,8 +338,8 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
   const pushName  = msg.pushName || ''
   const timestamp = Number(msg.messageTimestamp) || Math.floor(Date.now() / 1000)
 
-  if (!isRealtime && (Date.now() / 1000 - timestamp) > 172800) {
-    logger.info(`🚫 [${sessionId}] filtrado: append >48h jid=${jid} ts=${timestamp}`)
+  if (!isRealtime && (Date.now() / 1000 - timestamp) > 604800) {
+    logger.info(`🚫 [${sessionId}] filtrado: append >7d jid=${jid} ts=${timestamp}`)
     return
   }
 
@@ -414,7 +414,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
     const cutoff = await WhatsappMessage.findOne({
       where:  { session_id: sessionId, jid },
       order:  [['timestamp', 'DESC']],
-      offset: 99,
+      offset: 199,
       attributes: ['timestamp']
     })
     if (cutoff) {
@@ -950,10 +950,9 @@ async function createSession(sessionId, sessionType = 'personal') {
 
     logger.info(`📋 messaging-history [batch ${batchNum}]: chats=${chats?.length || 0} contacts=${contacts?.length || 0} msgs=${messages?.length || 0} para ${sessionId}`)
 
-    // Batches 3+: ignorar completamente — evita miles de operaciones DB con historial antiguo.
-    // Los primeros 2 batches contienen los mensajes más recientes (últimas 48-72h).
-    if (batchNum > 2) {
-      logger.info(`⏭️  [${sessionId}] Batch ${batchNum}: ignorado — solo procesar primeros 2 batches`)
+    // Batches 5+: ignorar — los primeros 4 cubren la última semana aprox.
+    if (batchNum > 4) {
+      logger.info(`⏭️  [${sessionId}] Batch ${batchNum}: ignorado — solo procesar primeros 4 batches`)
       return
     }
 
@@ -1030,8 +1029,8 @@ async function createSession(sessionId, sessionType = 'personal') {
       } catch (_) {}
     }
 
-    // Guardar mensajes recientes (últimas 48h) para que aparezcan al abrir el chat
-    const cutoffTs    = Math.floor(Date.now() / 1000) - 172800 // 48 horas
+    // Guardar mensajes recientes (última semana) para que aparezcan al abrir el chat
+    const cutoffTs    = Math.floor(Date.now() / 1000) - 604800 // 7 días
     const recentMsgs  = (messages || []).filter(m => {
       const ts = Number(m.messageTimestamp) || 0
       if (ts < cutoffTs) return false
@@ -1039,7 +1038,7 @@ async function createSession(sessionId, sessionType = 'personal') {
       if (m.message.protocolMessage || m.message.reactionMessage || m.message.pollUpdateMessage) return false
       const jid = m.key?.remoteJid
       return jid && !jid.endsWith('@g.us') && jid !== 'status@broadcast' && !jid.endsWith('@lid') && !jid.includes('@broadcast')
-    }).slice(0, 300) // máximo 300 mensajes por batch
+    }).slice(0, 600) // máximo 600 mensajes por batch
 
     if (recentMsgs.length > 0) {
       logger.info(`💾 Guardando ${recentMsgs.length} mensajes recientes (48h) en BD para ${sessionId}`)
