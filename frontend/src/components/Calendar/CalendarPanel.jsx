@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Plus, X, Clock, User, Phone, FileText, Check, Trash2, CalendarDays, Settings2, Bot, Link, Link2Off } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
+import { getSocket } from '../../services/socket';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -679,6 +680,28 @@ export default function CalendarPanel() {
   }, [year, month, outlookStatus?.connected, gcalStatus?.connected]);
 
   useEffect(() => { fetchMonth(); }, [fetchMonth]);
+
+  // ── Socket: cita creada por bot ────────────────────────
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    const onAppointmentCreated = (appt) => {
+      toast.success(`📅 Nueva cita agendada por bot: ${appt.contact_name} — ${appt.date} ${appt.start_time}`);
+      setMonthAppts(prev => {
+        const next = { ...prev };
+        if (!next[appt.date]) next[appt.date] = [];
+        if (!next[appt.date].find(a => a.id === appt.id)) next[appt.date] = [...next[appt.date], appt];
+        return next;
+      });
+      setDayAppts(prev => {
+        if (selectedDate !== appt.date) return prev;
+        if (prev.find(a => a.id === appt.id)) return prev;
+        return [...prev, appt];
+      });
+    };
+    socket.on('appointment:created', onAppointmentCreated);
+    return () => socket.off('appointment:created', onAppointmentCreated);
+  }, [selectedDate]);
 
   // ── Fetch schedule config ──────────────────────────────
   useEffect(() => {

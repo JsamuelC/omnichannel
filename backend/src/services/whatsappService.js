@@ -515,7 +515,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
         }
 
         // ── Prioridad 2: bot IA normal ──
-        const result      = await chatbotService.handleWhatsappMessage(sessionId, jid, body, chatRecord)
+        const result      = await chatbotService.handleWhatsappMessage(sessionId, jid, body, chatRecord, _io)
         const aiResponse  = result?.text        || null
         const catalogFile = result?.catalogFile || null
         const handoff     = result?.handoff     || false
@@ -1092,7 +1092,7 @@ async function createSession(sessionId, sessionType = 'personal') {
         if (yaRespondio) continue
         logger.info(`🤖 Bot (sync) [${jid}]: "${body.slice(0,50)}"`)
         const chatbotService = require('./chatbotService')
-        const result = await chatbotService.handleWhatsappMessage(sessionId, jid, body, chatRecord)
+        const result = await chatbotService.handleWhatsappMessage(sessionId, jid, body, chatRecord, _io)
         const aiResponse = result?.text || null
         if (aiResponse) {
           const syncSock = sessions[sessionId]?.sock || sock

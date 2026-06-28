@@ -216,6 +216,58 @@ html.dark {
 .typing-dot:nth-child(2) { animation-delay: -0.16s; }
 
 /* ─────────────────────────────────────────────────────────────
+   DARK MODE — overrides para paneles sin clases dark:
+   Aplica a componentes que usan bg-white / text-slate-X hardcoded
+   ───────────────────────────────────────────────────────────── */
+html.dark .ts-panel-bg {
+  background: #0f172a !important;
+  color: #e2e8f0;
+}
+/* Tarjetas blancas */
+html.dark .bg-white {
+  background-color: #1e293b !important;
+}
+/* Bordes claros */
+html.dark .border-slate-100 { border-color: rgba(255,255,255,0.07) !important; }
+html.dark .border-slate-200 { border-color: rgba(255,255,255,0.09) !important; }
+html.dark .border-gray-100  { border-color: rgba(255,255,255,0.07) !important; }
+html.dark .border-gray-200  { border-color: rgba(255,255,255,0.09) !important; }
+/* Fondos de sección */
+html.dark .bg-slate-50  { background-color: #1e293b !important; }
+html.dark .bg-slate-100 { background-color: #1e293b !important; }
+html.dark .bg-gray-50   { background-color: #1e293b !important; }
+html.dark .bg-gray-100  { background-color: #1e293b !important; }
+/* Texto oscuro → claro */
+html.dark .text-slate-800 { color: #e2e8f0 !important; }
+html.dark .text-slate-900 { color: #f1f5f9 !important; }
+html.dark .text-gray-800  { color: #e2e8f0 !important; }
+html.dark .text-gray-900  { color: #f1f5f9 !important; }
+html.dark .text-gray-700  { color: #cbd5e1 !important; }
+html.dark .text-slate-700 { color: #cbd5e1 !important; }
+/* Inputs */
+html.dark input:not([class*="bg-"]),
+html.dark textarea:not([class*="bg-"]),
+html.dark select:not([class*="bg-"]) {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder { color: #64748b !important; }
+/* Hover sobre filas */
+html.dark .hover\:bg-gray-50:hover  { background-color: rgba(255,255,255,0.04) !important; }
+html.dark .hover\:bg-slate-50:hover { background-color: rgba(255,255,255,0.04) !important; }
+/* Inline style bg override para paneles que usan style={{background}} */
+html.dark [style*="background: #f8fafc"],
+html.dark [style*="background:#f8fafc"],
+html.dark [style*="background-color: #f8fafc"],
+html.dark [style*="background: rgb(248"],
+html.dark [style*="background-color: white"],
+html.dark [style*="background: white"] {
+  background: #0f172a !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
    SCROLLBAR
    ───────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar       { width: 5px; height: 5px; }

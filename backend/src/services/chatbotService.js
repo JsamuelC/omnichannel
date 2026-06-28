@@ -600,7 +600,7 @@ class ChatbotService {
     };
   }
 
-  async createAppointmentFromBot(schedule, sessionId, companyId) {
+  async createAppointmentFromBot(schedule, sessionId, companyId, io) {
     try {
       const { Appointment } = require('../models');
       const Company = require('../models/Company');
@@ -636,6 +636,22 @@ class ChatbotService {
       }
 
       logger.info(`📅 Cita creada por bot: ${schedule.name} — ${schedule.date} ${schedule.time}`);
+
+      // Notificar al panel de calendario en tiempo real
+      if (io) {
+        io.to('agents').emit('appointment:created', {
+          id:               appointment.id,
+          company_id:       companyId,
+          title:            appointment.title,
+          contact_name:     appointment.contact_name,
+          contact_phone:    appointment.contact_phone,
+          date:             appointment.date,
+          start_time:       appointment.start_time,
+          duration_minutes: appointment.duration_minutes,
+          status:           appointment.status,
+        });
+      }
+
       return appointment;
     } catch (err) {
       logger.error('Error creando cita desde bot:', err.message);
@@ -875,7 +891,7 @@ class ChatbotService {
   }
 
   // ─── Bot para WhatsApp (Baileys): con memoria y modo genérico/personalizado ──
-  async handleWhatsappMessage(sessionId, jid, body, chatRecord) {
+  async handleWhatsappMessage(sessionId, jid, body, chatRecord, io) {
     try {
       // 1. Determinar system prompt según bot_mode
       let systemPrompt;
@@ -950,7 +966,7 @@ class ChatbotService {
       const { text: afterSchedule, schedule } = this.extractScheduleCommand(rawResponse);
       if (schedule) {
         const anyChat2 = await WhatsappChat.findOne({ where: { session_id: sessionId, jid }, attributes: ['company_id'] });
-        await this.createAppointmentFromBot(schedule, sessionId, anyChat2?.company_id);
+        await this.createAppointmentFromBot(schedule, sessionId, anyChat2?.company_id, io);
         logger.info(`📅 Bot WA [${jid}] agendó cita: ${schedule.name} ${schedule.date} ${schedule.time}`);
       }
 
