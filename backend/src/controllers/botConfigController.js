@@ -117,24 +117,19 @@ async test(req, res) {
 async getActive(req, res) {
   try {
     const companyFilter = await resolveCompanyFilter(req);
+    // Buscar cualquier config (activa o no) para no perder el prompt al editar
     const config = await BotConfig.findOne({
-      where: { is_active: true, channel: 'all', ...companyFilter },
-      order: [['created_at', 'DESC']]
+      where: { channel: 'all', ...companyFilter },
+      order: [['updated_at', 'DESC']]
     });
- 
-    // Si no existe, devolver defaults vacíos (el panel arranca en blanco)
+
     if (!config) {
       return res.json({
         success: true,
-        data: {
-          id:            null,
-          is_active:     true,
-          system_prompt: '',
-          name:          'Mi Asistente IA'
-        }
+        data: { id: null, is_active: true, system_prompt: '', name: 'Mi Asistente IA' }
       });
     }
- 
+
     res.json({ success: true, data: config });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
