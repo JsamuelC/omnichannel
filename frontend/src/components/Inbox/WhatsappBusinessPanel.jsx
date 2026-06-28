@@ -406,11 +406,26 @@ export default function WhatsappBusinessPanel() {
       }));
     };
 
+    // Cuando WA normaliza el JID (ej: agrega código de país), actualizar sin duplicar
+    const onJidUpdated = ({ oldJid, newJid }) => {
+      if (!oldJid || !newJid || oldJid === newJid) return;
+      setChatList(prev => {
+        const hasNew = prev.some(c => c.jid === newJid);
+        return prev
+          .filter(c => c.jid !== oldJid || hasNew)
+          .map(c => c.jid === oldJid ? { ...c, jid: newJid } : c);
+      });
+      if (activeChatRef.current === oldJid) {
+        setActiveBusinessChat(newJid);
+      }
+    };
+
     socket.on('whatsapp:qr', onQr);
     socket.on('whatsapp:status', onStatus);
     socket.on('whatsapp:chats_synced', onChatsSync);
     socket.on('whatsapp:message', onMessage);
     socket.on('whatsapp:chat_updated', onChatUpdated);
+    socket.on('whatsapp:jid_updated', onJidUpdated);
     socket.on('reconnect', onSocketReconnect);
     socket.on('document:ready', onDocReady);
 
@@ -420,6 +435,7 @@ export default function WhatsappBusinessPanel() {
       socket.off('whatsapp:chats_synced', onChatsSync);
       socket.off('whatsapp:message', onMessage);
       socket.off('whatsapp:chat_updated', onChatUpdated);
+      socket.off('whatsapp:jid_updated', onJidUpdated);
       socket.off('reconnect', onSocketReconnect);
       socket.off('document:ready', onDocReady);
     };

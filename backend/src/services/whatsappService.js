@@ -1292,30 +1292,57 @@ async function sendMessage(sessionId, to, text) {
   const msgTs   = Math.floor(Date.now() / 1000)
   const extId   = sentMsg?.key?.id || `agent_${msgTs}_${jid}`
 
+  // Usar el JID real que devuelve WhatsApp (puede incluir código de país que el usuario omitió)
+  const realJid = sentMsg?.key?.remoteJid || jid
+  if (realJid !== jid) {
+    logger.info(`🔄 sendMessage: JID normalizado por WA ${jid} → ${realJid}`)
+    // Si existe un chat con el JID sin código de país, migrar al JID real
+    try {
+      const oldChat = await WhatsappChat.findOne({ where: { session_id: sessionId, jid } })
+      const newChat = await WhatsappChat.findOne({ where: { session_id: sessionId, jid: realJid } })
+      if (oldChat && !newChat) {
+        await oldChat.update({ jid: realJid })
+        await WhatsappMessage.update({ jid: realJid }, { where: { session_id: sessionId, jid } })
+        logger.info(`🔀 sendMessage: chat migrado ${jid} → ${realJid}`)
+      } else if (oldChat && newChat) {
+        // Ambos existen: mover mensajes y eliminar el viejo
+        await WhatsappMessage.update({ jid: realJid }, { where: { session_id: sessionId, jid } })
+        await oldChat.destroy()
+        logger.info(`🔀 sendMessage: chat duplicado eliminado ${jid} → ${realJid}`)
+      }
+    } catch (mergeErr) {
+      logger.warn(`⚠️  sendMessage: error migrando JID ${jid} → ${realJid}: ${mergeErr.message}`)
+    }
+  }
+
   // Pre-guardar en BD para que el eco de WA no cree un duplicado
   try {
     await WhatsappMessage.findOrCreate({
       where:    { external_id: extId },
       defaults: {
-        session_id: sessionId, jid, contact_name: '',
+        session_id: sessionId, jid: realJid, contact_name: '',
         body: text, from_me: true, timestamp: msgTs,
         content_type: 'text', metadata: {}
       }
     })
     const [agentChat] = await WhatsappChat.findOrCreate({
-      where:    { session_id: sessionId, jid },
-      defaults: { session_id: sessionId, jid, contact_name: '', session_type: session.sessionType || 'personal' }
+      where:    { session_id: sessionId, jid: realJid },
+      defaults: { session_id: sessionId, jid: realJid, contact_name: '', session_type: session.sessionType || 'personal' }
     })
     await agentChat.update({ last_message: text, last_message_at: msgTs })
-    // Emitir via socket con externalId para que el frontend pueda deduplicar
+    // Emitir via socket con externalId y el JID real para que el frontend deduplique correctamente
     _io?.to('agents').emit('whatsapp:message', {
-      sessionId, from: jid, body: text, timestamp: msgTs,
+      sessionId, from: realJid, body: text, timestamp: msgTs,
       fromMe: true, pushName: '', contentType: 'text', mediaUrl: null,
       sessionType: session.sessionType || 'personal', externalId: extId
     })
+    // Si el JID cambió, notificar al frontend para que actualice la lista
+    if (realJid !== jid) {
+      _io?.to('agents').emit('whatsapp:jid_updated', { sessionId, oldJid: jid, newJid: realJid })
+    }
   } catch (_) {}
 
-  return { key: sentMsg?.key, timestamp: msgTs, externalId: extId }
+  return { key: sentMsg?.key, timestamp: msgTs, externalId: extId, jid: realJid }
 }
 
 function getSession(sessionId)       { return sessions[sessionId] || null }
