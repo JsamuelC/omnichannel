@@ -783,21 +783,26 @@ async function createSession(sessionId, sessionType = 'personal') {
     }
   })
 
-  sessions[sessionId] = { sock, status: 'connecting', sessionType, qr: null, historyBatches: 0, lastNotifyAt: 0 }
+  // Preservar contador de intentos entre reconexiones para backoff exponencial
+  const prevAttempts = sessions[sessionId]?.reconnectAttempts || 0
+  sessions[sessionId] = { sock, status: 'connecting', sessionType, qr: null, historyBatches: 0, lastNotifyAt: 0, reconnectAttempts: prevAttempts }
 
-  // Timeout de 90 s: si no hay QR ni conexión, credenciales corruptas → limpiar y notificar
+  // Timeout solo para sesiones NUEVAS (sin credenciales en disco → esperando QR).
+  // Si ya hay credenciales (restore), WA tardará unos segundos pero no es credencial corrupta.
+  const isRestore = fs.existsSync(path.join(sessionPath, 'creds.json'))
   let connectResolved = false
-  const connectTimeout = setTimeout(() => {
+  const connectTimeoutMs = isRestore ? 0 : 120000  // restore: sin timeout; nuevo: 2 min
+  const connectTimeout = connectTimeoutMs ? setTimeout(() => {
     if (connectResolved) return
     if (sessions[sessionId]?.status === 'connecting') {
-      logger.warn(`⏱️ [${sessionId}] Sin respuesta de WA en 90s — credenciales inválidas, limpiando`)
+      logger.warn(`⏱️ [${sessionId}] Sin QR en 120s — credenciales inválidas, limpiando`)
       delete sessions[sessionId]
       delete realtimeEmitted[sessionId]
       if (fs.existsSync(sessionPath)) fs.rmSync(sessionPath, { recursive: true, force: true })
       _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'not_found', sessionType })
       try { sock.end(undefined) } catch (_) {}
     }
-  }, 90000)
+  }, connectTimeoutMs) : null
 
   // ── Conexión ─────────────────────────────────────────────
   sock.ev.on('connection.update', async (update) => {
@@ -808,7 +813,7 @@ async function createSession(sessionId, sessionType = 'personal') {
 
     if (qr) {
       connectResolved = true
-      clearTimeout(connectTimeout)
+      if (connectTimeout) clearTimeout(connectTimeout)
       logger.info(`📱 QR generado para ${sessionId} — esperando escaneo`)
       const qrImage = await qrcode.toDataURL(qr)
       if (sessions[sessionId]) sessions[sessionId].qr = qrImage
@@ -818,7 +823,7 @@ async function createSession(sessionId, sessionType = 'personal') {
 
     if (connection === 'open') {
       connectResolved = true
-      clearTimeout(connectTimeout)
+      if (connectTimeout) clearTimeout(connectTimeout)
       if (sessions[sessionId]) {
         sessions[sessionId].status = 'connected'
         sessions[sessionId].qr = null
@@ -849,32 +854,32 @@ async function createSession(sessionId, sessionType = 'personal') {
       // fetchStatus('@all') eliminado — causa bloqueo de 60+ segundos innecesariamente.
       // Los nombres de contactos llegan via contacts.set / contacts.upsert / messaging-history.
 
-      // ── Keep-alive liviano cada 3 minutos con detección de conexión muerta ──
-      // Si 3 keep-alives seguidos fallan, la conexión está zombie → forzar reconexión.
+      // ── Keep-alive: verificar WebSocket cada 5 min ──────────────────────────
+      // Usa readyState del WS (sin llamadas API) → no genera tráfico innecesario.
+      // Si el WS está cerrado pero el session map dice 'connected' → reconectar.
+      if (sessions[sessionId]) sessions[sessionId].reconnectAttempts = 0  // reset en conexión exitosa
       let keepAliveFails = 0
-      const keepAliveTimer = setInterval(async () => {
+      const keepAliveTimer = setInterval(() => {
         if (!sessions[sessionId] || sessions[sessionId].sock !== sock) {
           clearInterval(keepAliveTimer)
           return
         }
         if (sessions[sessionId].status !== 'connected') return
-        try {
-          await sock.fetchBlocklist()
+        const wsState = sock.ws?.readyState  // 1 = OPEN, 0 = CONNECTING, 2/3 = CLOSING/CLOSED
+        if (wsState === 1) {
           keepAliveFails = 0
-          logger.info(`💓 [${sessionId}] Keep-alive OK`)
-        } catch (e) {
+        } else {
           keepAliveFails++
-          logger.warn(`💓 [${sessionId}] Keep-alive falló (${keepAliveFails}/3): ${e.message}`)
+          logger.warn(`💓 [${sessionId}] WS no está OPEN (state=${wsState}) — fallo ${keepAliveFails}/3`)
           if (keepAliveFails >= 3) {
             logger.warn(`💀 [${sessionId}] Conexión zombie detectada — forzando reconexión`)
             clearInterval(keepAliveTimer)
             if (sessions[sessionId]) sessions[sessionId].status = 'disconnected'
             _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'disconnected', sessionType })
             try { sock.end(undefined) } catch (_) {}
-            // connection.update con 'close' se encargará de reconectar
           }
         }
-      }, 3 * 60 * 1000) // cada 3 minutos
+      }, 5 * 60 * 1000) // cada 5 minutos
     }
 
     if (connection === 'close') {
@@ -885,20 +890,46 @@ async function createSession(sessionId, sessionType = 'personal') {
       _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'disconnected', sessionType })
       _io?.to(`session:${sessionId}`).emit('whatsapp:status', { sessionId, status: 'disconnected', sessionType })
       const sessionPath = path.join(SESSION_DIR, sessionId)
-      if (code === DisconnectReason.loggedOut || code === 401) {
-        // Credenciales inválidas: limpiar todo y notificar al frontend para mostrar botón de conectar
-        logger.warn(`🚫 [${sessionId}] WA rechazó la sesión (credenciales inválidas), limpiando...`)
+
+      // ── Clasificar el código de desconexión ────────────────────────────────
+      const FATAL_CODES = [
+        DisconnectReason.loggedOut,   // 401 — sesión cerrada por el usuario en el teléfono
+        DisconnectReason.badSession,  // 500 — credenciales corruptas
+        DisconnectReason.multideviceMismatch, // 411 — cuenta no tiene multi-device
+      ]
+      // 440 = connectionReplaced → otro cliente WA Web abierto, reconectamos para tomar el turno de vuelta
+      const isFatal  = FATAL_CODES.includes(code)
+      const hasFiles = fs.existsSync(sessionPath)
+      const inMemory = !!sessions[sessionId]
+
+      if (isFatal) {
+        // Sesión revocada por el teléfono → limpiar todo y mostrar botón de escanear QR
+        logger.warn(`🚫 [${sessionId}] Sesión revocada (code=${code}) — limpiando credenciales`)
         delete sessions[sessionId]
         delete realtimeEmitted[sessionId]
-        if (fs.existsSync(sessionPath)) fs.rmSync(sessionPath, { recursive: true, force: true })
+        delete lidToJid[sessionId]
+        delete lidFallback[sessionId]
+        if (hasFiles) fs.rmSync(sessionPath, { recursive: true, force: true })
         _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'not_found', sessionType })
-      } else if (sessions[sessionId] && fs.existsSync(sessionPath)) {
-        logger.info(`🔄 Reconectando sesión ${sessionType}: ${sessionId} (en 5s)`)
-        setTimeout(() => createSession(sessionId, sessionType), 5000)
-      } else if (sessions[sessionId] && !fs.existsSync(sessionPath)) {
+      } else if (inMemory && hasFiles) {
+        // Desconexión transitoria (red, teléfono apagado, timeout, etc.) → reconectar con backoff
+        const attempts = (sessions[sessionId]?.reconnectAttempts || 0) + 1
+        if (sessions[sessionId]) sessions[sessionId].reconnectAttempts = attempts
+        // Backoff: 5s → 15s → 30s → 60s (máximo), reset al conectar exitosamente
+        const delays   = [5000, 15000, 30000, 60000]
+        const delay    = delays[Math.min(attempts - 1, delays.length - 1)]
+        logger.info(`🔄 [${sessionId}] Reconectando en ${delay/1000}s (intento ${attempts}, code=${code})`)
+        setTimeout(() => {
+          // Solo reconectar si la sesión no fue eliminada manualmente mientras esperábamos
+          if (sessions[sessionId] && fs.existsSync(path.join(SESSION_DIR, sessionId))) {
+            createSession(sessionId, sessionType)
+          }
+        }, delay)
+      } else if (inMemory && !hasFiles) {
+        // Archivos eliminados (logout manual) mientras la sesión seguía en memoria
         delete sessions[sessionId]
         delete realtimeEmitted[sessionId]
-        logger.info(`🧹 Sesión ${sessionId} limpiada de memoria (archivos eliminados)`)
+        logger.info(`🧹 [${sessionId}] Sesión limpiada de memoria (archivos eliminados)`)
       }
     }
   })
