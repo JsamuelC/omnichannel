@@ -269,38 +269,24 @@ router.post('/business/session/start', auth, async (req, res) => {
 
 // ── Estado de la sesión business del asesor ───────────
 router.get('/business/session/status', auth, async (req, res) => {
-  // Primero buscar sesión propia
   const ownSessionId = `business_${req.user.id}`;
   const ownStatus = whatsappService.getSessionStatus(ownSessionId);
-  if (ownStatus === 'connected') {
+
+  // Si el usuario tiene su propia sesión activa o en proceso, devolverla siempre
+  if (ownStatus !== 'not_found') {
     return res.json({ success: true, data: { sessionId: ownSessionId, status: ownStatus } });
   }
 
-  // Si no tiene sesión propia, buscar sesiones compartidas
-  if (req.user.company_id || req.user.role === 'admin' || req.user.role === 'superadmin') {
+  // Sin sesión propia: buscar sesiones compartidas (solo operadores configurados, NO admins)
+  // Los admins/superadmin que hicieron logout deben ver 'not_found' para poder escanear QR nuevo
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+  if (!isAdmin && req.user.company_id) {
     try {
       const Company = require('../models/Company');
-      const companyId = req.user.company_id;
-      let company;
-      if (companyId) company = await Company.findByPk(companyId, { attributes: ['wa_sharing_config'] });
-      else company = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['wa_sharing_config'] });
-
+      const company = await Company.findByPk(req.user.company_id, { attributes: ['wa_sharing_config'] });
       const config = company?.wa_sharing_config || {};
-      const userId = req.user.id;
-      const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
-
-      // Admin ve todas las sesiones de su empresa
-      if (isAdmin) {
-        const allSessions = whatsappService.getBusinessSessions();
-        const connected = allSessions.find(s => s.status === 'connected');
-        if (connected) {
-          return res.json({ success: true, data: { sessionId: connected.sessionId, status: 'connected', shared: true } });
-        }
-      }
-
-      // Operador: buscar sesiones compartidas con él
       for (const [ownerId, agents] of Object.entries(config)) {
-        if (Array.isArray(agents) && agents.includes(userId)) {
+        if (Array.isArray(agents) && agents.includes(req.user.id)) {
           const sharedSessionId = `business_${ownerId}`;
           const sharedStatus = whatsappService.getSessionStatus(sharedSessionId);
           if (sharedStatus === 'connected') {
@@ -311,7 +297,7 @@ router.get('/business/session/status', auth, async (req, res) => {
     } catch (_) {}
   }
 
-  res.json({ success: true, data: { sessionId: ownSessionId, status: ownStatus } });
+  res.json({ success: true, data: { sessionId: ownSessionId, status: 'not_found' } });
 });
 
 // ── Todas las sesiones business (admin ve todas) ──────
