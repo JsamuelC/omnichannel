@@ -13,6 +13,32 @@ const upload = multer({
   dest: path.join(__dirname, '../../uploads/whatsapp-media')
 });
 
+// ── Helper: resuelve el sessionId activo para un usuario ─
+// Prioridad: sesión propia conectada → sesión compartida de operador
+async function resolveActiveSessionId(user) {
+  const ownId     = `business_${user.id}`
+  const ownStatus = whatsappService.getSessionStatus(ownId)
+  if (ownStatus !== 'not_found') return ownId   // tiene sesión propia (activa o conectando)
+
+  // Solo operadores pueden usar sesiones compartidas; admins gestionan la suya propia
+  const isAdmin = user.role === 'admin' || user.role === 'superadmin'
+  if (!isAdmin && user.company_id) {
+    try {
+      const Company = require('../models/Company')
+      const company = await Company.findByPk(user.company_id, { attributes: ['wa_sharing_config'] })
+      const config  = company?.wa_sharing_config || {}
+      for (const [ownerId, agents] of Object.entries(config)) {
+        if (Array.isArray(agents) && agents.includes(user.id)) {
+          const sharedId     = `business_${ownerId}`
+          const sharedStatus = whatsappService.getSessionStatus(sharedId)
+          if (sharedStatus === 'connected') return sharedId
+        }
+      }
+    } catch (_) {}
+  }
+  return ownId  // fallback a sesión propia
+}
+
 // ═══════════════════════════════════════════════════════
 // SESIONES PERSONALES (lo que ya tenías, sin cambios)
 // ═══════════════════════════════════════════════════════
@@ -344,13 +370,12 @@ router.delete('/business/session/logout', auth, async (req, res) => {
 // ── Chats de la sesión business del asesor ────────────
 router.get('/business/chats', auth, async (req, res) => {
   try {
-    const sessionId = `business_${req.user.id}`;
+    const sessionId = await resolveActiveSessionId(req.user);
 
     const rows = await WhatsappChat.findAll({
       where: {
         session_id:   sessionId,
         session_type: 'business',
-        // Solo chats con actividad real (evitar contactos sin conversación)
         last_message_at: { [Op.gt]: 0 },
         jid: {
           [Op.and]: [
@@ -361,7 +386,7 @@ router.get('/business/chats', auth, async (req, res) => {
         }
       },
       order:      [['last_message_at', 'DESC']],
-      limit:      100,
+      limit:      150,
       attributes: ['id', 'jid', 'contact_name', 'last_message',
                    'last_message_at', 'unread_count', 'bot_enabled', 'bot_mode', 'session_type', 'labels']
     });
@@ -400,9 +425,9 @@ router.get('/business/chats', auth, async (req, res) => {
 // ── Historial de mensajes business ───────────────────
 router.get('/business/chat/:jid', auth, async (req, res) => {
   try {
-    const sessionId      = `business_${req.user.id}`;
-    const jid            = decodeURIComponent(req.params.jid);
-    const { limit = 100 } = req.query;
+    const sessionId        = await resolveActiveSessionId(req.user);
+    const jid              = decodeURIComponent(req.params.jid);
+    const { limit = 100 }  = req.query;
 
     const messages = await WhatsappMessage.findAll({
       where: { session_id: sessionId, jid },
