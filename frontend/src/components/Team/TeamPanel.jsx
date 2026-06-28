@@ -176,12 +176,12 @@ function UserForm({ initial = {}, onSave, onCancel, isNew }) {
     <form onSubmit={handleSubmit} className="space-y-4">
 
       {/* ── Sección: Cuenta ─────────────────────────── */}
-      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #c7d2fe' }}>
-        <div className="px-4 py-3 bg-indigo-50 flex items-center gap-2">
-          <Shield size={13} className="text-indigo-500" />
-          <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Datos de acceso</span>
+      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--db-card-border)' }}>
+        <div className="px-4 py-3 flex items-center gap-2" style={{ background: 'rgba(99,102,241,0.08)', borderBottom: '1px solid var(--db-card-border)' }}>
+          <Shield size={13} style={{ color: '#6366f1' }} />
+          <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#6366f1' }}>Datos de acceso</span>
         </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3" style={{ background: 'var(--db-card-bg)' }}>
           <div className="sm:col-span-2">
             <Field label="Nombre completo" icon={<User />} required>
               <Input icon={<User />} type="text" value={form.name}
@@ -199,14 +199,12 @@ function UserForm({ initial = {}, onSave, onCancel, isNew }) {
               <div className="grid grid-cols-3 gap-2 mt-1">
                 {ROLES.map(r => (
                   <button key={r.value} type="button" onClick={() => set('role', r.value)}
-                    className={`p-3 rounded-xl border-2 text-left transition-all ${
-                      form.role === r.value
-                        ? 'border-indigo-500 bg-indigo-50'
-                        : ''
-                    }`}
-                    style={form.role !== r.value ? { border: '2px solid var(--db-card-border)' } : {}}>
-                    <p className={`text-xs font-bold ${form.role === r.value ? 'text-indigo-700' : ''}`}
-                       style={form.role !== r.value ? { color: 'var(--db-text)' } : {}}>
+                    className="p-3 rounded-xl text-left transition-all"
+                    style={{
+                      border: form.role === r.value ? '2px solid #6366f1' : '2px solid var(--db-card-border)',
+                      background: form.role === r.value ? 'rgba(99,102,241,0.1)' : 'var(--ts-input-bg)',
+                    }}>
+                    <p className="text-xs font-bold" style={{ color: form.role === r.value ? '#6366f1' : 'var(--db-text)' }}>
                       {r.label}
                     </p>
                     <p className="text-xs mt-0.5 leading-tight" style={{ color: 'var(--db-text-muted)' }}>{r.desc}</p>
@@ -583,11 +581,11 @@ export default function TeamPanel() {
       {confirmDelete && (
         <Modal title="Eliminar empleado" onClose={() => setConfirmDelete(null)}>
           <div className="space-y-4">
-            <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <Trash2 size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 p-4 rounded-xl" style={{ background: 'var(--db-error-bg)', border: '1px solid var(--db-error-border)' }}>
+              <Trash2 size={18} style={{ color: 'var(--db-error-text)' }} className="flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-red-700">¿Eliminar a {confirmDelete.name}?</p>
-                <p className="text-xs text-red-500 mt-1">La cuenta se desactivará. El historial de conversaciones se conserva.</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--db-error-text)' }}>¿Eliminar a {confirmDelete.name}?</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--db-error-text)', opacity: 0.8 }}>La cuenta se desactivará. El historial de conversaciones se conserva.</p>
               </div>
             </div>
             <div className="flex gap-3">
