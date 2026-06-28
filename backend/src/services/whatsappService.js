@@ -1384,7 +1384,28 @@ async function logoutSession(sessionId) {
   delete lidToJid[sessionId]
   delete lidFallback[sessionId]
 
-  // Limpiar mensajes y chats en BD para evitar duplicados al escanear QR nuevo
+  // 1. Limpiar archivos de media del disco antes de borrar mensajes
+  try {
+    const mediaMessages = await WhatsappMessage.findAll({
+      where: { session_id: sessionId },
+      attributes: ['media_url'],
+    })
+    let deletedFiles = 0
+    for (const m of mediaMessages) {
+      if (!m.media_url) continue
+      const filename = path.basename(m.media_url)
+      const filePath = path.join(MEDIA_DIR, filename)
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
+        deletedFiles++
+      }
+    }
+    if (deletedFiles > 0) logger.info(`🗑️  ${deletedFiles} archivos de media eliminados para ${sessionId}`)
+  } catch (e) {
+    logger.warn(`⚠️  Error limpiando media de ${sessionId}: ${e.message}`)
+  }
+
+  // 2. Limpiar mensajes y chats en BD
   try {
     await WhatsappMessage.destroy({ where: { session_id: sessionId } })
     await WhatsappChat.destroy({ where: { session_id: sessionId } })
@@ -1393,10 +1414,11 @@ async function logoutSession(sessionId) {
     logger.error(`Error limpiando BD para ${sessionId}: ${e.message}`)
   }
 
+  // 3. Eliminar credenciales del disco
   const sessionPath = path.join(SESSION_DIR, sessionId)
   if (fs.existsSync(sessionPath)) {
     fs.rmSync(sessionPath, { recursive: true, force: true })
-    logger.info(`🗑️  Sesión ${sessionId} eliminada del disco`)
+    logger.info(`🗑️  Credenciales de sesión ${sessionId} eliminadas del disco`)
   }
 
   if (session) {
