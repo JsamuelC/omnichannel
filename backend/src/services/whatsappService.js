@@ -426,12 +426,35 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
 
   try {
     const companyId = await resolveSessionCompanyId(sessionId)
+
+    // Si el JID es @lid, intentar encontrar el chat real en BD por la columna lid
+    if (jid.endsWith('@lid')) {
+      try {
+        const realChat = await WhatsappChat.findOne({ where: { session_id: sessionId, lid: jid } })
+        if (realChat && !realChat.jid.endsWith('@lid')) {
+          logger.info(`🔍 [${sessionId}] @lid resuelto por BD: ${jid} → ${realChat.jid}`)
+          jid = realChat.jid
+          msg.key.remoteJid = realChat.jid
+          // Actualizar mapa en memoria para futuras resoluciones
+          if (!lidToJid[sessionId]) lidToJid[sessionId] = {}
+          lidToJid[sessionId][origLid || jid] = realChat.jid
+        }
+      } catch (_) {}
+    }
+
     // contact_name siempre es el nombre del contacto (destinatario), nunca el del remitente
-    const contactName = fromMe ? (chatRecord?.contact_name || '') : (pushName || chatRecord?.contact_name || '')
+    const contactName = fromMe ? '' : (pushName || '')
     const [chatRecord] = await WhatsappChat.findOrCreate({
       where:    { session_id: sessionId, jid },
       defaults: { session_id: sessionId, jid, contact_name: contactName, session_type: sessionType, company_id: companyId }
     })
+
+    // Si este chat tiene un @lid que no habíamos mapeado, guardar la columna lid
+    if (origLid && !jid.endsWith('@lid') && !chatRecord.lid) {
+      await chatRecord.update({ lid: origLid }).catch(() => {})
+      if (!lidToJid[sessionId]) lidToJid[sessionId] = {}
+      lidToJid[sessionId][origLid] = jid
+    }
     const nameToKeep = chatRecord.contact_name || (!fromMe ? pushName : '') || ''
     const liveUpdate = {
       last_message:    body,
@@ -982,25 +1005,28 @@ async function createSession(sessionId, sessionType = 'personal') {
             const realChat = await WhatsappChat.findOne({ where: { session_id: sessionId, jid } })
             if (lidChat) {
               if (!realChat) {
-                // No existe el real aún: simplemente renombrar el @lid al JID real
-                await lidChat.update({ jid })
+                // No existe el real aún: renombrar el @lid al JID real y guardar columna lid
+                await lidChat.update({ jid, lid })
                 await WhatsappMessage.update({ jid }, { where: { session_id: sessionId, jid: lid } })
                 logger.info(`🔀 [${sessionId}] Chat @lid renombrado: ${lid} → ${jid}`)
               } else {
                 // Existen ambos: mover mensajes del @lid al real y eliminar el duplicado
                 await WhatsappMessage.update({ jid }, { where: { session_id: sessionId, jid: lid } })
                 // Actualizar last_message del real si el @lid era más reciente
+                const upd = { lid }
                 if ((lidChat.last_message_at || 0) > (realChat.last_message_at || 0)) {
-                  await realChat.update({
-                    last_message:    lidChat.last_message,
-                    last_message_at: lidChat.last_message_at,
-                    unread_count:    (realChat.unread_count || 0) + (lidChat.unread_count || 0),
-                    contact_name:    realChat.contact_name || lidChat.contact_name || name
-                  })
+                  upd.last_message    = lidChat.last_message
+                  upd.last_message_at = lidChat.last_message_at
+                  upd.unread_count    = (realChat.unread_count || 0) + (lidChat.unread_count || 0)
+                  upd.contact_name    = realChat.contact_name || lidChat.contact_name || name
                 }
+                await realChat.update(upd)
                 await lidChat.destroy()
                 logger.info(`🔀 [${sessionId}] Chats unificados: ${lid} → ${jid} (mensajes migrados, @lid eliminado)`)
               }
+            } else if (realChat && !realChat.lid) {
+              // El chat real existe pero no tiene lid — persistir el mapeo
+              await realChat.update({ lid }).catch(() => {})
             }
           } catch (mergeErr) {
             logger.warn(`⚠️  [${sessionId}] Error unificando @lid ${lid}: ${mergeErr.message}`)
