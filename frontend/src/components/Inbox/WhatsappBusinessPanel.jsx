@@ -1390,9 +1390,15 @@ const handleSendMedia = async (e) => {
                   <span className="text-sm text-slate-500">Cargando mensajes...</span>
                 </div>
               ) : messages.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="bg-white/80 rounded-lg px-4 py-2 text-sm text-slate-500 shadow-sm">
-                    Sin mensajes en este chat
+                <div className="flex flex-col items-center justify-center h-full gap-3">
+                  <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-slate-600">Sin mensajes guardados</p>
+                    <p className="text-xs text-slate-400 mt-1">Los mensajes nuevos aparecerán aquí</p>
                   </div>
                 </div>
               ) : (
