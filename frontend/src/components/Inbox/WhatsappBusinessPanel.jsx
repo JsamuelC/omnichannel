@@ -290,19 +290,25 @@ export default function WhatsappBusinessPanel() {
 
     const onStatus = ({ sessionId: sid, status, sessionType }) => {
       if (sessionType !== 'business') return;
+      // Ignorar eventos de otras sesiones business (ej: empresa diferente)
+      const currentSid = sessionIdRef.current;
+      if (currentSid && sid && sid !== currentSid) return;
       const wasConnected = sessionStatusRef.current === 'connected';
       setSessionStatus(status);
       setQrImage(null);
       if (status === 'connected') {
         setSessionId(sid);
         if (!wasConnected) {
-          // Transición real: de no-conectado a conectado (primer QR scan o reconexión Baileys)
           toast.success('WhatsApp Business conectado');
           setSyncing(true);
           loadChats(sid);
         }
-        // Si ya estábamos "conectados" localmente pero el socket acaba de reconectar,
-        // la recarga la dispara el handler 'reconnect' del socket (ver abajo)
+      }
+      if (status === 'not_found') {
+        // Sesión eliminada (logout completo) — limpiar estado local
+        clearBizStorage();
+        setChatList([]);
+        setActiveBusinessChat(null);
       }
       if (status === 'disconnected') toast.error('WhatsApp Business desconectado');
     };
@@ -455,12 +461,21 @@ export default function WhatsappBusinessPanel() {
       const { sessionId: sid, status, shared } = res.data;
       if (sid) joinWhatsappSession(sid);
       setSessionId(sid);
-      setSessionStatus(status);
       setIsSharedSession(!!shared);
-      if (status === 'connected' && !background) loadChats(sid);
-      if (background && status !== bizStatus) {
-        if (status === 'connected') loadChats(sid, true);
-        else setChatList([]);
+      // En background: solo actualizar si el status cambió Y no es un not_found transitorio
+      // (el servidor puede tardar unos segundos en restaurar la sesión al reiniciar)
+      if (background) {
+        if (status === 'connected') {
+          setSessionStatus('connected');
+          if (status !== bizStatus) loadChats(sid, true);
+        } else if (status === 'disconnected') {
+          setSessionStatus('disconnected');
+          setChatList([]);
+        }
+        // not_found en background: ignorar — podría ser restauración en curso
+      } else {
+        setSessionStatus(status);
+        if (status === 'connected') loadChats(sid);
       }
     } catch {
       if (!background) setSessionStatus('not_found');
