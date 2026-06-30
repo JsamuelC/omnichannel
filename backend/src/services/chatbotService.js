@@ -960,6 +960,7 @@ class ChatbotService {
       // Extraer comandos: [SCHEDULE:...] → [HUMAN_NEEDED] → [START_DOC:nombre] → [SEND_FILE:id]
       const { text: afterSchedule, schedule } = this.extractScheduleCommand(rawResponse);
       if (schedule) {
+        const { WhatsappChat } = require('../models');
         const anyChat2 = await WhatsappChat.findOne({ where: { session_id: sessionId, jid }, attributes: ['company_id'] });
         await this.createAppointmentFromBot(schedule, sessionId, anyChat2?.company_id, io);
         logger.info(`📅 Bot WA [${jid}] agendó cita: ${schedule.name} ${schedule.date} ${schedule.time}`);
