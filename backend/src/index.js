@@ -54,19 +54,40 @@ app.set('io', io);
 io.on('connection', (socket) => {
   logger.info(`🔌 Cliente conectado: ${socket.id}`);
 
-  socket.on('join:agents', (userId) => {
-    socket.join('agents');
-    socket.join(`user:${userId}`);
-    logger.info(`👤 Agente ${userId} unido a sala agents (socket ${socket.id})`);
-    // Enviar estado actual de sesiones WA para evitar la race condition
-    // en la que el backend ya conectó antes de que el frontend uniera la sala
-    const waSessions = whatsappService.getAllSessions();
-    for (const s of waSessions) {
-      socket.emit('whatsapp:status', {
-        sessionId:   s.sessionId,
-        status:      s.status,
-        sessionType: s.sessionType || 'personal'
-      });
+  socket.on('join:agents', async (userId) => {
+    try {
+      const { User } = require('./models');
+      const user = await User.findByPk(userId, { attributes: ['company_id', 'role'] });
+      const isSuperAdmin = user?.role === 'superadmin';
+      const companyId    = user?.company_id;
+
+      if (isSuperAdmin || !companyId) {
+        socket.join('agents');
+        logger.info(`👤 Superadmin ${userId} unido a sala agents global (socket ${socket.id})`);
+      } else {
+        socket.join(`agents:${companyId}`);
+        logger.info(`👤 Agente ${userId} unido a sala agents:${companyId} (socket ${socket.id})`);
+      }
+      socket.join(`user:${userId}`);
+
+      // Enviar estado actual de sesiones WA filtrado por empresa
+      const waSessions = whatsappService.getAllSessions();
+      for (const s of waSessions) {
+        if (!isSuperAdmin && companyId) {
+          const sessionCid = whatsappService.getSessionCompanyId(s.sessionId);
+          if (sessionCid && sessionCid !== companyId) continue;
+        }
+        socket.emit('whatsapp:status', {
+          sessionId:   s.sessionId,
+          status:      s.status,
+          sessionType: s.sessionType || 'personal'
+        });
+      }
+    } catch (e) {
+      // Fallback seguro: sala global si falla la DB
+      socket.join('agents');
+      socket.join(`user:${userId}`);
+      logger.warn(`⚠️  join:agents fallback global para ${userId}: ${e.message}`);
     }
   });
 

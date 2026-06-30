@@ -311,14 +311,11 @@ class ChatbotService {
           }
 
           case 'notify_human': {
-            const customMsg = rule.action_value?.trim() || `El bot necesita apoyo humano para el cliente ${jid}`;
-            io?.to('agents').emit('whatsapp:human_needed', {
-              sessionId,
-              jid,
-              message:   customMsg,
-              ruleName:  rule.name,
-              timestamp: Math.floor(Date.now() / 1000)
-            });
+            const customMsg  = rule.action_value?.trim() || `El bot necesita apoyo humano para el cliente ${jid}`;
+            const notifData  = { sessionId, jid, message: customMsg, ruleName: rule.name, timestamp: Math.floor(Date.now() / 1000) };
+            const notifCid   = chatRecord?.company_id || companyId;
+            if (notifCid) io?.to(`agents:${notifCid}`).emit('whatsapp:human_needed', notifData);
+            io?.to('agents').emit('whatsapp:human_needed', notifData); // superadmin
             logger.info(`🔔 Notificación humano enviada para ${jid} — regla: ${rule.name}`);
             break;
           }

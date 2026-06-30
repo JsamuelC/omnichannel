@@ -52,11 +52,10 @@ class MessageService {
       });
 
       if (this.io) {
-        this.io.to('agents').emit('message:new', {
-          message:      message.toJSON(),
-          conversation: conversation.toJSON(),
-          contact:      contact.toJSON()
-        });
+        const cid = conversation.company_id;
+        const payload = { message: message.toJSON(), conversation: conversation.toJSON(), contact: contact.toJSON() };
+        if (cid) this.io.to(`agents:${cid}`).emit('message:new', payload);
+        this.io.to('agents').emit('message:new', payload);
       }
 
       if (channel === 'whatsapp' && externalId) {
@@ -121,7 +120,10 @@ class MessageService {
     });
 
     if (this.io) {
-      this.io.to('agents').emit('message:sent', { message: message.toJSON(), conversationId });
+      const cid = conversation.company_id;
+      const payload = { message: message.toJSON(), conversationId };
+      if (cid) this.io.to(`agents:${cid}`).emit('message:sent', payload);
+      this.io.to('agents').emit('message:sent', payload);
     }
 
     return message;

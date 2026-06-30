@@ -67,7 +67,11 @@ exports.init = async (req, res) => {
         include: [{ model: Contact, as: 'contact' }]
       });
       if (fullConv) {
-        io.to('agents').emit(convCreated ? 'conversation:new' : 'conversation:updated', { conversation: fullConv.toJSON() });
+        const cid = fullConv.company_id;
+        const ev  = convCreated ? 'conversation:new' : 'conversation:updated';
+        const p   = { conversation: fullConv.toJSON() };
+        if (cid) io.to(`agents:${cid}`).emit(ev, p);
+        io.to('agents').emit(ev, p);
       }
     }
 
@@ -116,10 +120,10 @@ exports.sendMessage = async (req, res) => {
     // Emitir a agentes via socket
     const io = req.app.get('io');
     if (io) {
-      io.to('agents').emit('message:new', {
-        message:      message.toJSON(),
-        conversation: conversation.toJSON(),
-      });
+      const cid = conversation.company_id;
+      const p = { message: message.toJSON(), conversation: conversation.toJSON() };
+      if (cid) io.to(`agents:${cid}`).emit('message:new', p);
+      io.to('agents').emit('message:new', p);
     }
 
     // Respuesta del bot si la conversación está en modo bot
@@ -159,7 +163,10 @@ exports.sendMessage = async (req, res) => {
             });
 
             if (io) {
-              io.to('agents').emit('message:sent', { message: botMsg.toJSON(), conversationId: conversation_id });
+              const cid = conversation.company_id;
+              const p = { message: botMsg.toJSON(), conversationId: conversation_id };
+              if (cid) io.to(`agents:${cid}`).emit('message:sent', p);
+              io.to('agents').emit('message:sent', p);
             }
 
             botReply = botMsg.toJSON();
@@ -251,7 +258,10 @@ exports.endConversation = async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.to('agents').emit('conversation:updated', { conversation: conversation.toJSON() });
+      const cid = conversation.company_id;
+      const p = { conversation: conversation.toJSON() };
+      if (cid) io.to(`agents:${cid}`).emit('conversation:updated', p);
+      io.to('agents').emit('conversation:updated', p);
     }
 
     logger.info(`🔒 Conversación ${conversationId} cerrada por el cliente`);

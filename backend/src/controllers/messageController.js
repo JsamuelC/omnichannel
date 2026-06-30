@@ -199,7 +199,12 @@ class MessageController {
       });
 
       const io = req.app.get('io');
-      if (io) io.to('agents').emit('message:sent', { message: message.toJSON(), conversationId: conversation.id });
+      if (io) {
+        const cid = conversation.company_id;
+        const p = { message: message.toJSON(), conversationId: conversation.id };
+        if (cid) io.to(`agents:${cid}`).emit('message:sent', p);
+        io.to('agents').emit('message:sent', p);
+      }
 
       res.json({ success: true, data: message });
     } catch (error) {
@@ -235,10 +240,10 @@ class MessageController {
 
       const io = req.app.get('io');
       if (io) {
-        io.to('agents').emit('conversation:assigned', {
-          conversationId: conversation.id,
-          agentId
-        });
+        const cid = conversation.company_id;
+        const p = { conversationId: conversation.id, agentId };
+        if (cid) io.to(`agents:${cid}`).emit('conversation:assigned', p);
+        io.to('agents').emit('conversation:assigned', p);
         // Notificar específicamente al agente asignado
         if (agentId) {
           io.to(`user:${agentId}`).emit('conversation:assigned_to_you', {
@@ -282,7 +287,12 @@ class MessageController {
       await conversation.destroy();
 
       const io = req.app.get('io');
-      if (io) io.to('agents').emit('conversation:deleted', { conversationId: conversation.id });
+      if (io) {
+        const cid = conversation.company_id;
+        const p = { conversationId: conversation.id };
+        if (cid) io.to(`agents:${cid}`).emit('conversation:deleted', p);
+        io.to('agents').emit('conversation:deleted', p);
+      }
 
       res.json({ success: true, message: 'Conversación eliminada.' });
     } catch (error) {

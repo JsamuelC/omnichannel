@@ -22,6 +22,20 @@ const setSocketIO = (io) => { _io = io }
 // Caché en memoria para no hacer DB por cada mensaje
 const _sessionCompanyCache = {}
 
+// Acceso sincrónico al caché (útil en contextos donde ya fue resuelto antes)
+function getSessionCompanyId(sessionId) {
+  return _sessionCompanyCache[sessionId] || null
+}
+
+// Emite a la sala de la empresa + sala global (superadmin)
+function emitToCompany(sessionId, event, data) {
+  const companyId = _sessionCompanyCache[sessionId]
+  if (companyId) {
+    _io?.to(`agents:${companyId}`).emit(event, data)
+  }
+  _io?.to('agents').emit(event, data) // superadmin siempre recibe
+}
+
 async function resolveSessionCompanyId(sessionId) {
   if (_sessionCompanyCache[sessionId] !== undefined) return _sessionCompanyCache[sessionId]
   if (!sessionId?.startsWith('business_')) { _sessionCompanyCache[sessionId] = null; return null }
@@ -514,7 +528,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
                 defaults: { session_id: sessionId, jid, contact_name: nameToKeep, body: docResult.reply, from_me: true, timestamp: docTs, content_type: 'text', metadata: {} }
               })
               await chatRecord.update({ last_message: docResult.reply, last_message_at: docTs })
-              _io?.to('agents').emit('whatsapp:message', {
+              emitToCompany(sessionId, 'whatsapp:message', {
                 sessionId, from: jid, body: docResult.reply,
                 timestamp: docTs, externalId: docExtId,
                 fromMe: true, pushName: 'Bot', contentType: 'text', mediaUrl: null, sessionType
@@ -568,7 +582,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
             }
           })
           await chatRecord.update({ last_message: aiResponse, last_message_at: botTs })
-          _io?.to('agents').emit('whatsapp:message', {
+          emitToCompany(sessionId, 'whatsapp:message', {
             sessionId, from: jid, body: aiResponse,
             timestamp: botTs, externalId: botExtId,
             fromMe: true, pushName: 'Bot', contentType: 'text', mediaUrl: null,
@@ -638,7 +652,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
                     }
                   })
                   await chatRecord.update({ last_message: introMsg, last_message_at: docTs })
-                  _io?.to('agents').emit('whatsapp:message', {
+                  emitToCompany(sessionId, 'whatsapp:message', {
                     sessionId, from: jid, body: introMsg,
                     timestamp: docTs, externalId: docExtId,
                     fromMe: true, pushName: 'Bot', contentType: 'text', mediaUrl: null,
@@ -737,7 +751,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
 
   if (!fromMe) {
     logger.info(`📤 Emitiendo whatsapp:message a agents: from=${jid} body="${body?.slice(0,50)}"`)
-    _io?.to('agents').emit('whatsapp:message', {
+    emitToCompany(sessionId, 'whatsapp:message', {
       sessionId, from: jid, body, timestamp,
       pushName, fromMe: false, contentType, mediaUrl,
       mediaMimetype: mediaMeta?.mimetype || null,
@@ -783,6 +797,9 @@ async function createSession(sessionId, sessionType = 'personal') {
     }
   })
 
+  // Pre-cachear company_id para poder emitir a la sala correcta desde el inicio
+  await resolveSessionCompanyId(sessionId)
+
   // Preservar contador de intentos entre reconexiones para backoff exponencial
   const prevAttempts = sessions[sessionId]?.reconnectAttempts || 0
   sessions[sessionId] = { sock, status: 'connecting', sessionType, qr: null, historyBatches: 0, lastNotifyAt: 0, reconnectAttempts: prevAttempts }
@@ -799,7 +816,7 @@ async function createSession(sessionId, sessionType = 'personal') {
       delete sessions[sessionId]
       delete realtimeEmitted[sessionId]
       if (fs.existsSync(sessionPath)) fs.rmSync(sessionPath, { recursive: true, force: true })
-      _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'not_found', sessionType })
+      emitToCompany(sessionId, 'whatsapp:status', { sessionId, status: 'not_found', sessionType })
       try { sock.end(undefined) } catch (_) {}
     }
   }, connectTimeoutMs) : null
@@ -818,7 +835,7 @@ async function createSession(sessionId, sessionType = 'personal') {
       const qrImage = await qrcode.toDataURL(qr)
       if (sessions[sessionId]) sessions[sessionId].qr = qrImage
       _io?.to(`session:${sessionId}`).emit('whatsapp:qr', { sessionId, qr: qrImage, sessionType })
-      _io?.to('agents').emit('whatsapp:qr', { sessionId, qr: qrImage, sessionType })
+      emitToCompany(sessionId, 'whatsapp:qr', { sessionId, qr: qrImage, sessionType })
     }
 
     if (connection === 'open') {
@@ -829,7 +846,7 @@ async function createSession(sessionId, sessionType = 'personal') {
         sessions[sessionId].qr = null
         sessions[sessionId].historyBatches = 0  // reset para nueva conexión
       }
-      _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'connected', sessionType })
+      emitToCompany(sessionId, 'whatsapp:status', { sessionId, status: 'connected', sessionType })
       _io?.to(`session:${sessionId}`).emit('whatsapp:status', { sessionId, status: 'connected', sessionType })
       logger.info(`✅ WhatsApp ${sessionType} conectado: ${sessionId}`)
 
@@ -876,7 +893,7 @@ async function createSession(sessionId, sessionType = 'personal') {
             logger.warn(`💀 [${sessionId}] Conexión zombie detectada — forzando reconexión`)
             clearInterval(keepAliveTimer)
             if (sessions[sessionId]) sessions[sessionId].status = 'disconnected'
-            _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'disconnected', sessionType })
+            emitToCompany(sessionId, 'whatsapp:status', { sessionId, status: 'disconnected', sessionType })
             try { sock.end(undefined) } catch (_) {}
           }
         } else {
@@ -890,7 +907,7 @@ async function createSession(sessionId, sessionType = 'personal') {
       const reason = lastDisconnect?.error?.message || 'desconocido'
       logger.info(`🔌 WA desconectado [${sessionId}]: code=${code} reason="${reason}"`)
       if (sessions[sessionId]) { sessions[sessionId].status = 'disconnected'; sessions[sessionId].qr = null }
-      _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'disconnected', sessionType })
+      emitToCompany(sessionId, 'whatsapp:status', { sessionId, status: 'disconnected', sessionType })
       _io?.to(`session:${sessionId}`).emit('whatsapp:status', { sessionId, status: 'disconnected', sessionType })
       const sessionPath = path.join(SESSION_DIR, sessionId)
 
@@ -914,7 +931,7 @@ async function createSession(sessionId, sessionType = 'personal') {
         delete lidToJid[sessionId]
         delete lidFallback[sessionId]
         if (hasFiles) fs.rmSync(sessionPath, { recursive: true, force: true })
-        _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'not_found', sessionType })
+        emitToCompany(sessionId, 'whatsapp:status', { sessionId, status: 'not_found', sessionType })
       } else if (inMemory && hasFiles) {
         // Desconexión transitoria (red, teléfono apagado, timeout, etc.) → reconectar con backoff
         const attempts = (sessions[sessionId]?.reconnectAttempts || 0) + 1
@@ -961,14 +978,14 @@ async function createSession(sessionId, sessionType = 'personal') {
   sock.ev.on('chats.set', async ({ chats }) => {
     logger.info(`📋 chats.set: ${chats.length} chats para ${sessionId} (${sessionType})`)
     for (const chat of chats) await syncChat(sessionId, chat, sessionType, sock)
-    _io?.to('agents').emit('whatsapp:chats_synced', { sessionId, sessionType })
+    emitToCompany(sessionId, 'whatsapp:chats_synced', { sessionId, sessionType })
   })
 
   // ── chats.upsert ─────────────────────────────────────────
   sock.ev.on('chats.upsert', async (chats) => {
     logger.info(`📋 chats.upsert: ${chats.length} chats para ${sessionId} (${sessionType})`)
     for (const chat of chats) await syncChat(sessionId, chat, sessionType, sock)
-    _io?.to('agents').emit('whatsapp:chats_synced', { sessionId, sessionType })
+    emitToCompany(sessionId, 'whatsapp:chats_synced', { sessionId, sessionType })
   })
 
   // ── messaging-history.set ────────────────────────────────
@@ -1103,7 +1120,7 @@ async function createSession(sessionId, sessionType = 'personal') {
         const body = inner?.conversation || inner?.extendedTextMessage?.text || ''
         if (!body) continue
         logger.info(`📤 history→realtime: jid=${jid} body="${body.slice(0,40)}"`)
-        _io?.to('agents').emit('whatsapp:message', {
+        emitToCompany(sessionId, 'whatsapp:message', {
           sessionId, from: jid, body,
           timestamp: ts,
           pushName: m.pushName || '',
@@ -1157,7 +1174,7 @@ async function createSession(sessionId, sessionType = 'personal') {
               content_type: 'text', metadata: {}
             }
           })
-          _io?.to('agents').emit('whatsapp:message', {
+          emitToCompany(sessionId, 'whatsapp:message', {
             sessionId, from: jid, body: aiResponse, timestamp: botTs,
             fromMe: true, pushName: 'Bot', contentType: 'text', mediaUrl: null, sessionType
           })
@@ -1170,7 +1187,7 @@ async function createSession(sessionId, sessionType = 'personal') {
       }
     }
 
-    _io?.to('agents').emit('whatsapp:chats_synced', { sessionId, sessionType })
+    emitToCompany(sessionId, 'whatsapp:chats_synced', { sessionId, sessionType })
     logger.info(`✅ messaging-history sincronizado: ${sessionId} (${sessionType})`)
 
     // Ping al servidor de WA para despertar la entrega de mensajes en tiempo real.
@@ -1280,7 +1297,7 @@ async function createSession(sessionId, sessionType = 'personal') {
   sock.ev.on('contacts.set', async ({ contacts }) => {
     logger.info(`👤 contacts.set: ${contacts.length} contactos para ${sessionId}`)
     for (const contact of contacts) await syncContactName(contact)
-    _io?.to('agents').emit('whatsapp:chats_synced', { sessionId, sessionType })
+    emitToCompany(sessionId, 'whatsapp:chats_synced', { sessionId, sessionType })
   })
 
   sock.ev.on('contacts.upsert', async (contacts) => {
@@ -1372,14 +1389,14 @@ async function sendMessage(sessionId, to, text) {
     })
     await agentChat.update({ last_message: text, last_message_at: msgTs })
     // Emitir via socket con externalId y el JID real para que el frontend deduplique correctamente
-    _io?.to('agents').emit('whatsapp:message', {
+    emitToCompany(sessionId, 'whatsapp:message', {
       sessionId, from: realJid, body: text, timestamp: msgTs,
       fromMe: true, pushName: '', contentType: 'text', mediaUrl: null,
       sessionType: session.sessionType || 'personal', externalId: extId
     })
     // Si el JID cambió, notificar al frontend para que actualice la lista
     if (realJid !== jid) {
-      _io?.to('agents').emit('whatsapp:jid_updated', { sessionId, oldJid: jid, newJid: realJid })
+      emitToCompany(sessionId, 'whatsapp:jid_updated', { sessionId, oldJid: jid, newJid: realJid })
     }
   } catch (_) {}
 
@@ -1412,7 +1429,7 @@ function disconnectSession(sessionId) {
   const session = sessions[sessionId]
   if (session) {
     delete sessions[sessionId]          // Eliminar PRIMERO para que connection.update no reconecte
-    _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'disconnected', sessionType: session.sessionType || 'personal' })
+    emitToCompany(sessionId, 'whatsapp:status', { sessionId, status: 'disconnected', sessionType: session.sessionType || 'personal' })
     try { session.sock.end(undefined) } catch (_) {}
   }
 }
@@ -1486,7 +1503,7 @@ async function restoreAllSessions() {
 
 module.exports = {
   createSession, sendMessage, getSession,
-  getSessionStatus, getSessionQr, getAllSessions,
+  getSessionStatus, getSessionQr, getAllSessions, getSessionCompanyId,
   getPersonalSessions, getBusinessSessions,
   disconnectSession, logoutSession, setSocketIO, restoreAllSessions
 }
