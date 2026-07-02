@@ -13,6 +13,32 @@ const upload = multer({
   dest: path.join(__dirname, '../../uploads/whatsapp-media')
 });
 
+// ── Helper: resuelve el sessionId activo para un usuario ─
+// Prioridad: sesión propia conectada → sesión compartida de operador
+async function resolveActiveSessionId(user) {
+  const ownId     = `business_${user.id}`
+  const ownStatus = whatsappService.getSessionStatus(ownId)
+  if (ownStatus !== 'not_found') return ownId   // tiene sesión propia (activa o conectando)
+
+  // Solo operadores pueden usar sesiones compartidas; admins gestionan la suya propia
+  const isAdmin = user.role === 'admin' || user.role === 'superadmin'
+  if (!isAdmin && user.company_id) {
+    try {
+      const Company = require('../models/Company')
+      const company = await Company.findByPk(user.company_id, { attributes: ['wa_sharing_config'] })
+      const config  = company?.wa_sharing_config || {}
+      for (const [ownerId, agents] of Object.entries(config)) {
+        if (Array.isArray(agents) && agents.includes(user.id)) {
+          const sharedId     = `business_${ownerId}`
+          const sharedStatus = whatsappService.getSessionStatus(sharedId)
+          if (sharedStatus === 'connected') return sharedId
+        }
+      }
+    } catch (_) {}
+  }
+  return ownId  // fallback a sesión propia
+}
+
 // ═══════════════════════════════════════════════════════
 // SESIONES PERSONALES (lo que ya tenías, sin cambios)
 // ═══════════════════════════════════════════════════════
@@ -22,7 +48,7 @@ router.post('/session/start', auth, requireFeature('whatsapp_personal'), async (
   try {
     const { sessionId } = req.body;
     if (!sessionId) return res.status(400).json({ success: false, message: 'sessionId requerido' });
-    await whatsappService.createSession(sessionId, 'personal');
+    await whatsappService.createSession(sessionId, 'personal', req.user?.company_id || null);
     res.json({ success: true, message: `Sesión personal ${sessionId} iniciando` });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -244,6 +270,11 @@ router.post('/session/:sessionId/sync-contacts', auth, async (req, res) => {
 // ── Iniciar sesión business del asesor ────────────────
 router.post('/business/session/start', auth, async (req, res) => {
   try {
+    // Solo admin/superadmin pueden crear sesiones WA Business
+    if (req.user.role === 'agent') {
+      return res.status(403).json({ success: false, message: 'Solo administradores pueden conectar WhatsApp Business.' });
+    }
+
     const sessionId = `business_${req.user.id}`;
     const current   = whatsappService.getSessionStatus(sessionId);
 
@@ -263,22 +294,52 @@ router.post('/business/session/start', auth, async (req, res) => {
 });
 
 // ── Estado de la sesión business del asesor ───────────
-router.get('/business/session/status', auth, (req, res) => {
-  const sessionId = `business_${req.user.id}`;
-  const status    = whatsappService.getSessionStatus(sessionId);
-  res.json({ success: true, data: { sessionId, status } });
+router.get('/business/session/status', auth, async (req, res) => {
+  const ownSessionId = `business_${req.user.id}`;
+  const ownStatus = whatsappService.getSessionStatus(ownSessionId);
+
+  // Si el usuario tiene su propia sesión activa o en proceso, devolverla siempre
+  if (ownStatus !== 'not_found') {
+    return res.json({ success: true, data: { sessionId: ownSessionId, status: ownStatus } });
+  }
+
+  // Sin sesión propia: buscar sesiones compartidas (solo operadores configurados, NO admins)
+  // Los admins/superadmin que hicieron logout deben ver 'not_found' para poder escanear QR nuevo
+  const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+  if (!isAdmin && req.user.company_id) {
+    try {
+      const Company = require('../models/Company');
+      const company = await Company.findByPk(req.user.company_id, { attributes: ['wa_sharing_config'] });
+      const config = company?.wa_sharing_config || {};
+      for (const [ownerId, agents] of Object.entries(config)) {
+        if (Array.isArray(agents) && agents.includes(req.user.id)) {
+          const sharedSessionId = `business_${ownerId}`;
+          const sharedStatus = whatsappService.getSessionStatus(sharedSessionId);
+          if (sharedStatus === 'connected') {
+            return res.json({ success: true, data: { sessionId: sharedSessionId, status: 'connected', shared: true } });
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  res.json({ success: true, data: { sessionId: ownSessionId, status: 'not_found' } });
 });
 
 // ── Todas las sesiones business (admin ve todas) ──────
 router.get('/business/sessions', auth, async (req, res) => {
   try {
     const all = whatsappService.getBusinessSessions();
-    if (req.user.role === 'admin') {
+    if (req.user.role === 'admin' || req.user.role === 'superadmin') {
       return res.json({ success: true, data: all });
     }
-    // El asesor solo ve la suya
-    const mine = all.filter(s => s.sessionId === `business_${req.user.id}`);
-    res.json({ success: true, data: mine });
+    // El asesor ve la suya + compartidas
+    const Company = require('../models/Company');
+    const company = req.user.company_id ? await Company.findByPk(req.user.company_id, { attributes: ['wa_sharing_config'] }) : null;
+    const config = company?.wa_sharing_config || {};
+    const sharedOwners = Object.entries(config).filter(([, agents]) => Array.isArray(agents) && agents.includes(req.user.id)).map(([ownerId]) => `business_${ownerId}`);
+    const visible = all.filter(s => s.sessionId === `business_${req.user.id}` || sharedOwners.includes(s.sessionId));
+    res.json({ success: true, data: visible });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -309,13 +370,12 @@ router.delete('/business/session/logout', auth, async (req, res) => {
 // ── Chats de la sesión business del asesor ────────────
 router.get('/business/chats', auth, async (req, res) => {
   try {
-    const sessionId = `business_${req.user.id}`;
+    const sessionId = await resolveActiveSessionId(req.user);
 
     const rows = await WhatsappChat.findAll({
       where: {
         session_id:   sessionId,
         session_type: 'business',
-        // Solo chats con actividad real (evitar contactos sin conversación)
         last_message_at: { [Op.gt]: 0 },
         jid: {
           [Op.and]: [
@@ -326,7 +386,7 @@ router.get('/business/chats', auth, async (req, res) => {
         }
       },
       order:      [['last_message_at', 'DESC']],
-      limit:      100,
+      limit:      150,
       attributes: ['id', 'jid', 'contact_name', 'last_message',
                    'last_message_at', 'unread_count', 'bot_enabled', 'bot_mode', 'session_type', 'labels']
     });
@@ -365,9 +425,9 @@ router.get('/business/chats', auth, async (req, res) => {
 // ── Historial de mensajes business ───────────────────
 router.get('/business/chat/:jid', auth, async (req, res) => {
   try {
-    const sessionId      = `business_${req.user.id}`;
-    const jid            = decodeURIComponent(req.params.jid);
-    const { limit = 100 } = req.query;
+    const sessionId        = await resolveActiveSessionId(req.user);
+    const jid              = decodeURIComponent(req.params.jid);
+    const { limit = 100 }  = req.query;
 
     const messages = await WhatsappMessage.findAll({
       where: { session_id: sessionId, jid },

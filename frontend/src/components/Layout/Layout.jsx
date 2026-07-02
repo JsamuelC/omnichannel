@@ -13,6 +13,8 @@ import { getSocket } from '../../services/socket';
 import { ModuleIcon } from '../Modules/ModulosConfig';
 import UserProfileModal from './UserProfileModal';
 import toast from 'react-hot-toast';
+import { Bell } from 'lucide-react';
+import api from '../../services/api';
 
 // ─── Icono SVG inline para cada canal ───────────────────────
 const WhatsAppIcon = () => (
@@ -135,7 +137,19 @@ export default function Layout() {
   const { modules, fetchModules }        = useModuleStore();
   const [sidebarOpen, setSidebarOpen]    = useState(false); // móvil
   const [showProfile, setShowProfile]    = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount]     = useState(0);
+  const [showNotifs, setShowNotifs]       = useState(false);
+  const [userAvailability, setUserAvailability] = useState(user?.availability || 'active');
+  const [adminCompanyName, setAdminCompanyName] = useState(() => localStorage.getItem('ts-admin-company-name'));
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const sync = () => setAdminCompanyName(localStorage.getItem('ts-admin-company-name'));
+    const interval = setInterval(sync, 800);
+    window.addEventListener('storage', sync);
+    return () => { clearInterval(interval); window.removeEventListener('storage', sync); };
+  }, []);
 
   const role = user?.role || 'agent';
 
@@ -146,63 +160,107 @@ export default function Layout() {
     return true;
   });
 
-  useEffect(() => { fetchModules(); }, []);
+  useEffect(() => {
+    if (user?.company_id || user?.role === 'superadmin') fetchModules();
+  }, [user?.company_id]);
+
+  // ── Notificaciones ───────────────────────────────────────
+  const loadNotifications = async () => {
+    try {
+      const res = await api.get('/notifications?limit=20');
+      const data = res.data || res;
+      setNotifications(data.notifications || []);
+      setUnreadCount(data.unread_count || 0);
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const markAllRead = async () => {
+    try {
+      await api.post('/notifications/read');
+      setUnreadCount(0);
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch {}
+  };
 
   // ── Socket.io ────────────────────────────────────────────
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
 
+    const addNotifBadge = (title, body) => {
+      setNotifications(prev => [{ id: Date.now(), title, body, read: false, created_at: new Date().toISOString(), type: 'message' }, ...prev.slice(0, 19)]);
+      setUnreadCount(prev => prev + 1);
+    };
+
     const onNewMessage = (data) => {
       addIncomingMessage(data);
       const ch = CHANNEL_LABEL[data.conversation?.channel] || 'Mensaje';
-      toast(`[${ch}] ${data.contact?.name || 'Contacto'}: ${data.message?.content?.substring(0, 40) || '...'}`,
-        { duration: 4000 }
-      );
+      addNotifBadge(`${ch}`, `${data.contact?.name || 'Contacto'}: ${data.message?.content?.substring(0, 60) || '...'}`);
+    };
+
+    const onWhatsappMessage = (data) => {
+      const name = data.pushName || data.from || 'Contacto';
+      const preview = data.body ? data.body.substring(0, 60) : '...';
+      addNotifBadge('WhatsApp', name + ': ' + preview);
+    };
+
+    const onHumanNeeded = (data) => {
+      const name = data.contactName || (data.jid ? data.jid.split('@')[0] : 'Contacto');
+      addNotifBadge(`⚡ ${name} necesita atención`, data.message || 'El bot necesita apoyo humano');
+      fetchConversations();
     };
 
     const onEscalated = () => {
-      toast('Conversación escalada a agente', { duration: 5000 });
+      addNotifBadge('Conversación escalada', 'Una conversación fue escalada a agente');
       fetchConversations();
     };
 
     const onAssignedToYou = () => {
-      toast('Se te asignó una nueva conversación', { duration: 5000 });
+      addNotifBadge('Nueva asignación', 'Se te asignó una nueva conversación');
       fetchConversations();
     };
 
     const onDocReady = (data) => {
-      toast(`📄 Documento listo para revisar: "${data?.templateName || 'Documento'}"`, {
-        duration: 7000,
-        icon: '📄',
-      });
+      addNotifBadge('Documento listo', data?.templateName || 'Documento listo para revisar');
     };
 
     const onNewConversation = (data) => {
       const ch = CHANNEL_LABEL[data.conversation?.channel] || 'Nuevo chat';
-      toast(`[${ch}] Nueva conversación de ${data.conversation?.contact?.name || 'visitante'}`, { duration: 5000 });
+      addNotifBadge(ch, `Nueva conversación de ${data.conversation?.contact?.name || 'visitante'}`);
       fetchConversations();
     };
 
     socket.on('message:new',               onNewMessage);
+    socket.on('whatsapp:message',          (d) => { if (!d.fromMe) onWhatsappMessage(d); });
+    socket.on('whatsapp:human_needed',     onHumanNeeded);
     socket.on('message:sent',              fetchConversations);
-    socket.on('conversation:new',          fetchConversations);
+    socket.on('conversation:new',          onNewConversation);
     socket.on('conversation:escalated',    onEscalated);
     socket.on('conversation:assigned',     fetchConversations);
     socket.on('conversation:assigned_to_you', onAssignedToYou);
     socket.on('conversation:updated',      fetchConversations);
     socket.on('conversation:deleted',      (d) => removeConversation(d.conversationId));
+    socket.on('notification:new',          (n) => { setNotifications(prev => [n, ...prev.slice(0, 19)]); setUnreadCount(prev => prev + 1); });
     socket.on('document:ready',            onDocReady);
 
     return () => {
       socket.off('message:new',               onNewMessage);
+      socket.off('whatsapp:message');
+      socket.off('whatsapp:human_needed',    onHumanNeeded);
       socket.off('message:sent',              fetchConversations);
-      socket.off('conversation:new',          fetchConversations);
+      socket.off('conversation:new',          onNewConversation);
       socket.off('conversation:escalated',    onEscalated);
       socket.off('conversation:assigned',     fetchConversations);
       socket.off('conversation:assigned_to_you', onAssignedToYou);
       socket.off('conversation:updated',      fetchConversations);
       socket.off('conversation:deleted',      (d) => removeConversation(d.conversationId));
+      socket.off('notification:new');
       socket.off('document:ready',            onDocReady);
     };
   }, []);
@@ -343,6 +401,78 @@ export default function Layout() {
           )}
         </div>
 
+        {/* ── Notificaciones (campana) ────────────────── */}
+        <div className={`px-2 pt-2 relative ${sidebarOpen ? '' : 'hidden md:block'}`}>
+          <button
+            onClick={() => { setShowNotifs(p => !p); if (!showNotifs) loadNotifications(); }}
+            className="flex items-center gap-3 px-2.5 py-2.5 rounded-xl transition-all duration-150 w-full
+                       text-slate-400 hover:bg-white/5 hover:text-white relative"
+          >
+            <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center relative">
+              <Bell size={17} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </span>
+            <span className={`ts-sidebar-label text-sm font-medium truncate flex-1 text-left ${sidebarOpen ? '' : 'hidden md:block'}`}>
+              Notificaciones
+            </span>
+          </button>
+
+          {showNotifs && (
+            <div className="absolute left-full bottom-0 ml-2 w-80 max-h-96 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden"
+                 onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">Notificaciones</h3>
+                {unreadCount > 0 && (
+                  <button onClick={markAllRead} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">
+                    Marcar todo leído
+                  </button>
+                )}
+              </div>
+              <div className="overflow-y-auto max-h-72">
+                {notifications.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-8">Sin notificaciones</p>
+                ) : (
+                  notifications.map(n => (
+                    <div key={n.id}
+                      className={`px-4 py-3 border-b border-slate-50 dark:border-slate-700/50 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors
+                        ${!n.read ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}
+                      onClick={() => {
+                        setShowNotifs(false);
+                        if (n.type === 'appointment') navigate('/calendar');
+                        else if (n.type === 'human_needed' && n.metadata?.jid) {
+                          const params = new URLSearchParams({ wa_jid: n.metadata.jid });
+                          if (n.metadata.sessionId) params.set('wa_sid', n.metadata.sessionId);
+                          navigate('/inbox?' + params.toString());
+                        } else navigate('/inbox');
+                      }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="flex-shrink-0 mt-0.5 text-base">
+                          {n.type === 'appointment' ? '📅' : n.type === 'reminder' ? '⏰' : n.type === 'human_needed' ? '⚡' : '💬'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium truncate ${!n.read ? 'text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
+                            {n.title}
+                          </p>
+                          {n.body && <p className="text-xs text-slate-400 truncate mt-0.5">{n.body}</p>}
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+                            {new Date(n.created_at).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}
+                          </p>
+                        </div>
+                        {!n.read && <span className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0 mt-1.5" />}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* ── Modo claro / oscuro ─────────────────────── */}
         <div className={`px-2 pt-2 ${sidebarOpen ? '' : 'hidden md:block'}`}>
           <button
@@ -391,10 +521,27 @@ export default function Layout() {
           >
             {initials}
           </button>
-          {/* Info usuario */}
+          {/* Info usuario + disponibilidad */}
           <div className={`ts-sidebar-label flex-1 overflow-hidden ${sidebarOpen ? '' : 'hidden md:block'}`}>
             <p className="text-white text-xs font-semibold truncate">{user?.name || 'Usuario'}</p>
-            <p className="text-slate-500 text-xs truncate">{user?.email}</p>
+            <select
+              value={userAvailability}
+              onChange={async (e) => {
+                const val = e.target.value;
+                setUserAvailability(val);
+                try { await api.patch('/users/me/availability', { availability: val }); }
+                catch { toast.error('Error cambiando estado'); }
+              }}
+              className="mt-0.5 text-[10px] font-semibold rounded-full px-2 py-0.5 border-none outline-none cursor-pointer"
+              style={{
+                background: userAvailability === 'active' ? '#dcfce7' : userAvailability === 'break' ? '#fef3c7' : '#fef2f2',
+                color: userAvailability === 'active' ? '#16a34a' : userAvailability === 'break' ? '#d97706' : '#dc2626',
+              }}
+            >
+              <option value="active">🟢 Activo</option>
+              <option value="break">🟡 En descanso</option>
+              <option value="inactive">🔴 Inactivo</option>
+            </select>
           </div>
           {/* Logout */}
           <button
@@ -427,6 +574,23 @@ export default function Layout() {
         </header>
 
         {/* ── Área de contenido ──────────────────────── */}
+        {role === 'superadmin' && adminCompanyName && (
+          <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-2 bg-violet-600/15 border-b border-violet-500/30">
+            <span className="text-xs text-violet-300 font-semibold">
+              Gestionando: <span className="text-white">{adminCompanyName}</span>
+            </span>
+            <button
+              onClick={() => {
+                localStorage.removeItem('ts-admin-company-id');
+                localStorage.removeItem('ts-admin-company-name');
+                setAdminCompanyName(null);
+              }}
+              className="text-xs text-violet-400 hover:text-white transition-colors underline"
+            >
+              Quitar selección
+            </button>
+          </div>
+        )}
         <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>

@@ -1,5 +1,6 @@
 // frontend/src/components/Inbox/WhatsappBusinessPanel.jsx
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useWhatsappStore, useLabelStore, useAuthStore, useModuleStore } from '../../store';
 import ModuleRecordModal from '../Modules/ModuleRecordModal';
 import { whatsappApi } from '../../services/whatsappApi';
@@ -54,6 +55,7 @@ const chatDisplayName = (jid, name) =>
   name?.trim() || jid?.replace('@s.whatsapp.net', '').replace('@lid', '') || '';
 
 export default function WhatsappBusinessPanel() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     activeChat, setActiveChat,
     addMessage, getMessages, setChats,
@@ -290,19 +292,25 @@ export default function WhatsappBusinessPanel() {
 
     const onStatus = ({ sessionId: sid, status, sessionType }) => {
       if (sessionType !== 'business') return;
+      // Ignorar eventos de otras sesiones business (ej: empresa diferente)
+      const currentSid = sessionIdRef.current;
+      if (currentSid && sid && sid !== currentSid) return;
       const wasConnected = sessionStatusRef.current === 'connected';
       setSessionStatus(status);
       setQrImage(null);
       if (status === 'connected') {
         setSessionId(sid);
         if (!wasConnected) {
-          // Transición real: de no-conectado a conectado (primer QR scan o reconexión Baileys)
           toast.success('WhatsApp Business conectado');
           setSyncing(true);
           loadChats(sid);
         }
-        // Si ya estábamos "conectados" localmente pero el socket acaba de reconectar,
-        // la recarga la dispara el handler 'reconnect' del socket (ver abajo)
+      }
+      if (status === 'not_found') {
+        // Sesión eliminada (logout completo) — limpiar estado local
+        clearBizStorage();
+        setChatList([]);
+        setActiveBusinessChat(null);
       }
       if (status === 'disconnected') toast.error('WhatsApp Business desconectado');
     };
@@ -395,10 +403,37 @@ export default function WhatsappBusinessPanel() {
       toast(`📄 Documento listo para revisar: ${data?.templateName || ''}`, { duration: 5000 });
     };
 
+    const onChatUpdated = (data) => {
+      if (!data?.jid) return;
+      setChatList(prev => prev.map(c => {
+        if (c.jid !== data.jid) return c;
+        const updated = { ...c };
+        if (data.labels     !== undefined) updated.labels      = data.labels;
+        if (data.bot_enabled !== undefined) updated.bot_enabled = data.bot_enabled;
+        return updated;
+      }));
+    };
+
+    // Cuando WA normaliza el JID (ej: agrega código de país), actualizar sin duplicar
+    const onJidUpdated = ({ oldJid, newJid }) => {
+      if (!oldJid || !newJid || oldJid === newJid) return;
+      setChatList(prev => {
+        const hasNew = prev.some(c => c.jid === newJid);
+        return prev
+          .filter(c => c.jid !== oldJid || hasNew)
+          .map(c => c.jid === oldJid ? { ...c, jid: newJid } : c);
+      });
+      if (activeChatRef.current === oldJid) {
+        setActiveBusinessChat(newJid);
+      }
+    };
+
     socket.on('whatsapp:qr', onQr);
     socket.on('whatsapp:status', onStatus);
     socket.on('whatsapp:chats_synced', onChatsSync);
     socket.on('whatsapp:message', onMessage);
+    socket.on('whatsapp:chat_updated', onChatUpdated);
+    socket.on('whatsapp:jid_updated', onJidUpdated);
     socket.on('reconnect', onSocketReconnect);
     socket.on('document:ready', onDocReady);
 
@@ -407,6 +442,8 @@ export default function WhatsappBusinessPanel() {
       socket.off('whatsapp:status', onStatus);
       socket.off('whatsapp:chats_synced', onChatsSync);
       socket.off('whatsapp:message', onMessage);
+      socket.off('whatsapp:chat_updated', onChatUpdated);
+      socket.off('whatsapp:jid_updated', onJidUpdated);
       socket.off('reconnect', onSocketReconnect);
       socket.off('document:ready', onDocReady);
     };
@@ -418,17 +455,29 @@ export default function WhatsappBusinessPanel() {
     if (sessionId) joinWhatsappSession(sessionId);
   }, [sessionId]);
 
+  const [isSharedSession, setIsSharedSession] = useState(false);
+
   const loadBusinessSession = async (background = false) => {
     try {
       const res = await whatsappApi.getBusinessSessionStatus();
-      const { sessionId: sid, status } = res.data;
+      const { sessionId: sid, status, shared } = res.data;
       if (sid) joinWhatsappSession(sid);
       setSessionId(sid);
-      setSessionStatus(status);
-      if (status === 'connected' && !background) loadChats(sid);
-      if (background && status !== bizStatus) {
-        if (status === 'connected') loadChats(sid, true);
-        else setChatList([]);
+      setIsSharedSession(!!shared);
+      // En background: solo actualizar si el status cambió Y no es un not_found transitorio
+      // (el servidor puede tardar unos segundos en restaurar la sesión al reiniciar)
+      if (background) {
+        if (status === 'connected') {
+          setSessionStatus('connected');
+          if (status !== bizStatus) loadChats(sid, true);
+        } else if (status === 'disconnected') {
+          setSessionStatus('disconnected');
+          setChatList([]);
+        }
+        // not_found en background: ignorar — podría ser restauración en curso
+      } else {
+        setSessionStatus(status);
+        if (status === 'connected') loadChats(sid);
       }
     } catch {
       if (!background) setSessionStatus('not_found');
@@ -571,6 +620,14 @@ export default function WhatsappBusinessPanel() {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [sessionId]);
+
+  // Abrir chat desde parámetro URL (navegación desde notificación)
+  useEffect(() => {
+    const waJid = searchParams.get('wa_jid');
+    if (!waJid || sessionStatus !== 'connected') return;
+    handleOpenChat(waJid);
+    setSearchParams({}, { replace: true }); // limpiar params de la URL
+  }, [searchParams, sessionStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDownloadDoc = async (req) => {
     try {
@@ -820,6 +877,7 @@ const handleSendMedia = async (e) => {
 
   // ── Estado: sin sesión conectada ─────────────────────────
   if (sessionStatus === 'not_found' || sessionStatus === 'disconnected') {
+    const isAgent = user?.role === 'agent';
     return (
       <div className="flex flex-col items-center justify-center h-full gap-6 px-8 text-center">
         <div className="w-20 h-20 rounded-2xl bg-blue-50 flex items-center justify-center">
@@ -828,18 +886,22 @@ const handleSendMedia = async (e) => {
         <div>
           <p className="text-base font-semibold text-slate-700">WhatsApp Business</p>
           <p className="text-sm text-slate-400 mt-1">
-            {sessionStatus === 'disconnected'
-              ? 'La sesión fue desconectada. Las credenciales están guardadas.'
-              : 'Conecta tu número empresarial para atender clientes'}
+            {isAgent
+              ? 'No tienes acceso a una sesión de WhatsApp Business. Solicita acceso a tu administrador.'
+              : sessionStatus === 'disconnected'
+                ? 'La sesión fue desconectada. Las credenciales están guardadas.'
+                : 'Conecta tu número empresarial para atender clientes'}
           </p>
         </div>
-        <button
-          onClick={handleConnect}
-          className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-colors"
-        >
-          {sessionStatus === 'disconnected' ? 'Reconectar' : 'Conectar número business'}
-        </button>
-        {sessionStatus === 'disconnected' && (
+        {!isAgent && (
+          <button
+            onClick={handleConnect}
+            className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-colors"
+          >
+            {sessionStatus === 'disconnected' ? 'Reconectar' : 'Conectar número business'}
+          </button>
+        )}
+        {!isAgent && sessionStatus === 'disconnected' && (
           <button
             onClick={handleLogout}
             className="text-xs text-slate-400 hover:text-red-400 transition-colors underline"
@@ -1091,7 +1153,7 @@ const handleSendMedia = async (e) => {
                       <div className="flex items-center gap-1 ml-1 flex-shrink-0">
                         {/* Puntos de etiquetas */}
                         {(chat.labels || []).slice(0, 3).map(labelId => {
-                          const lbl = allLabels.find(l => l.id === labelId);
+                          const lbl = allLabels.find(l => l.id === labelId || l.nombre === labelId);
                           return lbl ? (
                             <span key={labelId} className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: lbl.color || '#6366f1' }} title={lbl.nombre} />
                           ) : null;
@@ -1166,7 +1228,7 @@ const handleSendMedia = async (e) => {
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 {/* Etiquetas asignadas */}
                 {currentLabels.map(labelId => {
-                  const lbl = allLabels.find(l => l.id === labelId);
+                  const lbl = allLabels.find(l => l.id === labelId || l.nombre === labelId);
                   if (!lbl) return null;
                   return (
                     <span
@@ -1369,9 +1431,15 @@ const handleSendMedia = async (e) => {
                   <span className="text-sm text-slate-500">Cargando mensajes...</span>
                 </div>
               ) : messages.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="bg-white/80 rounded-lg px-4 py-2 text-sm text-slate-500 shadow-sm">
-                    Sin mensajes en este chat
+                <div className="flex flex-col items-center justify-center h-full gap-3">
+                  <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-slate-600">Sin mensajes guardados</p>
+                    <p className="text-xs text-slate-400 mt-1">Los mensajes nuevos aparecerán aquí</p>
                   </div>
                 </div>
               ) : (

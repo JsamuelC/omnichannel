@@ -54,19 +54,40 @@ app.set('io', io);
 io.on('connection', (socket) => {
   logger.info(`🔌 Cliente conectado: ${socket.id}`);
 
-  socket.on('join:agents', (userId) => {
-    socket.join('agents');
-    socket.join(`user:${userId}`);
-    logger.info(`👤 Agente ${userId} unido a sala agents (socket ${socket.id})`);
-    // Enviar estado actual de sesiones WA para evitar la race condition
-    // en la que el backend ya conectó antes de que el frontend uniera la sala
-    const waSessions = whatsappService.getAllSessions();
-    for (const s of waSessions) {
-      socket.emit('whatsapp:status', {
-        sessionId:   s.sessionId,
-        status:      s.status,
-        sessionType: s.sessionType || 'personal'
-      });
+  socket.on('join:agents', async (userId) => {
+    try {
+      const { User } = require('./models');
+      const user = await User.findByPk(userId, { attributes: ['company_id', 'role'] });
+      const isSuperAdmin = user?.role === 'superadmin';
+      const companyId    = user?.company_id;
+
+      if (isSuperAdmin || !companyId) {
+        socket.join('agents');
+        logger.info(`👤 Superadmin ${userId} unido a sala agents global (socket ${socket.id})`);
+      } else {
+        socket.join(`agents:${companyId}`);
+        logger.info(`👤 Agente ${userId} unido a sala agents:${companyId} (socket ${socket.id})`);
+      }
+      socket.join(`user:${userId}`);
+
+      // Enviar estado actual de sesiones WA filtrado por empresa
+      const waSessions = whatsappService.getAllSessions();
+      for (const s of waSessions) {
+        if (!isSuperAdmin && companyId) {
+          const sessionCid = whatsappService.getSessionCompanyId(s.sessionId);
+          if (sessionCid && sessionCid !== companyId) continue;
+        }
+        socket.emit('whatsapp:status', {
+          sessionId:   s.sessionId,
+          status:      s.status,
+          sessionType: s.sessionType || 'personal'
+        });
+      }
+    } catch (e) {
+      // Fallback seguro: sala global si falla la DB
+      socket.join('agents');
+      socket.join(`user:${userId}`);
+      logger.warn(`⚠️  join:agents fallback global para ${userId}: ${e.message}`);
     }
   });
 
@@ -111,6 +132,7 @@ io.on('connection', (socket) => {
 
 messageService.setSocketIO(io);
 whatsappService.setSocketIO(io);
+try { require('./services/notificationService').setSocketIO(io); } catch (_) {}
 
 
 // ─────────────────────────────────────
@@ -130,11 +152,42 @@ app.get('/widget.js', (req, res) => {
 // MIDDLEWARES
 // ─────────────────────────────────────
 app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginResourcePolicy: false,
-  strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:  ["'self'"],
+      scriptSrc:   ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc:    ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc:     ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc:      ["'self'", "data:", "blob:", "https:"],
+      connectSrc:  ["'self'", "wss:", "ws:", "https:"],
+      frameSrc:    ["'none'"],
+      objectSrc:   ["'none'"],
+      baseUri:     ["'self'"],
+      formAction:  ["'self'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  frameguard: { action: 'sameorigin' },
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-  permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+  noSniff: true,
+  permissionsPolicy: {
+    features: {
+      camera:        ["()"],
+      microphone:    ["()"],
+      geolocation:   ["()"],
+      payment:       ["()"],
+      usb:           ["()"],
+      magnetometer:  ["()"],
+      gyroscope:     ["()"],
+      accelerometer: ["()"],
+    },
+  },
 }));
 
 app.use((req, res, next) => {
@@ -207,6 +260,7 @@ const startServer = async () => {
     await connectRedis();
     await migrate();
     campaignService.initializeProcessor();
+    require('./services/reminderService').startReminderChecker();
     await seedDefaultTeam();
     await whatsappService.restoreAllSessions();
 
@@ -264,13 +318,17 @@ const seedDefaultTeam = async () => {
   };
 
   await ensureUser({
-    name: 'Super Administrador', email: 'superadmin@tecnossync.com',
-    password: 'TuPassword123', role: 'superadmin', company_id: null
+    name: 'Super Administrador',
+    email:    process.env.SUPERADMIN_EMAIL    || 'superadmin@tecnossync.com',
+    password: process.env.SUPERADMIN_PASSWORD || 'TuPassword123',
+    role: 'superadmin', company_id: null
   });
 
   await ensureUser({
-    name: 'Administrador', email: 'admin@tecnossync.com',
-    password: 'Tecnossync2025!', role: 'admin', company_id: companyId
+    name: 'Administrador',
+    email:    process.env.ADMIN_EMAIL    || 'admin@tecnossync.com',
+    password: process.env.ADMIN_PASSWORD || 'Tecnossync2025!',
+    role: 'admin', company_id: companyId
   });
 
   // ── 3. Agentes de ejemplo (solo si no hay más usuarios) ────
@@ -295,10 +353,11 @@ const seedDefaultTeam = async () => {
   if (fixed > 0) logger.info(`🔗 ${fixed} usuario(s) vinculado(s) a empresa ${company.nombre}`);
 
   logger.info('─────────────────────────────────────────────');
-  logger.info('✅ Cuentas del sistema:');
-  logger.info('   SuperAdmin: superadmin@tecnossync.com / TuPassword123');
-  logger.info('   Admin:      admin@tecnossync.com / Tecnossync2025!');
-  logger.warn('⚠️  CAMBIA LAS CONTRASEÑAS EN PRODUCCIÓN');
+  logger.info('Cuentas del sistema verificadas');
+  if (process.env.NODE_ENV !== 'production') {
+    logger.info(`   SuperAdmin: ${process.env.SUPERADMIN_EMAIL || 'superadmin@tecnossync.com'}`);
+    logger.info(`   Admin:      ${process.env.ADMIN_EMAIL || 'admin@tecnossync.com'}`);
+  }
   logger.info('─────────────────────────────────────────────');
 };
 

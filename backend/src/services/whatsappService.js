@@ -19,6 +19,57 @@ fs.mkdirSync(MEDIA_DIR,   { recursive: true })
 let _io = null
 const setSocketIO = (io) => { _io = io }
 
+// Caché en memoria para no hacer DB por cada mensaje
+const _sessionCompanyCache = {}
+
+// Acceso sincrónico al caché (útil en contextos donde ya fue resuelto antes)
+function getSessionCompanyId(sessionId) {
+  return _sessionCompanyCache[sessionId] || null
+}
+
+// Emite a la sala de la empresa + sala global (superadmin)
+function emitToCompany(sessionId, event, data) {
+  const companyId = _sessionCompanyCache[sessionId]
+  if (companyId) {
+    _io?.to(`agents:${companyId}`).emit(event, data)
+  }
+  _io?.to('agents').emit(event, data) // superadmin siempre recibe
+}
+
+async function resolveSessionCompanyId(sessionId) {
+  if (_sessionCompanyCache[sessionId] !== undefined) return _sessionCompanyCache[sessionId]
+  if (sessionId?.startsWith('business_')) {
+    const userId = sessionId.replace('business_', '')
+    try {
+      const { User, WhatsappChat } = require('../models')
+      const { Op } = require('sequelize')
+      const user = await User.findByPk(userId, { attributes: ['company_id'] })
+      if (user?.company_id) {
+        _sessionCompanyCache[sessionId] = user.company_id
+      } else {
+        // Superadmin o usuario sin empresa: derivar company_id desde chats existentes
+        const chat = await WhatsappChat.findOne({
+          where: { session_id: sessionId, company_id: { [Op.ne]: null } },
+          attributes: ['company_id']
+        })
+        _sessionCompanyCache[sessionId] = chat?.company_id || null
+      }
+    } catch (_) { _sessionCompanyCache[sessionId] = null }
+  } else {
+    // Sesiones personales: buscar company_id desde chats existentes en DB
+    try {
+      const { WhatsappChat } = require('../models')
+      const { Op } = require('sequelize')
+      const chat = await WhatsappChat.findOne({
+        where: { session_id: sessionId, company_id: { [Op.ne]: null } },
+        attributes: ['company_id']
+      })
+      _sessionCompanyCache[sessionId] = chat?.company_id || null
+    } catch (_) { _sessionCompanyCache[sessionId] = null }
+  }
+  return _sessionCompanyCache[sessionId]
+}
+
 // Mapa LID→JID autoritativo: { sessionId: { 'X@lid': 'Y@s.whatsapp.net' } }
 // Se construye SOLO desde contacts.set / contacts.upsert / messaging-history.set
 const lidToJid = {}
@@ -148,9 +199,10 @@ async function syncChat(sessionId, chat, sessionType = 'personal', sock = null) 
   if (jid.endsWith('@g.us')) return
   if (jid.endsWith('@lid'))  return
 
-  const name    = resolveContactName(chat, jid, sock)
-  const ts      = toUnixTs(chat.conversationTimestamp)
-  const lastMsg = extractLastMsgBody(chat)
+  const name      = resolveContactName(chat, jid, sock)
+  const ts        = toUnixTs(chat.conversationTimestamp)
+  const lastMsg   = extractLastMsgBody(chat)
+  const companyId = await resolveSessionCompanyId(sessionId)
 
   try {
     const [record, created] = await WhatsappChat.findOrCreate({
@@ -162,7 +214,8 @@ async function syncChat(sessionId, chat, sessionType = 'personal', sock = null) 
         contact_name:    name,
         last_message:    lastMsg,
         last_message_at: ts,
-        unread_count:    chat.unreadCount || 0
+        unread_count:    chat.unreadCount || 0,
+        company_id:      companyId
       }
     })
     if (!created) {
@@ -173,6 +226,7 @@ async function syncChat(sessionId, chat, sessionType = 'personal', sock = null) 
       if (chat.unreadCount !== undefined && chat.unreadCount !== record.unread_count) {
         updates.unread_count = chat.unreadCount
       }
+      if (companyId && !record.company_id)       updates.company_id = companyId
       if (Object.keys(updates).length > 0) await record.update(updates)
     }
   } catch (_) {}
@@ -204,19 +258,28 @@ async function saveHistoryMessage(sessionId, sessionType, msg) {
     else if (innerMessage.stickerMessage)      { body = '[Sticker]'; contentType = 'image' }
     else return // tipo desconocido, ignorar
 
+    // contact_name es siempre del contacto, no del remitente (fromMe)
+    const histContactName = fromMe ? '' : pushName
     await WhatsappMessage.findOrCreate({
       where:    { external_id: extId },
-      defaults: { session_id: sessionId, jid, contact_name: pushName, body, from_me: fromMe, timestamp, external_id: extId, content_type: contentType, metadata: {} }
+      defaults: { session_id: sessionId, jid, contact_name: histContactName, body, from_me: fromMe, timestamp, external_id: extId, content_type: contentType, metadata: {} }
     })
 
     // Actualizar metadata del chat si este mensaje es más reciente
+    const companyId2 = await resolveSessionCompanyId(sessionId)
     const [chatRecord] = await WhatsappChat.findOrCreate({
       where:    { session_id: sessionId, jid },
-      defaults: { session_id: sessionId, jid, contact_name: pushName, session_type: sessionType, last_message_at: timestamp, last_message: body }
+      defaults: { session_id: sessionId, jid, contact_name: histContactName, session_type: sessionType, last_message_at: timestamp, last_message: body, company_id: companyId2 }
     })
+    const histUpdates = {}
     if (timestamp > (chatRecord.last_message_at || 0)) {
-      await chatRecord.update({ last_message: body, last_message_at: timestamp, contact_name: chatRecord.contact_name || pushName })
+      histUpdates.last_message = body
+      histUpdates.last_message_at = timestamp
+      // Solo actualizar nombre si el mensaje es del contacto y trae nombre
+      if (!fromMe && pushName) histUpdates.contact_name = chatRecord.contact_name || pushName
     }
+    if (companyId2 && !chatRecord.company_id) histUpdates.company_id = companyId2
+    if (Object.keys(histUpdates).length > 0) await chatRecord.update(histUpdates)
   } catch (e) {
     logger.warn(`⚠️  saveHistoryMessage error [${sessionId}]: ${e.message}`)
   }
@@ -311,8 +374,8 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
   const pushName  = msg.pushName || ''
   const timestamp = Number(msg.messageTimestamp) || Math.floor(Date.now() / 1000)
 
-  if (!isRealtime && (Date.now() / 1000 - timestamp) > 172800) {
-    logger.info(`🚫 [${sessionId}] filtrado: append >48h jid=${jid} ts=${timestamp}`)
+  if (!isRealtime && (Date.now() / 1000 - timestamp) > 604800) {
+    logger.info(`🚫 [${sessionId}] filtrado: append >7d jid=${jid} ts=${timestamp}`)
     return
   }
 
@@ -387,7 +450,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
     const cutoff = await WhatsappMessage.findOne({
       where:  { session_id: sessionId, jid },
       order:  [['timestamp', 'DESC']],
-      offset: 99,
+      offset: 199,
       attributes: ['timestamp']
     })
     if (cutoff) {
@@ -398,22 +461,76 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
   } catch (_) {}
 
   try {
+    const companyId = await resolveSessionCompanyId(sessionId)
+    // contact_name siempre es el nombre del contacto (destinatario), nunca el del remitente
+    const contactName = fromMe ? (chatRecord?.contact_name || '') : (pushName || chatRecord?.contact_name || '')
     const [chatRecord] = await WhatsappChat.findOrCreate({
       where:    { session_id: sessionId, jid },
-      defaults: { session_id: sessionId, jid, contact_name: pushName, session_type: sessionType }
+      defaults: { session_id: sessionId, jid, contact_name: contactName, session_type: sessionType, company_id: companyId }
     })
-    const nameToKeep = chatRecord.contact_name || pushName || ''
-    await chatRecord.update({
-      contact_name:    nameToKeep,
+    const nameToKeep = chatRecord.contact_name || (!fromMe ? pushName : '') || ''
+    const liveUpdate = {
       last_message:    body,
       last_message_at: timestamp,
       unread_count:    fromMe ? 0 : (chatRecord.unread_count || 0) + 1
-    })
+    }
+    // Solo actualizar nombre si el mensaje es del contacto (no fromMe) y trae un nombre nuevo
+    if (!fromMe && pushName && pushName !== chatRecord.contact_name) liveUpdate.contact_name = pushName
+    if (companyId && !chatRecord.company_id) liveUpdate.company_id = companyId
+    await chatRecord.update(liveUpdate)
 
     const isOldMessage = (Date.now() / 1000 - timestamp) > 86400
     const botEnabled = chatRecord.bot_enabled === true || chatRecord.bot_enabled === 1
-    logger.info(`🤖 Bot check [${jid}]: fromMe=${fromMe} type=${contentType} botEnabled=${botEnabled} isOld=${isOldMessage} realtime=${isRealtime}`)
-    if (!fromMe && contentType === 'text' && body.trim() && botEnabled && !isOldMessage && isRealtime) {
+
+    // Transcribir audio si es nota de voz y el bot está activo
+    let transcribedText = null
+    if (!fromMe && contentType === 'audio' && botEnabled && !isOldMessage && isRealtime) {
+      try {
+        const { transcribeAudio } = require('./transcriptionService')
+        const audioPath = `uploads/${sessionId}_${timestamp}.ogg`
+        const fs = require('fs')
+        const path = require('path')
+        const absPath = path.join(__dirname, '../../', audioPath)
+        // Descargar el audio del mensaje
+        const { downloadMediaMessage } = require('@whiskeysockets/baileys')
+        const activeSock = sessions[sessionId]?.sock || sock
+        if (activeSock && msg.message) {
+          const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: require('pino')({ level: 'silent' }), reuploadRequest: activeSock.updateMediaMessage })
+          if (buffer) {
+            fs.mkdirSync(path.dirname(absPath), { recursive: true })
+            fs.writeFileSync(absPath, buffer)
+            transcribedText = await transcribeAudio(absPath)
+            try { fs.unlinkSync(absPath) } catch (_) {}
+          }
+        }
+        if (transcribedText) {
+          body = transcribedText
+          logger.info(`🎤 Nota de voz transcrita [${jid}]: "${transcribedText.substring(0, 60)}"`)
+        }
+      } catch (e) {
+        logger.warn(`⚠️ Error transcribiendo audio [${jid}]: ${e.message}`)
+      }
+    }
+
+    // Verificar que el BotConfig global de la empresa esté activo
+    let globalBotActive = true
+    if (botEnabled && chatRecord.company_id) {
+      try {
+        const { BotConfig } = require('../models')
+        const { Op } = require('sequelize')
+        const cfg = await BotConfig.findOne({
+          where: { company_id: chatRecord.company_id, channel: { [Op.in]: ['whatsapp', 'all'] } },
+          order: [['updated_at', 'DESC']]
+        })
+        if (cfg && !cfg.is_active) {
+          globalBotActive = false
+          logger.info(`🤖 Bot global desactivado para company ${chatRecord.company_id} — omitiendo respuesta`)
+        }
+      } catch (_) {}
+    }
+
+    logger.info(`🤖 Bot check [${jid}]: fromMe=${fromMe} type=${contentType} botEnabled=${botEnabled} globalActive=${globalBotActive} isOld=${isOldMessage} realtime=${isRealtime}`)
+    if (!fromMe && (contentType === 'text' || transcribedText) && body.trim() && botEnabled && globalBotActive && !isOldMessage && isRealtime) {
       try {
         const chatbotService = require('./chatbotService')
 
@@ -433,7 +550,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
                 defaults: { session_id: sessionId, jid, contact_name: nameToKeep, body: docResult.reply, from_me: true, timestamp: docTs, content_type: 'text', metadata: {} }
               })
               await chatRecord.update({ last_message: docResult.reply, last_message_at: docTs })
-              _io?.to('agents').emit('whatsapp:message', {
+              emitToCompany(sessionId, 'whatsapp:message', {
                 sessionId, from: jid, body: docResult.reply,
                 timestamp: docTs, externalId: docExtId,
                 fromMe: true, pushName: 'Bot', contentType: 'text', mediaUrl: null, sessionType
@@ -444,7 +561,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
         }
 
         // ── Prioridad 2: bot IA normal ──
-        const result      = await chatbotService.handleWhatsappMessage(sessionId, jid, body, chatRecord)
+        const result      = await chatbotService.handleWhatsappMessage(sessionId, jid, body, chatRecord, _io)
         const aiResponse  = result?.text        || null
         const catalogFile = result?.catalogFile || null
         const handoff     = result?.handoff     || false
@@ -487,7 +604,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
             }
           })
           await chatRecord.update({ last_message: aiResponse, last_message_at: botTs })
-          _io?.to('agents').emit('whatsapp:message', {
+          emitToCompany(sessionId, 'whatsapp:message', {
             sessionId, from: jid, body: aiResponse,
             timestamp: botTs, externalId: botExtId,
             fromMe: true, pushName: 'Bot', contentType: 'text', mediaUrl: null,
@@ -503,15 +620,16 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
             const { DocumentTemplate, DocumentRequest } = require('../models')
             const { Op } = require('sequelize')
             const companyWhere = chatRecord.company_id ? { company_id: chatRecord.company_id } : {}
-            // Primero buscar coincidencia exacta, luego parcial
+            // Buscar por identificador exacto → nombre exacto → nombre parcial
             let tpl = await DocumentTemplate.findOne({
+              where: { identificador: startDoc.trim().toLowerCase(), ...companyWhere }
+            })
+            if (!tpl) tpl = await DocumentTemplate.findOne({
               where: { name: { [Op.iLike]: startDoc }, ...companyWhere }
             })
-            if (!tpl) {
-              tpl = await DocumentTemplate.findOne({
-                where: { name: { [Op.iLike]: `%${startDoc}%` }, ...companyWhere }
-              })
-            }
+            if (!tpl) tpl = await DocumentTemplate.findOne({
+              where: { name: { [Op.iLike]: `%${startDoc}%` }, ...companyWhere }
+            })
             if (tpl) {
               const manualFields = Object.values(
                 (tpl.fields || []).filter(f => f.source === 'manual')
@@ -556,7 +674,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
                     }
                   })
                   await chatRecord.update({ last_message: introMsg, last_message_at: docTs })
-                  _io?.to('agents').emit('whatsapp:message', {
+                  emitToCompany(sessionId, 'whatsapp:message', {
                     sessionId, from: jid, body: introMsg,
                     timestamp: docTs, externalId: docExtId,
                     fromMe: true, pushName: 'Bot', contentType: 'text', mediaUrl: null,
@@ -655,7 +773,7 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
 
   if (!fromMe) {
     logger.info(`📤 Emitiendo whatsapp:message a agents: from=${jid} body="${body?.slice(0,50)}"`)
-    _io?.to('agents').emit('whatsapp:message', {
+    emitToCompany(sessionId, 'whatsapp:message', {
       sessionId, from: jid, body, timestamp,
       pushName, fromMe: false, contentType, mediaUrl,
       mediaMimetype: mediaMeta?.mimetype || null,
@@ -669,8 +787,8 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
 // IDs de mensajes ya emitidos vía history→realtime — persiste entre reconexiones del mismo sessionId
 const realtimeEmitted = {}
 
-// ── createSession ahora recibe sessionType ───────────────────
-async function createSession(sessionId, sessionType = 'personal') {
+// ── createSession ahora recibe sessionType y companyId opcional ──
+async function createSession(sessionId, sessionType = 'personal', companyId = null) {
   const sessionPath = path.join(SESSION_DIR, sessionId)
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath)
 
@@ -679,8 +797,6 @@ async function createSession(sessionId, sessionType = 'personal') {
   const sock = makeWASocket({
     auth: {
       creds: state.creds,
-      // makeCacheableSignalKeyStore garantiza que las sesiones Signal se persisten correctamente
-      // entre mensajes — sin esto cada mensaje tiene pendingPreKey (primera sesión) y no llega al cliente
       keys: makeCacheableSignalKeyStore(state.keys, require('pino')({ level: 'silent' }))
     },
     browser:           Browsers.macOS('Desktop'),
@@ -689,6 +805,10 @@ async function createSession(sessionId, sessionType = 'personal') {
     syncFullHistory:   false,
     markOnlineOnConnect: true,
     generateHighQualityLinkPreview: false,
+    connectTimeoutMs:     60000,
+    defaultQueryTimeoutMs: 60000,
+    retryRequestDelayMs:  500,
+    qrTimeout:            40000,
     // getMessage permite a Baileys descifrar mensajes reintentados (CIPHERTEXT retry)
     getMessage: async (key) => {
       try {
@@ -699,21 +819,32 @@ async function createSession(sessionId, sessionType = 'personal') {
     }
   })
 
-  sessions[sessionId] = { sock, status: 'connecting', sessionType, qr: null, historyBatches: 0, lastNotifyAt: 0 }
+  // Pre-cachear company_id para poder emitir a la sala correcta desde el inicio
+  if (companyId && _sessionCompanyCache[sessionId] === undefined) {
+    _sessionCompanyCache[sessionId] = companyId
+  }
+  await resolveSessionCompanyId(sessionId)
 
-  // Timeout de 90 s: si no hay QR ni conexión, credenciales corruptas → limpiar y notificar
+  // Preservar contador de intentos entre reconexiones para backoff exponencial
+  const prevAttempts = sessions[sessionId]?.reconnectAttempts || 0
+  sessions[sessionId] = { sock, status: 'connecting', sessionType, qr: null, historyBatches: 0, lastNotifyAt: 0, reconnectAttempts: prevAttempts }
+
+  // Timeout solo para sesiones NUEVAS (sin credenciales en disco → esperando QR).
+  // Si ya hay credenciales (restore), WA tardará unos segundos pero no es credencial corrupta.
+  const isRestore = fs.existsSync(path.join(sessionPath, 'creds.json'))
   let connectResolved = false
-  const connectTimeout = setTimeout(() => {
+  const connectTimeoutMs = isRestore ? 0 : 120000  // restore: sin timeout; nuevo: 2 min
+  const connectTimeout = connectTimeoutMs ? setTimeout(() => {
     if (connectResolved) return
     if (sessions[sessionId]?.status === 'connecting') {
-      logger.warn(`⏱️ [${sessionId}] Sin respuesta de WA en 90s — credenciales inválidas, limpiando`)
+      logger.warn(`⏱️ [${sessionId}] Sin QR en 120s — credenciales inválidas, limpiando`)
       delete sessions[sessionId]
       delete realtimeEmitted[sessionId]
       if (fs.existsSync(sessionPath)) fs.rmSync(sessionPath, { recursive: true, force: true })
-      _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'not_found', sessionType })
+      emitToCompany(sessionId, 'whatsapp:status', { sessionId, status: 'not_found', sessionType })
       try { sock.end(undefined) } catch (_) {}
     }
-  }, 90000)
+  }, connectTimeoutMs) : null
 
   // ── Conexión ─────────────────────────────────────────────
   sock.ev.on('connection.update', async (update) => {
@@ -724,23 +855,23 @@ async function createSession(sessionId, sessionType = 'personal') {
 
     if (qr) {
       connectResolved = true
-      clearTimeout(connectTimeout)
+      if (connectTimeout) clearTimeout(connectTimeout)
       logger.info(`📱 QR generado para ${sessionId} — esperando escaneo`)
       const qrImage = await qrcode.toDataURL(qr)
       if (sessions[sessionId]) sessions[sessionId].qr = qrImage
       _io?.to(`session:${sessionId}`).emit('whatsapp:qr', { sessionId, qr: qrImage, sessionType })
-      _io?.to('agents').emit('whatsapp:qr', { sessionId, qr: qrImage, sessionType })
+      emitToCompany(sessionId, 'whatsapp:qr', { sessionId, qr: qrImage, sessionType })
     }
 
     if (connection === 'open') {
       connectResolved = true
-      clearTimeout(connectTimeout)
+      if (connectTimeout) clearTimeout(connectTimeout)
       if (sessions[sessionId]) {
         sessions[sessionId].status = 'connected'
         sessions[sessionId].qr = null
         sessions[sessionId].historyBatches = 0  // reset para nueva conexión
       }
-      _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'connected', sessionType })
+      emitToCompany(sessionId, 'whatsapp:status', { sessionId, status: 'connected', sessionType })
       _io?.to(`session:${sessionId}`).emit('whatsapp:status', { sessionId, status: 'connected', sessionType })
       logger.info(`✅ WhatsApp ${sessionType} conectado: ${sessionId}`)
 
@@ -765,32 +896,35 @@ async function createSession(sessionId, sessionType = 'personal') {
       // fetchStatus('@all') eliminado — causa bloqueo de 60+ segundos innecesariamente.
       // Los nombres de contactos llegan via contacts.set / contacts.upsert / messaging-history.
 
-      // ── Keep-alive liviano cada 3 minutos con detección de conexión muerta ──
-      // Si 3 keep-alives seguidos fallan, la conexión está zombie → forzar reconexión.
+      // ── Keep-alive: Baileys maneja reconexión internamente; solo detectamos zombie ──
+      // Un socket zombie es uno donde status='connected' pero WS lleva CERRADO (state 2/3).
+      // state=undefined significa que Baileys usa otro transporte → ignorar, no es fallo.
+      if (sessions[sessionId]) sessions[sessionId].reconnectAttempts = 0  // reset en conexión exitosa
       let keepAliveFails = 0
-      const keepAliveTimer = setInterval(async () => {
+      const keepAliveTimer = setInterval(() => {
         if (!sessions[sessionId] || sessions[sessionId].sock !== sock) {
           clearInterval(keepAliveTimer)
           return
         }
         if (sessions[sessionId].status !== 'connected') return
-        try {
-          await sock.fetchBlocklist()
-          keepAliveFails = 0
-          logger.info(`💓 [${sessionId}] Keep-alive OK`)
-        } catch (e) {
+        // sock.ws puede ser un objeto Baileys propio — readyState solo existe en WS nativo
+        const wsState = sock.ws?.readyState
+        // Solo fallar si el WS está EXPLÍCITAMENTE cerrado (2=CLOSING, 3=CLOSED)
+        // undefined o 0 (CONNECTING) no son fallos — Baileys puede estar reconectando
+        if (wsState === 2 || wsState === 3) {
           keepAliveFails++
-          logger.warn(`💓 [${sessionId}] Keep-alive falló (${keepAliveFails}/3): ${e.message}`)
+          logger.warn(`💓 [${sessionId}] WS cerrado (state=${wsState}) — fallo ${keepAliveFails}/3`)
           if (keepAliveFails >= 3) {
             logger.warn(`💀 [${sessionId}] Conexión zombie detectada — forzando reconexión`)
             clearInterval(keepAliveTimer)
             if (sessions[sessionId]) sessions[sessionId].status = 'disconnected'
-            _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'disconnected', sessionType })
+            emitToCompany(sessionId, 'whatsapp:status', { sessionId, status: 'disconnected', sessionType })
             try { sock.end(undefined) } catch (_) {}
-            // connection.update con 'close' se encargará de reconectar
           }
+        } else {
+          if (keepAliveFails > 0) keepAliveFails = 0  // reset si vuelve a estar OK
         }
-      }, 3 * 60 * 1000) // cada 3 minutos
+      }, 5 * 60 * 1000) // cada 5 minutos
     }
 
     if (connection === 'close') {
@@ -798,23 +932,50 @@ async function createSession(sessionId, sessionType = 'personal') {
       const reason = lastDisconnect?.error?.message || 'desconocido'
       logger.info(`🔌 WA desconectado [${sessionId}]: code=${code} reason="${reason}"`)
       if (sessions[sessionId]) { sessions[sessionId].status = 'disconnected'; sessions[sessionId].qr = null }
-      _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'disconnected', sessionType })
+      emitToCompany(sessionId, 'whatsapp:status', { sessionId, status: 'disconnected', sessionType })
       _io?.to(`session:${sessionId}`).emit('whatsapp:status', { sessionId, status: 'disconnected', sessionType })
       const sessionPath = path.join(SESSION_DIR, sessionId)
-      if (code === DisconnectReason.loggedOut || code === 401) {
-        // Credenciales inválidas: limpiar todo y notificar al frontend para mostrar botón de conectar
-        logger.warn(`🚫 [${sessionId}] WA rechazó la sesión (credenciales inválidas), limpiando...`)
+
+      // ── Clasificar el código de desconexión ────────────────────────────────
+      const FATAL_CODES = [
+        DisconnectReason.loggedOut,           // 401 — sesión cerrada por el usuario en el teléfono
+        DisconnectReason.multideviceMismatch, // 411 — cuenta no tiene multi-device habilitado
+        // 500 (badSession) NO es fatal — puede ser error transitorio del servidor de WA
+        // Solo reconectar, no borrar credenciales
+      ]
+      // 440 = connectionReplaced → otro cliente WA Web abierto, reconectamos para tomar el turno de vuelta
+      const isFatal  = FATAL_CODES.includes(code)
+      const hasFiles = fs.existsSync(sessionPath)
+      const inMemory = !!sessions[sessionId]
+
+      if (isFatal) {
+        // Sesión revocada por el teléfono → limpiar todo y mostrar botón de escanear QR
+        logger.warn(`🚫 [${sessionId}] Sesión revocada (code=${code}) — limpiando credenciales`)
         delete sessions[sessionId]
         delete realtimeEmitted[sessionId]
-        if (fs.existsSync(sessionPath)) fs.rmSync(sessionPath, { recursive: true, force: true })
-        _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'not_found', sessionType })
-      } else if (sessions[sessionId] && fs.existsSync(sessionPath)) {
-        logger.info(`🔄 Reconectando sesión ${sessionType}: ${sessionId}`)
-        createSession(sessionId, sessionType)
-      } else if (sessions[sessionId] && !fs.existsSync(sessionPath)) {
+        delete lidToJid[sessionId]
+        delete lidFallback[sessionId]
+        if (hasFiles) fs.rmSync(sessionPath, { recursive: true, force: true })
+        emitToCompany(sessionId, 'whatsapp:status', { sessionId, status: 'not_found', sessionType })
+      } else if (inMemory && hasFiles) {
+        // Desconexión transitoria (red, teléfono apagado, timeout, etc.) → reconectar con backoff
+        const attempts = (sessions[sessionId]?.reconnectAttempts || 0) + 1
+        if (sessions[sessionId]) sessions[sessionId].reconnectAttempts = attempts
+        // Backoff: 5s → 15s → 30s → 60s (máximo), reset al conectar exitosamente
+        const delays   = [5000, 15000, 30000, 60000]
+        const delay    = delays[Math.min(attempts - 1, delays.length - 1)]
+        logger.info(`🔄 [${sessionId}] Reconectando en ${delay/1000}s (intento ${attempts}, code=${code})`)
+        setTimeout(() => {
+          // Solo reconectar si la sesión no fue eliminada manualmente mientras esperábamos
+          if (sessions[sessionId] && fs.existsSync(path.join(SESSION_DIR, sessionId))) {
+            createSession(sessionId, sessionType)
+          }
+        }, delay)
+      } else if (inMemory && !hasFiles) {
+        // Archivos eliminados (logout manual) mientras la sesión seguía en memoria
         delete sessions[sessionId]
         delete realtimeEmitted[sessionId]
-        logger.info(`🧹 Sesión ${sessionId} limpiada de memoria (archivos eliminados)`)
+        logger.info(`🧹 [${sessionId}] Sesión limpiada de memoria (archivos eliminados)`)
       }
     }
   })
@@ -842,14 +1003,14 @@ async function createSession(sessionId, sessionType = 'personal') {
   sock.ev.on('chats.set', async ({ chats }) => {
     logger.info(`📋 chats.set: ${chats.length} chats para ${sessionId} (${sessionType})`)
     for (const chat of chats) await syncChat(sessionId, chat, sessionType, sock)
-    _io?.to('agents').emit('whatsapp:chats_synced', { sessionId, sessionType })
+    emitToCompany(sessionId, 'whatsapp:chats_synced', { sessionId, sessionType })
   })
 
   // ── chats.upsert ─────────────────────────────────────────
   sock.ev.on('chats.upsert', async (chats) => {
     logger.info(`📋 chats.upsert: ${chats.length} chats para ${sessionId} (${sessionType})`)
     for (const chat of chats) await syncChat(sessionId, chat, sessionType, sock)
-    _io?.to('agents').emit('whatsapp:chats_synced', { sessionId, sessionType })
+    emitToCompany(sessionId, 'whatsapp:chats_synced', { sessionId, sessionType })
   })
 
   // ── messaging-history.set ────────────────────────────────
@@ -866,10 +1027,15 @@ async function createSession(sessionId, sessionType = 'personal') {
 
     logger.info(`📋 messaging-history [batch ${batchNum}]: chats=${chats?.length || 0} contacts=${contacts?.length || 0} msgs=${messages?.length || 0} para ${sessionId}`)
 
-    // Batches 3+: ignorar completamente — evita miles de operaciones DB con historial antiguo.
-    // Los primeros 2 batches contienen los mensajes más recientes (últimas 48-72h).
-    if (batchNum > 2) {
-      logger.info(`⏭️  [${sessionId}] Batch ${batchNum}: ignorado — solo procesar primeros 2 batches`)
+    // Batches vacíos: ignorar (WA a veces envía batches de relleno sin datos)
+    const hasData = (chats?.length || 0) + (messages?.length || 0) > 0
+    if (!hasData) {
+      logger.info(`⏭️  [${sessionId}] Batch ${batchNum}: vacío — ignorado`)
+      return
+    }
+    // Batch 15+: corte de seguridad para no procesar historial muy antiguo
+    if (batchNum > 15) {
+      logger.info(`⏭️  [${sessionId}] Batch ${batchNum}: límite de seguridad alcanzado`)
       return
     }
 
@@ -946,8 +1112,8 @@ async function createSession(sessionId, sessionType = 'personal') {
       } catch (_) {}
     }
 
-    // Guardar mensajes recientes (últimas 48h) para que aparezcan al abrir el chat
-    const cutoffTs    = Math.floor(Date.now() / 1000) - 172800 // 48 horas
+    // Guardar mensajes recientes (última semana) para que aparezcan al abrir el chat
+    const cutoffTs    = Math.floor(Date.now() / 1000) - 604800 // 7 días
     const recentMsgs  = (messages || []).filter(m => {
       const ts = Number(m.messageTimestamp) || 0
       if (ts < cutoffTs) return false
@@ -955,7 +1121,7 @@ async function createSession(sessionId, sessionType = 'personal') {
       if (m.message.protocolMessage || m.message.reactionMessage || m.message.pollUpdateMessage) return false
       const jid = m.key?.remoteJid
       return jid && !jid.endsWith('@g.us') && jid !== 'status@broadcast' && !jid.endsWith('@lid') && !jid.includes('@broadcast')
-    }).slice(0, 300) // máximo 300 mensajes por batch
+    }).slice(0, 600) // máximo 600 mensajes por batch
 
     if (recentMsgs.length > 0) {
       logger.info(`💾 Guardando ${recentMsgs.length} mensajes recientes (48h) en BD para ${sessionId}`)
@@ -979,7 +1145,7 @@ async function createSession(sessionId, sessionType = 'personal') {
         const body = inner?.conversation || inner?.extendedTextMessage?.text || ''
         if (!body) continue
         logger.info(`📤 history→realtime: jid=${jid} body="${body.slice(0,40)}"`)
-        _io?.to('agents').emit('whatsapp:message', {
+        emitToCompany(sessionId, 'whatsapp:message', {
           sessionId, from: jid, body,
           timestamp: ts,
           pushName: m.pushName || '',
@@ -1018,7 +1184,7 @@ async function createSession(sessionId, sessionType = 'personal') {
         if (yaRespondio) continue
         logger.info(`🤖 Bot (sync) [${jid}]: "${body.slice(0,50)}"`)
         const chatbotService = require('./chatbotService')
-        const result = await chatbotService.handleWhatsappMessage(sessionId, jid, body, chatRecord)
+        const result = await chatbotService.handleWhatsappMessage(sessionId, jid, body, chatRecord, _io)
         const aiResponse = result?.text || null
         if (aiResponse) {
           const syncSock = sessions[sessionId]?.sock || sock
@@ -1033,7 +1199,7 @@ async function createSession(sessionId, sessionType = 'personal') {
               content_type: 'text', metadata: {}
             }
           })
-          _io?.to('agents').emit('whatsapp:message', {
+          emitToCompany(sessionId, 'whatsapp:message', {
             sessionId, from: jid, body: aiResponse, timestamp: botTs,
             fromMe: true, pushName: 'Bot', contentType: 'text', mediaUrl: null, sessionType
           })
@@ -1046,7 +1212,7 @@ async function createSession(sessionId, sessionType = 'personal') {
       }
     }
 
-    _io?.to('agents').emit('whatsapp:chats_synced', { sessionId, sessionType })
+    emitToCompany(sessionId, 'whatsapp:chats_synced', { sessionId, sessionType })
     logger.info(`✅ messaging-history sincronizado: ${sessionId} (${sessionType})`)
 
     // Ping al servidor de WA para despertar la entrega de mensajes en tiempo real.
@@ -1156,7 +1322,7 @@ async function createSession(sessionId, sessionType = 'personal') {
   sock.ev.on('contacts.set', async ({ contacts }) => {
     logger.info(`👤 contacts.set: ${contacts.length} contactos para ${sessionId}`)
     for (const contact of contacts) await syncContactName(contact)
-    _io?.to('agents').emit('whatsapp:chats_synced', { sessionId, sessionType })
+    emitToCompany(sessionId, 'whatsapp:chats_synced', { sessionId, sessionType })
   })
 
   sock.ev.on('contacts.upsert', async (contacts) => {
@@ -1209,30 +1375,57 @@ async function sendMessage(sessionId, to, text) {
   const msgTs   = Math.floor(Date.now() / 1000)
   const extId   = sentMsg?.key?.id || `agent_${msgTs}_${jid}`
 
+  // Usar el JID real que devuelve WhatsApp (puede incluir código de país que el usuario omitió)
+  const realJid = sentMsg?.key?.remoteJid || jid
+  if (realJid !== jid) {
+    logger.info(`🔄 sendMessage: JID normalizado por WA ${jid} → ${realJid}`)
+    // Si existe un chat con el JID sin código de país, migrar al JID real
+    try {
+      const oldChat = await WhatsappChat.findOne({ where: { session_id: sessionId, jid } })
+      const newChat = await WhatsappChat.findOne({ where: { session_id: sessionId, jid: realJid } })
+      if (oldChat && !newChat) {
+        await oldChat.update({ jid: realJid })
+        await WhatsappMessage.update({ jid: realJid }, { where: { session_id: sessionId, jid } })
+        logger.info(`🔀 sendMessage: chat migrado ${jid} → ${realJid}`)
+      } else if (oldChat && newChat) {
+        // Ambos existen: mover mensajes y eliminar el viejo
+        await WhatsappMessage.update({ jid: realJid }, { where: { session_id: sessionId, jid } })
+        await oldChat.destroy()
+        logger.info(`🔀 sendMessage: chat duplicado eliminado ${jid} → ${realJid}`)
+      }
+    } catch (mergeErr) {
+      logger.warn(`⚠️  sendMessage: error migrando JID ${jid} → ${realJid}: ${mergeErr.message}`)
+    }
+  }
+
   // Pre-guardar en BD para que el eco de WA no cree un duplicado
   try {
     await WhatsappMessage.findOrCreate({
       where:    { external_id: extId },
       defaults: {
-        session_id: sessionId, jid, contact_name: '',
+        session_id: sessionId, jid: realJid, contact_name: '',
         body: text, from_me: true, timestamp: msgTs,
         content_type: 'text', metadata: {}
       }
     })
     const [agentChat] = await WhatsappChat.findOrCreate({
-      where:    { session_id: sessionId, jid },
-      defaults: { session_id: sessionId, jid, contact_name: '', session_type: session.sessionType || 'personal' }
+      where:    { session_id: sessionId, jid: realJid },
+      defaults: { session_id: sessionId, jid: realJid, contact_name: '', session_type: session.sessionType || 'personal' }
     })
     await agentChat.update({ last_message: text, last_message_at: msgTs })
-    // Emitir via socket con externalId para que el frontend pueda deduplicar
-    _io?.to('agents').emit('whatsapp:message', {
-      sessionId, from: jid, body: text, timestamp: msgTs,
+    // Emitir via socket con externalId y el JID real para que el frontend deduplique correctamente
+    emitToCompany(sessionId, 'whatsapp:message', {
+      sessionId, from: realJid, body: text, timestamp: msgTs,
       fromMe: true, pushName: '', contentType: 'text', mediaUrl: null,
       sessionType: session.sessionType || 'personal', externalId: extId
     })
+    // Si el JID cambió, notificar al frontend para que actualice la lista
+    if (realJid !== jid) {
+      emitToCompany(sessionId, 'whatsapp:jid_updated', { sessionId, oldJid: jid, newJid: realJid })
+    }
   } catch (_) {}
 
-  return { key: sentMsg?.key, timestamp: msgTs, externalId: extId }
+  return { key: sentMsg?.key, timestamp: msgTs, externalId: extId, jid: realJid }
 }
 
 function getSession(sessionId)       { return sessions[sessionId] || null }
@@ -1261,7 +1454,7 @@ function disconnectSession(sessionId) {
   const session = sessions[sessionId]
   if (session) {
     delete sessions[sessionId]          // Eliminar PRIMERO para que connection.update no reconecte
-    _io?.to('agents').emit('whatsapp:status', { sessionId, status: 'disconnected', sessionType: session.sessionType || 'personal' })
+    emitToCompany(sessionId, 'whatsapp:status', { sessionId, status: 'disconnected', sessionType: session.sessionType || 'personal' })
     try { session.sock.end(undefined) } catch (_) {}
   }
 }
@@ -1274,7 +1467,28 @@ async function logoutSession(sessionId) {
   delete lidToJid[sessionId]
   delete lidFallback[sessionId]
 
-  // Limpiar mensajes y chats en BD para evitar duplicados al escanear QR nuevo
+  // 1. Limpiar archivos de media del disco antes de borrar mensajes
+  try {
+    const mediaMessages = await WhatsappMessage.findAll({
+      where: { session_id: sessionId },
+      attributes: ['media_url'],
+    })
+    let deletedFiles = 0
+    for (const m of mediaMessages) {
+      if (!m.media_url) continue
+      const filename = path.basename(m.media_url)
+      const filePath = path.join(MEDIA_DIR, filename)
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
+        deletedFiles++
+      }
+    }
+    if (deletedFiles > 0) logger.info(`🗑️  ${deletedFiles} archivos de media eliminados para ${sessionId}`)
+  } catch (e) {
+    logger.warn(`⚠️  Error limpiando media de ${sessionId}: ${e.message}`)
+  }
+
+  // 2. Limpiar mensajes y chats en BD
   try {
     await WhatsappMessage.destroy({ where: { session_id: sessionId } })
     await WhatsappChat.destroy({ where: { session_id: sessionId } })
@@ -1283,10 +1497,11 @@ async function logoutSession(sessionId) {
     logger.error(`Error limpiando BD para ${sessionId}: ${e.message}`)
   }
 
+  // 3. Eliminar credenciales del disco
   const sessionPath = path.join(SESSION_DIR, sessionId)
   if (fs.existsSync(sessionPath)) {
     fs.rmSync(sessionPath, { recursive: true, force: true })
-    logger.info(`🗑️  Sesión ${sessionId} eliminada del disco`)
+    logger.info(`🗑️  Credenciales de sesión ${sessionId} eliminadas del disco`)
   }
 
   if (session) {
@@ -1313,7 +1528,7 @@ async function restoreAllSessions() {
 
 module.exports = {
   createSession, sendMessage, getSession,
-  getSessionStatus, getSessionQr, getAllSessions,
+  getSessionStatus, getSessionQr, getAllSessions, getSessionCompanyId,
   getPersonalSessions, getBusinessSessions,
   disconnectSession, logoutSession, setSocketIO, restoreAllSessions
 }

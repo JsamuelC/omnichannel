@@ -63,9 +63,15 @@ class ChatbotService {
     }
   }
 
-  async getActiveIntegration() {
+  async getActiveIntegration(companyId) {
     const { Integration } = require('../models');
-    return Integration.findOne({ where: { is_active: true } });
+    if (companyId) {
+      const integration = await Integration.findOne({ where: { is_active: true, company_id: companyId } });
+      if (integration) return integration;
+    }
+    // Fallback: integración global del superadmin (company_id IS NULL)
+    // Nunca devolvemos la integración de otra empresa (evita fuga multi-tenant)
+    return Integration.findOne({ where: { is_active: true, company_id: null } });
   }
 
   async generateResponse(prompt, userMessage, provider, apiKey, model) {
@@ -81,10 +87,10 @@ class ChatbotService {
   }
 
   // ─── Construye bloque de contexto con datos de la empresa ───────
-  async buildCompanyContext() {
+  async buildCompanyContext(companyId) {
     try {
       const Company = require('../models/Company');
-      const company = await Company.findOne();
+      const company = companyId ? await Company.findByPk(companyId) : await Company.findOne();
       if (!company || !company.nombre) return '';
 
       const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
@@ -131,17 +137,14 @@ class ChatbotService {
 
       const lines = ['=== PLANTILLAS DE DOCUMENTOS DISPONIBLES ==='];
       for (const tpl of templates) {
-        const manualFields = (tpl.fields || []).filter(f => f.source === 'manual');
         const desc = tpl.description ? ` — ${tpl.description}` : '';
-        lines.push(`- "${tpl.name}"${desc}`);
-        if (manualFields.length) {
-          lines.push(`  Datos que se solicitan al cliente: ${manualFields.map(f => f.label).join(', ')}`);
-        }
+        const id   = tpl.identificador || tpl.name;
+        lines.push(`- [START_DOC:${id}] → "${tpl.name}"${desc}`);
       }
       lines.push('');
-      lines.push('Cuando el cliente solicite un documento, contrato, acuerdo o formulario formal, responde confirmando que procederás y agrega al final de tu mensaje EXACTAMENTE (sin comillas ni espacios extra):');
-      lines.push('[START_DOC:Nombre exacto de la plantilla]');
-      lines.push('Solo usa [START_DOC:...] cuando el cliente lo pida explícitamente, no en respuestas informativas.');
+      lines.push('INSTRUCCIÓN IMPORTANTE: cuando el cliente solicite uno de estos documentos, responde confirmando brevemente y agrega al FINAL de tu mensaje, en una línea sola:');
+      lines.push('[START_DOC:identificador]');
+      lines.push('NO preguntes los datos al cliente. El sistema recopila la información automáticamente.');
       lines.push('===========================================');
       return lines.join('\n');
     } catch (err) {
@@ -153,7 +156,7 @@ class ChatbotService {
   // ─── Resuelve tokens {{catalogo:identificador}} en el system prompt ──
   async resolvePromptCatalogs(systemPrompt, companyId) {
     // Prepend company context automatically
-    const companyCtx = await this.buildCompanyContext();
+    const companyCtx = await this.buildCompanyContext(companyId);
     const docCtx     = await this.buildDocumentTemplatesContext(companyId);
     const base = [companyCtx, docCtx].filter(Boolean).join('\n\n') + (companyCtx || docCtx ? '\n\n' : '');
 
@@ -239,8 +242,11 @@ class ChatbotService {
   async evaluateFlowRules({ sessionId, jid, userMessage, botText, catalogFile, handoff, chatRecord, sock }, io) {
     try {
       const { FlowRule, WhatsappChat } = require('../models');
+      const companyId = chatRecord?.company_id || null;
+      const ruleWhere = { is_active: true };
+      if (companyId) ruleWhere.company_id = companyId;
       const rules = await FlowRule.findAll({
-        where: { is_active: true },
+        where: ruleWhere,
         order: [['priority', 'DESC'], ['created_at', 'ASC']]
       });
       if (!rules.length) return;
@@ -288,16 +294,31 @@ class ChatbotService {
             const labelName = rule.action_value?.trim();
             if (!labelName) break;
             try {
-              const chat = chatRecord || (sessionId && jid ? await WhatsappChat.findOne({ where: { session_id: sessionId, jid } }) : null);
+              const { Label } = require('../models');
+              const chat     = chatRecord || (sessionId && jid ? await WhatsappChat.findOne({ where: { session_id: sessionId, jid } }) : null);
+              const labelCid = chat?.company_id || companyId;
+              // Resolver ID real de la etiqueta (el action_value puede ser nombre o id)
+              let labelId = labelName;
+              const labelRecord = await Label.findOne({
+                where: labelCid
+                  ? { nombre: labelName, company_id: labelCid }
+                  : { nombre: labelName },
+                attributes: ['id']
+              });
+              if (labelRecord) labelId = labelRecord.id;
               if (chat) {
                 const current = Array.isArray(chat.labels) ? chat.labels : [];
-                if (!current.includes(labelName)) {
-                  await chat.update({ labels: [...current, labelName] });
-                  io?.to('agents').emit('whatsapp:chat_updated', { sessionId, jid, labels: [...current, labelName] });
-                  logger.info(`🏷️  Etiqueta "${labelName}" aplicada a ${jid}`);
+                if (!current.includes(labelId)) {
+                  await chat.update({ labels: [...current, labelId] });
+                  const updPayload = { sessionId, jid, labels: [...current, labelId] };
+                  if (labelCid) io?.to(`agents:${labelCid}`).emit('whatsapp:chat_updated', updPayload);
+                  io?.to('agents').emit('whatsapp:chat_updated', updPayload); // superadmin
+                  logger.info(`🏷️  Etiqueta "${labelName}" (${labelId}) aplicada a ${jid}`);
                 }
               } else {
-                io?.to('agents').emit('flowrule:action', { rule: rule.name, action: 'apply_label', label: labelName, jid });
+                const noChPayload = { rule: rule.name, action: 'apply_label', label: labelId, jid };
+                if (labelCid) io?.to(`agents:${labelCid}`).emit('flowrule:action', noChPayload);
+                io?.to('agents').emit('flowrule:action', noChPayload); // superadmin
                 logger.info(`🏷️  Regla "${rule.name}" disparada: aplicar "${labelName}" a ${jid} (sin chat WA)`);
               }
             } catch (e) { logger.warn('FlowRule apply_label error:', e.message); }
@@ -305,15 +326,24 @@ class ChatbotService {
           }
 
           case 'notify_human': {
-            const customMsg = rule.action_value?.trim() || `El bot necesita apoyo humano para el cliente ${jid}`;
-            io?.to('agents').emit('whatsapp:human_needed', {
-              sessionId,
-              jid,
-              message:   customMsg,
-              ruleName:  rule.name,
-              timestamp: Math.floor(Date.now() / 1000)
-            });
-            logger.info(`🔔 Notificación humano enviada para ${jid} — regla: ${rule.name}`);
+            const contactName = chatRecord?.contact_name || (jid ? jid.split('@')[0] : 'Contacto');
+            const customMsg   = rule.action_value?.trim() || `El bot necesita apoyo humano para el cliente ${contactName}`;
+            const notifCid    = chatRecord?.company_id || companyId;
+            const notifData   = { sessionId, jid, contactName, message: customMsg, ruleName: rule.name, timestamp: Math.floor(Date.now() / 1000) };
+            if (notifCid) io?.to(`agents:${notifCid}`).emit('whatsapp:human_needed', notifData);
+            io?.to('agents').emit('whatsapp:human_needed', notifData); // superadmin
+            // Persistir en DB para que sobreviva al refresco de página
+            try {
+              const { Notification } = require('../models');
+              await Notification.create({
+                company_id: notifCid || null,
+                type:       'human_needed',
+                title:      `⚡ ${contactName} necesita atención`,
+                body:       customMsg,
+                metadata:   { sessionId, jid, contactName, ruleName: rule.name },
+              });
+            } catch (e) { logger.warn('No se pudo persistir notificación human_needed:', e.message); }
+            logger.info(`🔔 Notificación humano enviada para ${jid} (${contactName}) — regla: ${rule.name}`);
             break;
           }
 
@@ -322,7 +352,10 @@ class ChatbotService {
               const chat = chatRecord || (sessionId && jid ? await WhatsappChat.findOne({ where: { session_id: sessionId, jid } }) : null);
               if (chat && chat.bot_enabled) {
                 await chat.update({ bot_enabled: false });
-                io?.to('agents').emit('whatsapp:chat_updated', { sessionId, jid, bot_enabled: false });
+                const botCid = chat.company_id || companyId;
+                const botPayload = { sessionId, jid, bot_enabled: false };
+                if (botCid) io?.to(`agents:${botCid}`).emit('whatsapp:chat_updated', botPayload);
+                io?.to('agents').emit('whatsapp:chat_updated', botPayload); // superadmin
                 logger.info(`🤖 Bot desactivado para ${jid} por regla "${rule.name}"`);
               }
             } catch (e) { logger.warn('FlowRule disable_bot error:', e.message); }
@@ -361,7 +394,7 @@ class ChatbotService {
         return config.escalation_message;
       }
 
-      const integration = await this.getActiveIntegration();
+      const integration = await this.getActiveIntegration(conversation.company_id);
       if (!integration) {
         logger.warn('No hay integración de IA activa — bot no responde');
         return null;
@@ -437,6 +470,22 @@ class ChatbotService {
 
   async escalateToHuman(conversation, config, io) {
     await conversation.update({ status: 'open' });
+
+    // Intentar asignar por round-robin si está configurado
+    if (conversation.company_id) {
+      try {
+        const Company = require('../models/Company');
+        const company = await Company.findByPk(conversation.company_id, { attributes: ['routing_config'] });
+        if (company?.routing_config?.mode === 'round_robin') {
+          const { assignRoundRobin } = require('./routingService');
+          const agent = await assignRoundRobin(conversation.company_id, conversation.id);
+          if (agent) {
+            io?.to(`user:${agent.id}`).emit('conversation:assigned_to_you', { conversationId: conversation.id });
+          }
+        }
+      } catch (_) {}
+    }
+
     io?.to('agents').emit('conversation:escalated', {
       conversationId: conversation.id,
       channel:        conversation.channel,
@@ -447,12 +496,14 @@ class ChatbotService {
 
   async getBotConfig(companyId, channel) {
     const ch = channel === 'web' ? 'all' : channel;
+    const where = { is_active: true };
+    if (companyId) where.company_id = companyId;
     return await BotConfig.findOne({
-      where: { company_id: companyId || null, channel: ch, is_active: true }
+      where: { ...where, channel: ch }
     }) || await BotConfig.findOne({
-      where: { channel: 'all', is_active: true }
+      where: { ...where, channel: 'all' }
     }) || await BotConfig.findOne({
-      where: { is_active: true }
+      where
     });
   }
 
@@ -571,7 +622,7 @@ class ChatbotService {
     };
   }
 
-  async createAppointmentFromBot(schedule, sessionId, companyId) {
+  async createAppointmentFromBot(schedule, sessionId, companyId, io) {
     try {
       const { Appointment } = require('../models');
       const Company = require('../models/Company');
@@ -607,6 +658,22 @@ class ChatbotService {
       }
 
       logger.info(`📅 Cita creada por bot: ${schedule.name} — ${schedule.date} ${schedule.time}`);
+
+      // Notificar al panel de calendario en tiempo real
+      if (io) {
+        io.to('agents').emit('appointment:created', {
+          id:               appointment.id,
+          company_id:       companyId,
+          title:            appointment.title,
+          contact_name:     appointment.contact_name,
+          contact_phone:    appointment.contact_phone,
+          date:             appointment.date,
+          start_time:       appointment.start_time,
+          duration_minutes: appointment.duration_minutes,
+          status:           appointment.status,
+        });
+      }
+
       return appointment;
     } catch (err) {
       logger.error('Error creando cita desde bot:', err.message);
@@ -662,10 +729,17 @@ class ChatbotService {
         // ── Fase de confirmación ─────────────────────────────────────────────
         if (collectedSoFar.__awaiting_confirmation) {
           const CONFIRM_WORDS = ['si', 'sí', 'yes', 'correcto', 'confirmar', 'confirmo', 'ok', 'listo', 'exacto'];
+          const CANCEL_CONFIRM = ['no', 'cancelar', 'cancel', 'empezar de nuevo', 'reiniciar'];
           const bodyLow = body.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-          const confirmed = CONFIRM_WORDS.some(w => bodyLow === w || bodyLow.startsWith(w + ' '));
+          // Acepta: "sí", "sí,", "sí.", "sí todo bien", "ok!", etc.
+          const confirmed = CONFIRM_WORDS.some(w => bodyLow === w || bodyLow.startsWith(w + ' ') || bodyLow.startsWith(w + ',') || bodyLow.startsWith(w + '.') || bodyLow.startsWith(w + '!'));
+          const cancelled = CANCEL_CONFIRM.some(w => bodyLow === w || bodyLow.startsWith(w + ' ') || bodyLow.startsWith(w + ','));
 
-          if (!confirmed) {
+          if (cancelled || (!confirmed && !cancelled)) {
+            // Si es ambiguo o negativo, pedir que confirme de nuevo en lugar de cancelar
+            if (!cancelled) {
+              return { handled: true, reply: 'Por favor responde *sí* para confirmar y generar el documento, o *cancelar* para salir.' };
+            }
             await activeReq.update({ status: 'rejected' });
             return { handled: true, reply: 'Solicitud cancelada. Si deseas volver a intentarlo, escríbeme cuando gustes.' };
           }
@@ -839,7 +913,7 @@ class ChatbotService {
   }
 
   // ─── Bot para WhatsApp (Baileys): con memoria y modo genérico/personalizado ──
-  async handleWhatsappMessage(sessionId, jid, body, chatRecord) {
+  async handleWhatsappMessage(sessionId, jid, body, chatRecord, io) {
     try {
       // 1. Determinar system prompt según bot_mode
       let systemPrompt;
@@ -862,10 +936,16 @@ class ChatbotService {
         }
         systemPrompt = config.system_prompt;
         logger.info(`🤖 Bot WA [${jid}] modo: generic — usando config ${config.id} (canal: ${config.channel})`);
+
+        // Verificar keywords de escalación ANTES de llamar a la IA
+        if (this.checkEscalationKeywords(body.toLowerCase(), config.escalation_keywords)) {
+          logger.info(`🔀 Bot WA [${jid}]: keyword de escalación detectada — handoff directo`);
+          return { text: config.escalation_message || null, handoff: true, catalogFile: null, startDoc: null, schedule: null };
+        }
       }
 
       // 2. Integración de IA activa
-      const integration = await this.getActiveIntegration();
+      const integration = await this.getActiveIntegration(chatRecord?.company_id);
       if (!integration) {
         logger.warn('⚠️  Bot WA: no hay integración de IA activa');
         return null;
@@ -913,8 +993,9 @@ class ChatbotService {
       // Extraer comandos: [SCHEDULE:...] → [HUMAN_NEEDED] → [START_DOC:nombre] → [SEND_FILE:id]
       const { text: afterSchedule, schedule } = this.extractScheduleCommand(rawResponse);
       if (schedule) {
+        const { WhatsappChat } = require('../models');
         const anyChat2 = await WhatsappChat.findOne({ where: { session_id: sessionId, jid }, attributes: ['company_id'] });
-        await this.createAppointmentFromBot(schedule, sessionId, anyChat2?.company_id);
+        await this.createAppointmentFromBot(schedule, sessionId, anyChat2?.company_id, io);
         logger.info(`📅 Bot WA [${jid}] agendó cita: ${schedule.name} ${schedule.date} ${schedule.time}`);
       }
 
