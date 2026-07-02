@@ -48,7 +48,7 @@ router.post('/session/start', auth, requireFeature('whatsapp_personal'), async (
   try {
     const { sessionId } = req.body;
     if (!sessionId) return res.status(400).json({ success: false, message: 'sessionId requerido' });
-    await whatsappService.createSession(sessionId, 'personal');
+    await whatsappService.createSession(sessionId, 'personal', req.user?.company_id || null);
     res.json({ success: true, message: `Sesión personal ${sessionId} iniciando` });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

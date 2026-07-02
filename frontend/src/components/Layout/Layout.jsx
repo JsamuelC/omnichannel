@@ -211,8 +211,8 @@ export default function Layout() {
     };
 
     const onHumanNeeded = (data) => {
-      const name = data.jid ? data.jid.split('@')[0] : 'Contacto';
-      addNotifBadge('⚡ Atención requerida', (data.message || 'El bot necesita apoyo humano') + ' — ' + name);
+      const name = data.contactName || (data.jid ? data.jid.split('@')[0] : 'Contacto');
+      addNotifBadge(`⚡ ${name} necesita atención`, data.message || 'El bot necesita apoyo humano');
       fetchConversations();
     };
 
@@ -443,12 +443,16 @@ export default function Layout() {
                       onClick={() => {
                         setShowNotifs(false);
                         if (n.type === 'appointment') navigate('/calendar');
-                        else if (n.type === 'message') navigate('/inbox');
+                        else if (n.type === 'human_needed' && n.metadata?.jid) {
+                          const params = new URLSearchParams({ wa_jid: n.metadata.jid });
+                          if (n.metadata.sessionId) params.set('wa_sid', n.metadata.sessionId);
+                          navigate('/inbox?' + params.toString());
+                        } else navigate('/inbox');
                       }}
                     >
                       <div className="flex items-start gap-2">
                         <span className="flex-shrink-0 mt-0.5 text-base">
-                          {n.type === 'appointment' ? '📅' : n.type === 'reminder' ? '⏰' : '💬'}
+                          {n.type === 'appointment' ? '📅' : n.type === 'reminder' ? '⏰' : n.type === 'human_needed' ? '⚡' : '💬'}
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm font-medium truncate ${!n.read ? 'text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>

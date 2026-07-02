@@ -38,13 +38,35 @@ function emitToCompany(sessionId, event, data) {
 
 async function resolveSessionCompanyId(sessionId) {
   if (_sessionCompanyCache[sessionId] !== undefined) return _sessionCompanyCache[sessionId]
-  if (!sessionId?.startsWith('business_')) { _sessionCompanyCache[sessionId] = null; return null }
-  const userId = sessionId.replace('business_', '')
-  try {
-    const { User } = require('../models')
-    const user = await User.findByPk(userId, { attributes: ['company_id'] })
-    _sessionCompanyCache[sessionId] = user?.company_id || null
-  } catch (_) { _sessionCompanyCache[sessionId] = null }
+  if (sessionId?.startsWith('business_')) {
+    const userId = sessionId.replace('business_', '')
+    try {
+      const { User, WhatsappChat } = require('../models')
+      const { Op } = require('sequelize')
+      const user = await User.findByPk(userId, { attributes: ['company_id'] })
+      if (user?.company_id) {
+        _sessionCompanyCache[sessionId] = user.company_id
+      } else {
+        // Superadmin o usuario sin empresa: derivar company_id desde chats existentes
+        const chat = await WhatsappChat.findOne({
+          where: { session_id: sessionId, company_id: { [Op.ne]: null } },
+          attributes: ['company_id']
+        })
+        _sessionCompanyCache[sessionId] = chat?.company_id || null
+      }
+    } catch (_) { _sessionCompanyCache[sessionId] = null }
+  } else {
+    // Sesiones personales: buscar company_id desde chats existentes en DB
+    try {
+      const { WhatsappChat } = require('../models')
+      const { Op } = require('sequelize')
+      const chat = await WhatsappChat.findOne({
+        where: { session_id: sessionId, company_id: { [Op.ne]: null } },
+        attributes: ['company_id']
+      })
+      _sessionCompanyCache[sessionId] = chat?.company_id || null
+    } catch (_) { _sessionCompanyCache[sessionId] = null }
+  }
   return _sessionCompanyCache[sessionId]
 }
 
@@ -765,8 +787,8 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
 // IDs de mensajes ya emitidos vía history→realtime — persiste entre reconexiones del mismo sessionId
 const realtimeEmitted = {}
 
-// ── createSession ahora recibe sessionType ───────────────────
-async function createSession(sessionId, sessionType = 'personal') {
+// ── createSession ahora recibe sessionType y companyId opcional ──
+async function createSession(sessionId, sessionType = 'personal', companyId = null) {
   const sessionPath = path.join(SESSION_DIR, sessionId)
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath)
 
@@ -798,6 +820,9 @@ async function createSession(sessionId, sessionType = 'personal') {
   })
 
   // Pre-cachear company_id para poder emitir a la sala correcta desde el inicio
+  if (companyId && _sessionCompanyCache[sessionId] === undefined) {
+    _sessionCompanyCache[sessionId] = companyId
+  }
   await resolveSessionCompanyId(sessionId)
 
   // Preservar contador de intentos entre reconexiones para backoff exponencial

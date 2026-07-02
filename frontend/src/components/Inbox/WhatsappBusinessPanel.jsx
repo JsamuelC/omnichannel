@@ -1,5 +1,6 @@
 // frontend/src/components/Inbox/WhatsappBusinessPanel.jsx
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useWhatsappStore, useLabelStore, useAuthStore, useModuleStore } from '../../store';
 import ModuleRecordModal from '../Modules/ModuleRecordModal';
 import { whatsappApi } from '../../services/whatsappApi';
@@ -54,6 +55,7 @@ const chatDisplayName = (jid, name) =>
   name?.trim() || jid?.replace('@s.whatsapp.net', '').replace('@lid', '') || '';
 
 export default function WhatsappBusinessPanel() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     activeChat, setActiveChat,
     addMessage, getMessages, setChats,
@@ -619,6 +621,14 @@ export default function WhatsappBusinessPanel() {
     }
   }, [sessionId]);
 
+  // Abrir chat desde parámetro URL (navegación desde notificación)
+  useEffect(() => {
+    const waJid = searchParams.get('wa_jid');
+    if (!waJid || sessionStatus !== 'connected') return;
+    handleOpenChat(waJid);
+    setSearchParams({}, { replace: true }); // limpiar params de la URL
+  }, [searchParams, sessionStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleDownloadDoc = async (req) => {
     try {
       const token = localStorage.getItem('token');
@@ -1143,7 +1153,7 @@ const handleSendMedia = async (e) => {
                       <div className="flex items-center gap-1 ml-1 flex-shrink-0">
                         {/* Puntos de etiquetas */}
                         {(chat.labels || []).slice(0, 3).map(labelId => {
-                          const lbl = allLabels.find(l => l.id === labelId);
+                          const lbl = allLabels.find(l => l.id === labelId || l.nombre === labelId);
                           return lbl ? (
                             <span key={labelId} className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: lbl.color || '#6366f1' }} title={lbl.nombre} />
                           ) : null;
@@ -1218,7 +1228,7 @@ const handleSendMedia = async (e) => {
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 {/* Etiquetas asignadas */}
                 {currentLabels.map(labelId => {
-                  const lbl = allLabels.find(l => l.id === labelId);
+                  const lbl = allLabels.find(l => l.id === labelId || l.nombre === labelId);
                   if (!lbl) return null;
                   return (
                     <span

@@ -132,7 +132,7 @@ io.on('connection', (socket) => {
 
 messageService.setSocketIO(io);
 whatsappService.setSocketIO(io);
-require('./services/notificationService').setSocketIO(io);
+try { require('./services/notificationService').setSocketIO(io); } catch (_) {}
 
 
 // ─────────────────────────────────────

@@ -294,16 +294,31 @@ class ChatbotService {
             const labelName = rule.action_value?.trim();
             if (!labelName) break;
             try {
-              const chat = chatRecord || (sessionId && jid ? await WhatsappChat.findOne({ where: { session_id: sessionId, jid } }) : null);
+              const { Label } = require('../models');
+              const chat     = chatRecord || (sessionId && jid ? await WhatsappChat.findOne({ where: { session_id: sessionId, jid } }) : null);
+              const labelCid = chat?.company_id || companyId;
+              // Resolver ID real de la etiqueta (el action_value puede ser nombre o id)
+              let labelId = labelName;
+              const labelRecord = await Label.findOne({
+                where: labelCid
+                  ? { nombre: labelName, company_id: labelCid }
+                  : { nombre: labelName },
+                attributes: ['id']
+              });
+              if (labelRecord) labelId = labelRecord.id;
               if (chat) {
                 const current = Array.isArray(chat.labels) ? chat.labels : [];
-                if (!current.includes(labelName)) {
-                  await chat.update({ labels: [...current, labelName] });
-                  io?.to('agents').emit('whatsapp:chat_updated', { sessionId, jid, labels: [...current, labelName] });
-                  logger.info(`🏷️  Etiqueta "${labelName}" aplicada a ${jid}`);
+                if (!current.includes(labelId)) {
+                  await chat.update({ labels: [...current, labelId] });
+                  const updPayload = { sessionId, jid, labels: [...current, labelId] };
+                  if (labelCid) io?.to(`agents:${labelCid}`).emit('whatsapp:chat_updated', updPayload);
+                  io?.to('agents').emit('whatsapp:chat_updated', updPayload); // superadmin
+                  logger.info(`🏷️  Etiqueta "${labelName}" (${labelId}) aplicada a ${jid}`);
                 }
               } else {
-                io?.to('agents').emit('flowrule:action', { rule: rule.name, action: 'apply_label', label: labelName, jid });
+                const noChPayload = { rule: rule.name, action: 'apply_label', label: labelId, jid };
+                if (labelCid) io?.to(`agents:${labelCid}`).emit('flowrule:action', noChPayload);
+                io?.to('agents').emit('flowrule:action', noChPayload); // superadmin
                 logger.info(`🏷️  Regla "${rule.name}" disparada: aplicar "${labelName}" a ${jid} (sin chat WA)`);
               }
             } catch (e) { logger.warn('FlowRule apply_label error:', e.message); }
@@ -311,12 +326,24 @@ class ChatbotService {
           }
 
           case 'notify_human': {
-            const customMsg  = rule.action_value?.trim() || `El bot necesita apoyo humano para el cliente ${jid}`;
-            const notifData  = { sessionId, jid, message: customMsg, ruleName: rule.name, timestamp: Math.floor(Date.now() / 1000) };
-            const notifCid   = chatRecord?.company_id || companyId;
+            const contactName = chatRecord?.contact_name || (jid ? jid.split('@')[0] : 'Contacto');
+            const customMsg   = rule.action_value?.trim() || `El bot necesita apoyo humano para el cliente ${contactName}`;
+            const notifCid    = chatRecord?.company_id || companyId;
+            const notifData   = { sessionId, jid, contactName, message: customMsg, ruleName: rule.name, timestamp: Math.floor(Date.now() / 1000) };
             if (notifCid) io?.to(`agents:${notifCid}`).emit('whatsapp:human_needed', notifData);
             io?.to('agents').emit('whatsapp:human_needed', notifData); // superadmin
-            logger.info(`🔔 Notificación humano enviada para ${jid} — regla: ${rule.name}`);
+            // Persistir en DB para que sobreviva al refresco de página
+            try {
+              const { Notification } = require('../models');
+              await Notification.create({
+                company_id: notifCid || null,
+                type:       'human_needed',
+                title:      `⚡ ${contactName} necesita atención`,
+                body:       customMsg,
+                metadata:   { sessionId, jid, contactName, ruleName: rule.name },
+              });
+            } catch (e) { logger.warn('No se pudo persistir notificación human_needed:', e.message); }
+            logger.info(`🔔 Notificación humano enviada para ${jid} (${contactName}) — regla: ${rule.name}`);
             break;
           }
 
@@ -325,7 +352,10 @@ class ChatbotService {
               const chat = chatRecord || (sessionId && jid ? await WhatsappChat.findOne({ where: { session_id: sessionId, jid } }) : null);
               if (chat && chat.bot_enabled) {
                 await chat.update({ bot_enabled: false });
-                io?.to('agents').emit('whatsapp:chat_updated', { sessionId, jid, bot_enabled: false });
+                const botCid = chat.company_id || companyId;
+                const botPayload = { sessionId, jid, bot_enabled: false };
+                if (botCid) io?.to(`agents:${botCid}`).emit('whatsapp:chat_updated', botPayload);
+                io?.to('agents').emit('whatsapp:chat_updated', botPayload); // superadmin
                 logger.info(`🤖 Bot desactivado para ${jid} por regla "${rule.name}"`);
               }
             } catch (e) { logger.warn('FlowRule disable_bot error:', e.message); }
@@ -906,6 +936,12 @@ class ChatbotService {
         }
         systemPrompt = config.system_prompt;
         logger.info(`🤖 Bot WA [${jid}] modo: generic — usando config ${config.id} (canal: ${config.channel})`);
+
+        // Verificar keywords de escalación ANTES de llamar a la IA
+        if (this.checkEscalationKeywords(body.toLowerCase(), config.escalation_keywords)) {
+          logger.info(`🔀 Bot WA [${jid}]: keyword de escalación detectada — handoff directo`);
+          return { text: config.escalation_message || null, handoff: true, catalogFile: null, startDoc: null, schedule: null };
+        }
       }
 
       // 2. Integración de IA activa
