@@ -85,6 +85,59 @@ router.patch ('/users/:id/toggle',   auth, requireRole('admin'), requireFeature(
 router.delete('/users/:id',          auth, requireRole('admin'), requireFeature('team_management'), companyScope, userController.remove.bind(userController));
 router.patch ('/users/:id/password', auth,                       companyScope, userController.changePassword.bind(userController));
 
+// ── WhatsApp Business sharing ──────────────────────────
+router.get('/wa-sharing', auth, async (req, res) => {
+  try {
+    const Company = require('../models/Company');
+    const companyId = req.user.company_id;
+    let company;
+    if (companyId) company = await Company.findByPk(companyId, { attributes: ['wa_sharing_config'] });
+    else if (req.user.role === 'superadmin') company = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['wa_sharing_config'] });
+    res.json({ success: true, data: company?.wa_sharing_config || {} });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+router.put('/wa-sharing', auth, requireRole('admin'), async (req, res) => {
+  try {
+    const Company = require('../models/Company');
+    const companyId = req.user.company_id;
+    let company;
+    if (companyId) company = await Company.findByPk(companyId);
+    else if (req.user.role === 'superadmin') company = await Company.findOne({ order: [['created_at', 'ASC']] });
+    if (!company) return res.status(404).json({ success: false, message: 'Empresa no encontrada' });
+    await company.update({ wa_sharing_config: req.body.config });
+    res.json({ success: true, data: company.wa_sharing_config });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// Listar sesiones WA compartidas conmigo
+router.get('/wa-sharing/my-access', auth, async (req, res) => {
+  try {
+    const Company = require('../models/Company');
+    const { User } = require('../models');
+    const companyId = req.user.company_id;
+    let company;
+    if (companyId) company = await Company.findByPk(companyId, { attributes: ['wa_sharing_config'] });
+    else if (req.user.role === 'superadmin') company = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['wa_sharing_config'] });
+    const config = company?.wa_sharing_config || {};
+    const myId = req.user.id;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+
+    // Admin ve todas las sesiones de su empresa
+    if (isAdmin) {
+      const allUsers = await User.findAll({ where: { company_id: companyId || company?.id, is_active: true }, attributes: ['id', 'name'] });
+      return res.json({ success: true, data: { can_view_all: true, users: allUsers.map(u => u.id) } });
+    }
+
+    // Operador: ver quién le compartió
+    const sharedWith = [];
+    for (const [ownerId, agents] of Object.entries(config)) {
+      if (Array.isArray(agents) && agents.includes(myId)) sharedWith.push(ownerId);
+    }
+    res.json({ success: true, data: { can_view_all: false, shared_from: sharedWith } });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 // ─────────────────────────────────────
 // WIDGET DE CHAT WEB (sin auth — público)
 // ─────────────────────────────────────
