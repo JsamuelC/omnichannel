@@ -26,13 +26,14 @@ export const useAuthStore = create((set, get) => ({
   login: async (email, password) => {
     set({ isLoading: true });
     try {
-      const res = await api.post('/auth/login', { email, password });
+      const deviceToken = localStorage.getItem('ts-device-token');
+      const res = await api.post('/auth/login', { email, password, ...(deviceToken ? { deviceToken } : {}) });
       // Paso 1: backend envió OTP → necesita segundo factor
       if (res.needs_otp) {
         set({ isLoading: false });
         return { success: true, needs_otp: true, debug_otp: res.debug_otp };
       }
-      // Flujo directo (no debería ocurrir con OTP activo)
+      // Dispositivo confiable (o flujo directo sin OTP activo) → ya viene el token final
       const { token, user } = res.data;
       localStorage.setItem('token', token);
       initSocket(user.id);

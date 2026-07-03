@@ -105,6 +105,7 @@ const migrate = async () => {
       // OTP de inicio de sesión
       { table: 'users', col: 'login_otp',             def: { type: DT.STRING(6),   allowNull: true } },
       { table: 'users', col: 'login_otp_expires',     def: { type: DT.DATE,        allowNull: true } },
+      { table: 'users', col: 'trusted_devices',       def: { type: DT.JSONB,       allowNull: true, defaultValue: [] } },
       // Google Calendar
       { table: 'company',       col: 'google_calendar_tokens', def: { type: DT.JSONB,       allowNull: true, defaultValue: null } },
       { table: 'appointments',  col: 'google_event_id',        def: { type: DT.STRING(500), allowNull: true } },

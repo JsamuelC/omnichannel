@@ -127,6 +127,12 @@ const User = sequelize.define('users', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+  // Dispositivos que omiten el OTP por 15 días (ver authController)
+  trusted_devices: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: [],
+  },
   // Verificación de email al crear cuenta
   email_verified: {
     type: DataTypes.BOOLEAN,
@@ -166,6 +172,7 @@ User.prototype.comparePassword = async function(plainPassword) {
 User.prototype.toJSON = function() {
   const values = { ...this.get() };
   delete values.password_hash;
+  delete values.trusted_devices; // contiene tokens en texto plano — no debe salir en respuestas JSON
   return values;
 };
 

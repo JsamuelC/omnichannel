@@ -156,6 +156,7 @@ function StepOTP({ email, debugOtp, onBack }) {
   const [loading,   setLoading]   = useState(false);
   const [resending, setResending] = useState(false);
   const [cooldown,  setCooldown]  = useState(0);
+  const [rememberDevice, setRememberDevice] = useState(true);
   const inputRefs = useRef([]);
   const navigate  = useNavigate();
   const setSession = useAuthStore(s => s._setSession);
@@ -197,8 +198,9 @@ function StepOTP({ email, debugOtp, onBack }) {
     if (fullCode.length < 6) { toast.error('Ingresa los 6 dígitos.'); return; }
     setLoading(true);
     try {
-      const res = await api.post('/auth/verify-login-otp', { email, otp: fullCode });
-      const { token, user } = res.data;
+      const res = await api.post('/auth/verify-login-otp', { email, otp: fullCode, rememberDevice });
+      const { token, user, deviceToken } = res.data;
+      if (deviceToken) localStorage.setItem('ts-device-token', deviceToken);
       setSession(token, user);
       toast.success('¡Bienvenido a Tecnossync!');
       navigate('/inbox');
@@ -271,6 +273,12 @@ function StepOTP({ email, debugOtp, onBack }) {
           ))}
         </div>
       </div>
+
+      <label className="flex items-center gap-2 cursor-pointer select-none">
+        <input type="checkbox" checked={rememberDevice} onChange={e => setRememberDevice(e.target.checked)}
+          className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+        <span className="text-sm text-gray-600">Recordar este dispositivo por 15 días</span>
+      </label>
 
       <button type="submit" disabled={loading || fullCode.length < 6}
         className="w-full py-3 rounded-xl font-semibold text-white text-sm
