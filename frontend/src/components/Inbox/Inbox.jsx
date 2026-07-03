@@ -1,6 +1,5 @@
 // frontend/src/components/Inbox/Inbox.jsx
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { useConversationStore } from '../../store';
 import ConversationList          from './ConversationList';
 import ChatWindow                from '../Chat/ChatWindow';
@@ -11,16 +10,13 @@ import { PanelRight, PanelLeft, Briefcase } from 'lucide-react';
 const SIDEBAR_KEY = 'ts-sidebar-visible';
 
 export default function Inbox() {
-  const [searchParams] = useSearchParams();
   const { fetchConversations, activeConversation } = useConversationStore();
   const [showList, setShowList] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_KEY);
     return saved !== null ? saved === 'true' : true;
   });
   const [showInfo, setShowInfo] = useState(true);
-  const [inboxTab, setInboxTab] = useState(() =>
-    searchParams.get('wa_jid') || searchParams.get('wa_sid') ? 'business' : 'general'
-  );
+  const [inboxTab, setInboxTab] = useState('general');
 
   const toggleSidebar = () => {
     const next = !showList;
