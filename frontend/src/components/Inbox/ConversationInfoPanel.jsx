@@ -106,6 +106,10 @@ function InfoRow({ label, value, mono = false }) {
   );
 }
 
+// El widget solo envía la key del campo (ej: "motivo_visita"), no la etiqueta original
+const humanizeFieldKey = (key) =>
+  key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────
 export default function ConversationInfoPanel({ conversation }) {
   const [contact, setContact]         = useState(null);
@@ -273,6 +277,11 @@ export default function ConversationInfoPanel({ conversation }) {
   const summary     = conversation?.metadata?.summary;
   const summaryDate = conversation?.metadata?.summary_updated_at
     ? formatDate(conversation.metadata.summary_updated_at) : null;
+
+  // Campos del formulario previo del widget web (name/email/phone ya se ven arriba como datos del contacto)
+  const STANDARD_FORM_KEYS = ['name', 'email', 'phone'];
+  const formData = Object.entries(conversation?.metadata?.form_data || {})
+    .filter(([key, value]) => !STANDARD_FORM_KEYS.includes(key) && value);
 
   const statusMap = {
     bot:      { label: 'Bot activo',  cls: 'bg-violet-100 text-violet-700' },
@@ -502,6 +511,15 @@ export default function ConversationInfoPanel({ conversation }) {
           </>
         )}
       </Section>
+
+      {/* ── DATOS DEL FORMULARIO (widget web) ── */}
+      {formData.length > 0 && (
+        <Section title="Datos del formulario" icon={FileText} defaultOpen>
+          {formData.map(([key, value]) => (
+            <InfoRow key={key} label={humanizeFieldKey(key)} value={value} />
+          ))}
+        </Section>
+      )}
 
       {/* ── CAMPOS ADICIONALES por contacto ── */}
       <Section title="Campos adicionales" icon={Hash} defaultOpen={customFields.length > 0}>
