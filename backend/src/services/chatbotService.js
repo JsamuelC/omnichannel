@@ -243,8 +243,9 @@ class ChatbotService {
     try {
       const { FlowRule, WhatsappChat } = require('../models');
       const companyId = chatRecord?.company_id || null;
-      const ruleWhere = { is_active: true };
-      if (companyId) ruleWhere.company_id = companyId;
+      // company_id: companyId siempre filtra explícitamente (null → solo reglas globales,
+      // nunca reglas de otra empresa) — evita fuga multi-tenant cuando chatRecord no trae company_id
+      const ruleWhere = { is_active: true, company_id: companyId };
       const rules = await FlowRule.findAll({
         where: ruleWhere,
         order: [['priority', 'DESC'], ['created_at', 'ASC']]
@@ -299,10 +300,10 @@ class ChatbotService {
               const labelCid = chat?.company_id || companyId;
               // Resolver ID real de la etiqueta (el action_value puede ser nombre o id)
               let labelId = labelName;
+              // company_id: labelCid siempre filtra explícitamente (nunca busca sin scope,
+              // evita traer el id de una etiqueta de otra empresa con el mismo nombre)
               const labelRecord = await Label.findOne({
-                where: labelCid
-                  ? { nombre: labelName, company_id: labelCid }
-                  : { nombre: labelName },
+                where: { nombre: labelName, company_id: labelCid },
                 attributes: ['id']
               });
               if (labelRecord) labelId = labelRecord.id;

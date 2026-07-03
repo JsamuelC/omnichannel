@@ -576,7 +576,7 @@ export default function WhatsappBusinessPanel() {
     else setDocRequests([]);
   }, [activeBusinessChat, fetchDocRequests]);
 
-  const handleOpenChat = useCallback(async (jid) => {
+  const handleOpenChat = useCallback(async (jid, sid = null) => {
     setActiveBusinessChat(jid);
     setShowBotPanel(false);
     setEditingName(false);
@@ -586,8 +586,8 @@ export default function WhatsappBusinessPanel() {
     fetchDocRequests(jid);
     try {
       const [histRes, cfgRes] = await Promise.all([
-        whatsappApi.getBusinessHistory(jid),
-        whatsappApi.getBusinessChatConfig(jid)
+        whatsappApi.getBusinessHistory(jid, 100, sid),
+        whatsappApi.getBusinessChatConfig(jid, sid)
       ]);
       const dbMsgs = (histRes.data?.messages || []).map(mapDbMsg);
       // Fusionar con mensajes en el store (socket) evitando duplicados
@@ -625,7 +625,8 @@ export default function WhatsappBusinessPanel() {
   useEffect(() => {
     const waJid = searchParams.get('wa_jid');
     if (!waJid || sessionStatus !== 'connected') return;
-    handleOpenChat(waJid);
+    const waSid = searchParams.get('wa_sid'); // sesión que disparó la notificación (si difiere de la propia)
+    handleOpenChat(waJid, waSid);
     setSearchParams({}, { replace: true }); // limpiar params de la URL
   }, [searchParams, sessionStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -39,6 +39,41 @@ async function resolveActiveSessionId(user) {
   return ownId  // fallback a sesión propia
 }
 
+// ── Helper: valida si el usuario puede acceder a una sesión business
+// específica (propia, compartida con él, o de su empresa si es admin)
+async function canAccessSession(user, sessionId) {
+  if (!sessionId?.startsWith('business_')) return false
+  if (sessionId === `business_${user.id}`) return true
+  if (user.role === 'superadmin') return true // ve todas las sesiones de todas las empresas
+
+  const ownerId = sessionId.replace('business_', '')
+  try {
+    const { User } = require('../models')
+    const owner = await User.findByPk(ownerId, { attributes: ['company_id'] })
+    if (!owner?.company_id || owner.company_id !== user.company_id) return false
+
+    if (user.role === 'admin') return true // admin ve todas las sesiones de su propia empresa
+
+    const Company = require('../models/Company')
+    const company = await Company.findByPk(user.company_id, { attributes: ['wa_sharing_config'] })
+    const config  = company?.wa_sharing_config || {}
+    return Array.isArray(config[ownerId]) && config[ownerId].includes(user.id)
+  } catch (_) {
+    return false
+  }
+}
+
+// ── Helper: resuelve el sessionId activo, permitiendo override explícito
+// (p.ej. al abrir un chat desde una notificación de otra sesión) validado
+// contra canAccessSession para no permitir ver sesiones ajenas
+async function resolveRequestedSessionId(user, requestedSid) {
+  const defaultSid = await resolveActiveSessionId(user)
+  if (requestedSid && requestedSid !== defaultSid && await canAccessSession(user, requestedSid)) {
+    return requestedSid
+  }
+  return defaultSid
+}
+
 // ═══════════════════════════════════════════════════════
 // SESIONES PERSONALES (lo que ya tenías, sin cambios)
 // ═══════════════════════════════════════════════════════
@@ -425,7 +460,7 @@ router.get('/business/chats', auth, async (req, res) => {
 // ── Historial de mensajes business ───────────────────
 router.get('/business/chat/:jid', auth, async (req, res) => {
   try {
-    const sessionId        = await resolveActiveSessionId(req.user);
+    const sessionId        = await resolveRequestedSessionId(req.user, req.query.sid);
     const jid              = decodeURIComponent(req.params.jid);
     const { limit = 100 }  = req.query;
 
@@ -443,7 +478,7 @@ router.get('/business/chat/:jid', auth, async (req, res) => {
 // ── Config del bot por chat business ─────────────────
 router.get('/business/chat/:jid/config', auth, async (req, res) => {
   try {
-    const sessionId = `business_${req.user.id}`;
+    const sessionId = await resolveRequestedSessionId(req.user, req.query.sid);
     const jid       = decodeURIComponent(req.params.jid);
     const [chat] = await WhatsappChat.findOrCreate({
       where:    { session_id: sessionId, jid },

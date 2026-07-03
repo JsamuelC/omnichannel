@@ -46,12 +46,12 @@ export const whatsappApi = {
   // Chats
   getBusinessChats:    ()             => api.get('/whatsapp/business/chats'),
   getBusinessContacts: (search = '') => api.get(`/whatsapp/business/contacts${search ? `?search=${encodeURIComponent(search)}` : ''}`),
-  getBusinessHistory: (jid, limit = 100) =>
-    api.get(`/whatsapp/business/chat/${encodeURIComponent(jid)}?limit=${limit}`),
+  getBusinessHistory: (jid, limit = 100, sid = null) =>
+    api.get(`/whatsapp/business/chat/${encodeURIComponent(jid)}?limit=${limit}${sid ? `&sid=${encodeURIComponent(sid)}` : ''}`),
 
   // Config bot por chat
-  getBusinessChatConfig: (jid) =>
-    api.get(`/whatsapp/business/chat/${encodeURIComponent(jid)}/config`),
+  getBusinessChatConfig: (jid, sid = null) =>
+    api.get(`/whatsapp/business/chat/${encodeURIComponent(jid)}/config${sid ? `?sid=${encodeURIComponent(sid)}` : ''}`),
 
   toggleBusinessBot: (jid, bot_enabled, bot_prompt, bot_mode) =>
     api.patch(`/whatsapp/business/chat/${encodeURIComponent(jid)}/bot`,
