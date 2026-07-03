@@ -66,9 +66,13 @@ export const useAuthStore = create((set, get) => ({
       const user = res.data;
       initSocket(user.id);
       set({ user, permissions: user.permissions, activeFeatures: user.active_features ?? null });
-    } catch {
-      localStorage.removeItem('token');
-      set({ user: null, token: null, permissions: null, activeFeatures: null });
+    } catch (err) {
+      // Solo cerrar sesión si el token es realmente inválido/venció (401).
+      // Un error transitorio (red, 500, backend reiniciando) no debe desloguear al usuario.
+      if (err?.status === 401) {
+        localStorage.removeItem('token');
+        set({ user: null, token: null, permissions: null, activeFeatures: null });
+      }
     }
   },
 
