@@ -7,12 +7,13 @@ import ChatWindow                from '../Chat/ChatWindow';
 import WhatsappBusinessPanel     from './WhatsappBusinessPanel';
 import ConversationInfoPanel     from './ConversationInfoPanel';
 import { PanelRight, PanelLeft, Briefcase } from 'lucide-react';
+import api from '../../services/api';
 
 const SIDEBAR_KEY = 'ts-sidebar-visible';
 
 export default function Inbox() {
-  const [searchParams] = useSearchParams();
-  const { fetchConversations, activeConversation } = useConversationStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { fetchConversations, activeConversation, selectConversation } = useConversationStore();
   const [showList, setShowList] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_KEY);
     return saved !== null ? saved === 'true' : true;
@@ -20,6 +21,7 @@ export default function Inbox() {
   const [showInfo, setShowInfo] = useState(true);
   const [inboxTab, setInboxTab] = useState(() => {
     if (searchParams.get('wa_jid') || searchParams.get('wa_sid')) return 'business';
+    if (searchParams.get('conv')) return 'general';
     return localStorage.getItem('ts-inbox-tab') || 'general';
   });
 
@@ -39,6 +41,24 @@ export default function Inbox() {
   useEffect(() => {
     if (activeConversation && window.innerWidth < 768) setShowList(false);
   }, [activeConversation]);
+
+  // Cambiar de tab por parámetro URL aunque el usuario ya esté en la bandeja
+  // (el useState de arriba solo corre al montar, así que un clic en una
+  // notificación estando ya en /inbox no cambiaba de tab sin esto)
+  useEffect(() => {
+    if (searchParams.get('wa_jid') || searchParams.get('wa_sid')) setInboxTab('business');
+    else if (searchParams.get('conv')) setInboxTab('general');
+  }, [searchParams]);
+
+  // Abrir conversación desde parámetro URL (navegación desde notificación)
+  useEffect(() => {
+    const convId = searchParams.get('conv');
+    if (!convId) return;
+    api.get(`/conversations/${convId}`)
+      .then(res => { if (res.data) selectConversation(res.data); })
+      .catch(() => {});
+    setSearchParams({}, { replace: true }); // limpiar params de la URL
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

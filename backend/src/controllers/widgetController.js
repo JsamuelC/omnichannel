@@ -186,6 +186,7 @@ exports.sendMessage = async (req, res) => {
               handoff,
               chatRecord:  { company_id: conversation.company_id, contact_name: conversation.contact?.name },
               sock:        null,
+              conversationId: conversation.id,
             }, io);
           } catch (ruleErr) {
             logger.warn('⚠️  Error evaluando reglas de flujo (widget):', ruleErr.message);

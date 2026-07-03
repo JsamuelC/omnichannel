@@ -170,7 +170,8 @@ class MessageService {
           // reglas de la empresa (siempre filtraba a company_id NULL) y notify_human
           // nunca se disparaba para Messenger/Instagram/Widget
           chatRecord:  { company_id: conversation.company_id, contact_name: contact?.name },
-          sock:        null
+          sock:        null,
+          conversationId: conversation.id
         }, this.io);
       } catch (ruleErr) {
         logger.warn('⚠️  Error evaluando reglas de flujo (omnichannel):', ruleErr.message);
