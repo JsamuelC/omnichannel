@@ -19,10 +19,12 @@ import EtiquetasConfig  from './components/Configuration/Etiquetasconfig';
 import PanelInfoConfig  from './components/Configuration/PanelInfoConfig';
 import VouchersPanel    from './components/Vouchers/VouchersPanel';
 import WhatsappConfig  from './components/Configuration/WhatsappConfig';
+import WASharingConfig        from './components/Configuration/WASharingConfig';
 import Integraciones   from './components/Configuration/Integraciones';
 import FlowRulesConfig       from './components/Configuration/FlowRulesConfig';
 import MensajesRapidosConfig  from './components/Configuration/MensajesRapidosConfig';
 import WidgetsConfig          from './components/Configuration/WidgetsConfig';
+import ChatRoutingConfig      from './components/Configuration/ChatRoutingConfig';
 import MessengerConfig        from './components/Configuration/MessengerConfig';
 import InstagramConfig        from './components/Configuration/InstagramConfig';
 import ModulosConfig          from './components/Modules/ModulosConfig';
@@ -125,6 +127,7 @@ export default function App() {
 
          {/* Canales */}
         <Route path="config/whatsapp"  element={<RoleRoute role="admin"><FeatureRoute feature="whatsapp_business"><WhatsappConfig /></FeatureRoute></RoleRoute>} />
+        <Route path="config/wa-sharing"  element={<RoleRoute role="admin"><WASharingConfig /></RoleRoute>} />
         <Route path="config/messenger" element={<RoleRoute role="admin"><FeatureRoute feature="config_messenger"><MessengerConfig /></FeatureRoute></RoleRoute>} />
         <Route path="config/instagram" element={<RoleRoute role="admin"><FeatureRoute feature="config_instagram"><InstagramConfig /></FeatureRoute></RoleRoute>} />
         <Route path="config/tiktok"    element={<FeatureRoute feature="config_tiktok"><Placeholder name="TikTok" /></FeatureRoute>} />
@@ -135,7 +138,7 @@ export default function App() {
         <Route path="config/flow-rules"    element={<RoleRoute role="admin"><FeatureRoute feature="flow_rules"><FlowRulesConfig /></FeatureRoute></RoleRoute>} />
 
         {/* Automatizaciones */}
-        <Route path="config/enrutamiento"    element={<FeatureRoute feature="config_chat_routing"><Placeholder name="Enrutamiento de Chat" /></FeatureRoute>} />
+        <Route path="config/enrutamiento"    element={<RoleRoute role="admin"><FeatureRoute feature="config_chat_routing"><ChatRoutingConfig /></FeatureRoute></RoleRoute>} />
         <Route path="config/informes"        element={<FeatureRoute feature="config_reports"><Placeholder name="Programar Informe" /></FeatureRoute>} />
         <Route path="config/mensajesRapidos" element={<RoleRoute role="admin"><FeatureRoute feature="quick_messages"><MensajesRapidosConfig /></FeatureRoute></RoleRoute>} />
 

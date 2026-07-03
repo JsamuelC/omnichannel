@@ -140,6 +140,22 @@ const Company = sequelize.define('company', {
     allowNull:    true,
     defaultValue: [],
   },
+  routing_config: {
+    type:         DataTypes.JSONB,
+    allowNull:    true,
+    defaultValue: { mode: 'manual' },
+  },
+  wa_sharing_config: {
+    type:         DataTypes.JSONB,
+    allowNull:    true,
+    defaultValue: null,
+    comment:      '{ userId: [sharedWithUserId1, ...] } — quién comparte WA con quién',
+  },
+  widget_config: {
+    type:         DataTypes.JSONB,
+    allowNull:    true,
+    defaultValue: null,
+  },
 }, {
   tableName: 'company',
   timestamps: true,

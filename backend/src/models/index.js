@@ -28,6 +28,7 @@ const DocumentTemplate   = require('./DocumentTemplate');
 const DocumentRequest    = require('./DocumentRequest');
 const MergeTemplate      = require('./MergeTemplate');
 const CompanyPayment     = require('./CompanyPayment');
+const Notification       = require('./Notification');
 
 // ============================
 // ASOCIACIONES ORIGINALES
@@ -112,6 +113,12 @@ const migrate = async () => {
       // Messenger & Instagram config
       { table: 'company',       col: 'messenger_config',       def: { type: DT.JSONB,       allowNull: true, defaultValue: null } },
       { table: 'company',       col: 'instagram_config',       def: { type: DT.JSONB,       allowNull: true, defaultValue: null } },
+      // Company WA sharing + widget + routing config
+      { table: 'company', col: 'wa_sharing_config', def: { type: DT.JSONB, allowNull: true, defaultValue: null } },
+      { table: 'company', col: 'widget_config', def: { type: DT.JSONB, allowNull: true, defaultValue: null } },
+      { table: 'company', col: 'routing_config', def: { type: DT.JSONB, allowNull: true, defaultValue: { mode: 'manual' } } },
+      // Blocked IPs for widget spam
+      { table: 'company',       col: 'blocked_ips',            def: { type: DT.JSONB,       allowNull: true, defaultValue: [] } },
     ];
     for (const { table, col, def } of preCols) {
       await safeAdd(table, col, def);
@@ -148,6 +155,7 @@ const migrate = async () => {
     await safeSync(DocumentRequest);
     await safeSync(MergeTemplate);
     await safeSync(CompanyPayment);
+    await safeSync(Notification);
     await safeAdd('merge_templates', 'canal', { type: DT.STRING(30), allowNull: false, defaultValue: 'all' });
 
     // Agregar trigger_keywords a document_templates si no existe
@@ -406,5 +414,6 @@ module.exports = {
   DocumentRequest,
   MergeTemplate,
   CompanyPayment,
+  Notification,
   migrate
 };

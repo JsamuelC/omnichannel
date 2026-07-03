@@ -18,6 +18,7 @@ const SECTIONS = [
     title: 'Canales',
     items: [
       { label: 'WhatsApp API (Meta)',   to: '/config/whatsapp',  badge: 'Meta', feature: 'whatsapp_business' },
+      { label: 'Compartir WhatsApp',   to: '/config/wa-sharing',  feature: 'whatsapp_personal' },
       { label: 'Messenger',             to: '/config/messenger',  feature: 'config_messenger' },
       { label: 'Instagram',             to: '/config/instagram',  feature: 'config_instagram' },
       { label: 'TikTok',               to: '/config/tiktok',     feature: 'config_tiktok' },

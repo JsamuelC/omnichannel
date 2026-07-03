@@ -50,12 +50,15 @@ const updateCompany = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Empresa no encontrada.' });
 
     const { nombre, sitio_web, telefono, telefono_secundario, email,
-            fax, direccion, ciudad, pais, descripcion, horarios } = req.body;
+            fax, direccion, ciudad, pais, descripcion, horarios, routing_config, widget_config, wa_sharing_config } = req.body;
 
     await company.update({
       nombre, sitio_web, telefono, telefono_secundario, email,
       fax, direccion, ciudad, pais, descripcion,
-      ...(horarios !== undefined ? { horarios } : {})
+      ...(horarios !== undefined ? { horarios } : {}),
+      ...(routing_config !== undefined ? { routing_config } : {}),
+      ...(widget_config !== undefined ? { widget_config } : {}),
+      ...(wa_sharing_config !== undefined ? { wa_sharing_config } : {}),
     });
 
     res.json({ success: true, data: company, message: 'Empresa actualizada.' });
