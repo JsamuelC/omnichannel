@@ -443,7 +443,10 @@ export default function Layout() {
                       onClick={() => {
                         setShowNotifs(false);
                         if (n.type === 'appointment') navigate('/calendar');
-                        else if (n.type === 'human_needed' && n.metadata?.jid) {
+                        else if (n.type === 'human_needed' && n.metadata?.conversationId) {
+                          // Mensajería general (Messenger/Instagram/Widget) — no es un chat de WhatsApp
+                          navigate('/inbox?conv=' + n.metadata.conversationId);
+                        } else if (n.type === 'human_needed' && n.metadata?.jid) {
                           const params = new URLSearchParams({ wa_jid: n.metadata.jid });
                           if (n.metadata.sessionId) params.set('wa_sid', n.metadata.sessionId);
                           navigate('/inbox?' + params.toString());

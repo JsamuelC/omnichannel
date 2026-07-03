@@ -1,22 +1,34 @@
 // frontend/src/components/Inbox/Inbox.jsx
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useConversationStore } from '../../store';
 import ConversationList          from './ConversationList';
 import ChatWindow                from '../Chat/ChatWindow';
 import WhatsappBusinessPanel     from './WhatsappBusinessPanel';
 import ConversationInfoPanel     from './ConversationInfoPanel';
 import { PanelRight, PanelLeft, Briefcase } from 'lucide-react';
+import api from '../../services/api';
 
 const SIDEBAR_KEY = 'ts-sidebar-visible';
 
 export default function Inbox() {
-  const { fetchConversations, activeConversation } = useConversationStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { fetchConversations, activeConversation, selectConversation } = useConversationStore();
   const [showList, setShowList] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_KEY);
     return saved !== null ? saved === 'true' : true;
   });
   const [showInfo, setShowInfo] = useState(true);
-  const [inboxTab, setInboxTab] = useState('general');
+  const [inboxTab, setInboxTab] = useState(() => {
+    if (searchParams.get('wa_jid') || searchParams.get('wa_sid')) return 'business';
+    if (searchParams.get('conv')) return 'general';
+    return localStorage.getItem('ts-inbox-tab') || 'general';
+  });
+
+  const handleTabChange = (tab) => {
+    setInboxTab(tab);
+    localStorage.setItem('ts-inbox-tab', tab);
+  };
 
   const toggleSidebar = () => {
     const next = !showList;
@@ -30,6 +42,24 @@ export default function Inbox() {
     if (activeConversation && window.innerWidth < 768) setShowList(false);
   }, [activeConversation]);
 
+  // Cambiar de tab por parámetro URL aunque el usuario ya esté en la bandeja
+  // (el useState de arriba solo corre al montar, así que un clic en una
+  // notificación estando ya en /inbox no cambiaba de tab sin esto)
+  useEffect(() => {
+    if (searchParams.get('wa_jid') || searchParams.get('wa_sid')) setInboxTab('business');
+    else if (searchParams.get('conv')) setInboxTab('general');
+  }, [searchParams]);
+
+  // Abrir conversación desde parámetro URL (navegación desde notificación)
+  useEffect(() => {
+    const convId = searchParams.get('conv');
+    if (!convId) return;
+    api.get(`/conversations/${convId}`)
+      .then(res => { if (res.data) selectConversation(res.data); })
+      .catch(() => {});
+    setSearchParams({}, { replace: true }); // limpiar params de la URL
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
 
@@ -38,7 +68,7 @@ export default function Inbox() {
 
         {/* Bandeja general */}
         <button
-          onClick={() => setInboxTab('general')}
+          onClick={() => handleTabChange('general')}
           className={`flex items-center gap-2 px-6 py-3 text-sm font-medium transition-all border-b-2
             ${inboxTab === 'general'
               ? 'text-[#00a884] border-[#00a884] bg-[#f0fdf4] dark:bg-[#00a884]/10'
@@ -53,7 +83,7 @@ export default function Inbox() {
 
         {/* WhatsApp Business (Baileys) */}
         <button
-          onClick={() => setInboxTab('business')}
+          onClick={() => handleTabChange('business')}
           className={`flex items-center gap-2 px-6 py-3 text-sm font-medium transition-all border-b-2
             ${inboxTab === 'business'
               ? 'text-blue-600 dark:text-blue-400 border-blue-500 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-500/10'

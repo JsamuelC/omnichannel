@@ -174,7 +174,8 @@ class MessageService {
           catalogFile,
           handoff,
           chatRecord:  { company_id: conversation.company_id, contact_name: contact?.name },
-          sock:        null
+          sock:        null,
+          conversationId: conversation.id
         }, this.io);
       } catch (ruleErr) {
         logger.warn('⚠️  Error evaluando reglas de flujo (omnichannel):', ruleErr.message);

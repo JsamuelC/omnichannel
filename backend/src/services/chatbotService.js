@@ -239,7 +239,7 @@ class ChatbotService {
   }
 
   // ─── Evalúa y ejecuta las reglas de flujo tras respuesta del bot ──
-  async evaluateFlowRules({ sessionId, jid, userMessage, botText, catalogFile, handoff, chatRecord, sock }, io) {
+  async evaluateFlowRules({ sessionId, jid, userMessage, botText, catalogFile, handoff, chatRecord, sock, conversationId }, io) {
     try {
       const { FlowRule, WhatsappChat } = require('../models');
       const companyId = chatRecord?.company_id || null;
@@ -330,7 +330,10 @@ class ChatbotService {
             const contactName = chatRecord?.contact_name || (jid ? jid.split('@')[0] : 'Contacto');
             const customMsg   = rule.action_value?.trim() || `El bot necesita apoyo humano para el cliente ${contactName}`;
             const notifCid    = chatRecord?.company_id || companyId;
-            const notifData   = { sessionId, jid, contactName, message: customMsg, ruleName: rule.name, timestamp: Math.floor(Date.now() / 1000) };
+            // conversationId solo existe para Messenger/Instagram/Widget (no WhatsApp,
+            // que se identifica por sessionId+jid) — el frontend lo usa para saber a
+            // qué pantalla/chat abrir al hacer clic en la notificación
+            const notifData   = { sessionId, jid, contactName, conversationId, message: customMsg, ruleName: rule.name, timestamp: Math.floor(Date.now() / 1000) };
             if (notifCid) io?.to(`agents:${notifCid}`).emit('whatsapp:human_needed', notifData);
             io?.to('agents').emit('whatsapp:human_needed', notifData); // superadmin
             // Persistir en DB para que sobreviva al refresco de página
@@ -341,7 +344,7 @@ class ChatbotService {
                 type:       'human_needed',
                 title:      `⚡ ${contactName} necesita atención`,
                 body:       customMsg,
-                metadata:   { sessionId, jid, contactName, ruleName: rule.name },
+                metadata:   { sessionId, jid, contactName, conversationId, ruleName: rule.name },
               });
             } catch (e) { logger.warn('No se pudo persistir notificación human_needed:', e.message); }
             logger.info(`🔔 Notificación humano enviada para ${jid} (${contactName}) — regla: ${rule.name}`);
