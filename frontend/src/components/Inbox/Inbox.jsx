@@ -18,9 +18,15 @@ export default function Inbox() {
     return saved !== null ? saved === 'true' : true;
   });
   const [showInfo, setShowInfo] = useState(true);
-  const [inboxTab, setInboxTab] = useState(() =>
-    searchParams.get('wa_jid') || searchParams.get('wa_sid') ? 'business' : 'general'
-  );
+  const [inboxTab, setInboxTab] = useState(() => {
+    if (searchParams.get('wa_jid') || searchParams.get('wa_sid')) return 'business';
+    return localStorage.getItem('ts-inbox-tab') || 'general';
+  });
+
+  const handleTabChange = (tab) => {
+    setInboxTab(tab);
+    localStorage.setItem('ts-inbox-tab', tab);
+  };
 
   const toggleSidebar = () => {
     const next = !showList;
@@ -42,7 +48,7 @@ export default function Inbox() {
 
         {/* Bandeja general */}
         <button
-          onClick={() => setInboxTab('general')}
+          onClick={() => handleTabChange('general')}
           className={`flex items-center gap-2 px-6 py-3 text-sm font-medium transition-all border-b-2
             ${inboxTab === 'general'
               ? 'text-[#00a884] border-[#00a884] bg-[#f0fdf4] dark:bg-[#00a884]/10'
@@ -57,7 +63,7 @@ export default function Inbox() {
 
         {/* WhatsApp Business (Baileys) */}
         <button
-          onClick={() => setInboxTab('business')}
+          onClick={() => handleTabChange('business')}
           className={`flex items-center gap-2 px-6 py-3 text-sm font-medium transition-all border-b-2
             ${inboxTab === 'business'
               ? 'text-blue-600 dark:text-blue-400 border-blue-500 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-500/10'
