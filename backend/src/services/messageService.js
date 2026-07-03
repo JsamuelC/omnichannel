@@ -173,7 +173,7 @@ class MessageService {
           botText,
           catalogFile,
           handoff,
-          chatRecord:  { company_id: conversation.company_id },
+          chatRecord:  { company_id: conversation.company_id, contact_name: contact?.name },
           sock:        null
         }, this.io);
       } catch (ruleErr) {
