@@ -165,7 +165,11 @@ class MessageService {
           botText,
           catalogFile,
           handoff,
-          chatRecord:  null,
+          // chatRecord sin session_id real (no es WhatsapChat) — solo se usa para
+          // resolver company_id/nombre; sin esto, evaluateFlowRules nunca encontraba
+          // reglas de la empresa (siempre filtraba a company_id NULL) y notify_human
+          // nunca se disparaba para Messenger/Instagram/Widget
+          chatRecord:  { company_id: conversation.company_id, contact_name: contact?.name },
           sock:        null
         }, this.io);
       } catch (ruleErr) {

@@ -141,7 +141,9 @@ exports.sendMessage = async (req, res) => {
 
         if (realtimeEnabled) {
           const result = await chatbotService.handleMessage(conversation, message, io);
-          const botText = result ? (typeof result === 'string' ? result : result.text) : null;
+          const botText     = result ? (typeof result === 'string' ? result : result.text)   : null;
+          const catalogFile = result && typeof result === 'object' ? result.catalogFile      : null;
+          const handoff     = result && typeof result === 'object' ? result.handoff || false : false;
 
           if (botText) {
             await new Promise(r => setTimeout(r, 800));
@@ -164,6 +166,23 @@ exports.sendMessage = async (req, res) => {
             }
 
             botReply = botMsg.toJSON();
+          }
+
+          // Evaluar reglas de flujo (notify_human es la única acción que aplica al
+          // widget hoy — apply_label/disable_bot/send_message dependen de WhatsappChat)
+          try {
+            await chatbotService.evaluateFlowRules({
+              sessionId:   null,
+              jid:         conversation.contact?.web_id || `contact_${conversation.contact_id}`,
+              userMessage: text.trim(),
+              botText,
+              catalogFile,
+              handoff,
+              chatRecord:  { company_id: conversation.company_id, contact_name: conversation.contact?.name },
+              sock:        null,
+            }, io);
+          } catch (ruleErr) {
+            logger.warn('⚠️  Error evaluando reglas de flujo (widget):', ruleErr.message);
           }
         }
       } catch (botErr) {
