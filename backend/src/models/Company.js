@@ -135,6 +135,11 @@ const Company = sequelize.define('company', {
     allowNull:    true,
     defaultValue: null,
   },
+  blocked_ips: {
+    type:         DataTypes.JSONB,
+    allowNull:    true,
+    defaultValue: [],
+  },
 }, {
   tableName: 'company',
   timestamps: true,

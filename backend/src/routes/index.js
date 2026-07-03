@@ -93,6 +93,10 @@ router.post('/widget/message',                 widgetController.sendMessage);
 router.get ('/widget/messages/:conversationId', widgetController.getMessages);
 router.get ('/widget/poll/:conversationId',     widgetController.poll);
 router.get ('/widget/config/:companyId',        widgetController.getConfig);
+router.post('/widget/end/:conversationId',     widgetController.endConversation);
+router.post('/widget/block-ip',                auth, requireRole('admin'), widgetController.blockIp);
+router.post('/widget/unblock-ip',              auth, requireRole('admin'), widgetController.unblockIp);
+router.get ('/widget/blocked-ips',             auth, requireRole('admin'), widgetController.getBlockedIps);
 
 // ─────────────────────────────────────
 // WEBHOOKS META (sin auth — validados por HMAC)

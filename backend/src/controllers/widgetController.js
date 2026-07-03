@@ -11,11 +11,17 @@ exports.init = async (req, res) => {
 
     if (!company_id) return res.status(400).json({ success: false, error: 'company_id requerido' });
 
-    const company = await Company.findByPk(company_id, { attributes: ['id', 'nombre'] });
+    const company = await Company.findByPk(company_id, { attributes: ['id', 'nombre', 'blocked_ips'] });
     if (!company) return res.status(404).json({ success: false, error: 'Empresa no encontrada' });
 
     const webId = session_id || `web_${uuid()}`;
     const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null;
+
+    // Verificar si la IP está bloqueada
+    const blockedIps = company.blocked_ips || [];
+    if (clientIp && blockedIps.includes(clientIp)) {
+      return res.status(403).json({ success: false, error: 'blocked' });
+    }
 
     const [contact] = await Contact.findOrCreate({
       where: { web_id: webId },
@@ -61,7 +67,11 @@ exports.init = async (req, res) => {
         include: [{ model: Contact, as: 'contact' }]
       });
       if (fullConv) {
-        io.to('agents').emit(convCreated ? 'conversation:new' : 'conversation:updated', { conversation: fullConv.toJSON() });
+        const cid = fullConv.company_id;
+        const ev  = convCreated ? 'conversation:new' : 'conversation:updated';
+        const p   = { conversation: fullConv.toJSON() };
+        if (cid) io.to(`agents:${cid}`).emit(ev, p);
+        io.to('agents').emit(ev, p);
       }
     }
 
@@ -107,25 +117,18 @@ exports.sendMessage = async (req, res) => {
       last_message_preview: text.trim().substring(0, 80),
     });
 
-    // Emitir a agentes via socket (incluir contact para que la bandeja muestre nombre)
+    // Emitir a agentes via socket
     const io = req.app.get('io');
     if (io) {
-      io.to('agents').emit('message:new', {
-        message:      message.toJSON(),
-        conversation: conversation.toJSON(),
-        contact:      conversation.contact?.toJSON() || null,
-      });
+      const cid = conversation.company_id;
+      const p = { message: message.toJSON(), conversation: conversation.toJSON() };
+      if (cid) io.to(`agents:${cid}`).emit('message:new', p);
+      io.to('agents').emit('message:new', p);
     }
 
     // Respuesta del bot si la conversación está en modo bot
     let botReply = null;
-    const botConfig = await BotConfig.findOne({
-      where: { is_active: true, company_id: conversation.company_id },
-      order: [['created_at', 'DESC']]
-    });
-    const widgetRealtime = botConfig?.widget_realtime_responses !== false;
-
-    if (conversation.status === 'bot' && widgetRealtime) {
+    if (conversation.status === 'bot') {
       try {
         // Verificar si el bot tiene habilitadas respuestas en tiempo real para el widget
         const botConfig = await BotConfig.findOne({
@@ -162,7 +165,10 @@ exports.sendMessage = async (req, res) => {
             });
 
             if (io) {
-              io.to('agents').emit('message:sent', { message: botMsg.toJSON(), conversationId: conversation_id });
+              const cid = conversation.company_id;
+              const p = { message: botMsg.toJSON(), conversationId: conversation_id };
+              if (cid) io.to(`agents:${cid}`).emit('message:sent', p);
+              io.to('agents').emit('message:sent', p);
             }
 
             botReply = botMsg.toJSON();
@@ -242,18 +248,110 @@ exports.poll = async (req, res) => {
 exports.getConfig = async (req, res) => {
   try {
     const company = await Company.findByPk(req.params.companyId, {
-      attributes: ['id', 'nombre', 'horarios'],
+      attributes: ['id', 'nombre', 'horarios', 'telefono'],
     });
     if (!company) return res.status(404).json({ success: false, error: 'No encontrada' });
 
     res.json({
       success: true,
       data: {
-        company_id:   company.id,
-        company_name: company.nombre,
-        horarios:     company.horarios,
+        company_id:    company.id,
+        company_name:  company.nombre,
+        company_phone: company.telefono || null,
+        horarios:      company.horarios,
       },
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// POST /api/widget/end/:conversationId — cliente finaliza la conversación
+exports.endConversation = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const conversation = await Conversation.findByPk(conversationId);
+    if (!conversation) return res.status(404).json({ success: false, error: 'No encontrada' });
+
+    await conversation.update({ status: 'resolved' });
+
+    const io = req.app.get('io');
+    if (io) {
+      const cid = conversation.company_id;
+      const p = { conversation: conversation.toJSON() };
+      if (cid) io.to(`agents:${cid}`).emit('conversation:updated', p);
+      io.to('agents').emit('conversation:updated', p);
+    }
+
+    logger.info(`🔒 Conversación ${conversationId} cerrada por el cliente`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// POST /api/widget/block-ip — bloquear IP (requiere auth)
+exports.blockIp = async (req, res) => {
+  try {
+    const { ip, company_id } = req.body;
+    if (!ip) return res.status(400).json({ success: false, error: 'IP requerida' });
+
+    const companyId = company_id || req.user?.company_id;
+    let company;
+    if (companyId) {
+      company = await Company.findByPk(companyId);
+    } else if (req.user?.role === 'superadmin') {
+      company = await Company.findOne({ order: [['created_at', 'ASC']] });
+    }
+    if (!company) return res.status(404).json({ success: false, error: 'Empresa no encontrada' });
+
+    const blocked = company.blocked_ips || [];
+    if (!blocked.includes(ip)) {
+      blocked.push(ip);
+      await company.update({ blocked_ips: blocked });
+    }
+    logger.info(`🚫 IP bloqueada: ${ip} para ${company.nombre}`);
+    res.json({ success: true, data: { blocked_ips: blocked } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// POST /api/widget/unblock-ip — desbloquear IP (requiere auth)
+exports.unblockIp = async (req, res) => {
+  try {
+    const { ip, company_id } = req.body;
+    if (!ip) return res.status(400).json({ success: false, error: 'IP requerida' });
+
+    const companyId = company_id || req.user?.company_id;
+    let company;
+    if (companyId) {
+      company = await Company.findByPk(companyId);
+    } else if (req.user?.role === 'superadmin') {
+      company = await Company.findOne({ order: [['created_at', 'ASC']] });
+    }
+    if (!company) return res.status(404).json({ success: false, error: 'Empresa no encontrada' });
+
+    const blocked = (company.blocked_ips || []).filter(i => i !== ip);
+    await company.update({ blocked_ips: blocked });
+    logger.info(`✅ IP desbloqueada: ${ip} para ${company.nombre}`);
+    res.json({ success: true, data: { blocked_ips: blocked } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// GET /api/widget/blocked-ips — listar IPs bloqueadas
+exports.getBlockedIps = async (req, res) => {
+  try {
+    const companyId = req.user?.company_id;
+    let company;
+    if (companyId) {
+      company = await Company.findByPk(companyId, { attributes: ['blocked_ips'] });
+    } else if (req.user?.role === 'superadmin') {
+      company = await Company.findOne({ order: [['created_at', 'ASC']], attributes: ['blocked_ips'] });
+    }
+    res.json({ success: true, data: company?.blocked_ips || [] });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
