@@ -91,10 +91,18 @@ const requireConversationAccess = async (req, res, next) => {
 
   try {
     const { Conversation } = require('../models');
+    const { Op } = require('sequelize');
     const companyFilter = { company_id: req.user.company_id };
 
+    // Un agente puede ver sus propias conversaciones asignadas y las que
+    // todavía no tienen agente (p.ej. una escalada del bot que llegó por
+    // notificación, antes de que alguien la tome)
     const conv = await Conversation.findOne({
-      where: { id: req.params.id, assigned_agent_id: req.user.id, ...companyFilter }
+      where: {
+        id: req.params.id,
+        [Op.or]: [{ assigned_agent_id: req.user.id }, { assigned_agent_id: null }],
+        ...companyFilter,
+      }
     });
 
     if (!conv) {
