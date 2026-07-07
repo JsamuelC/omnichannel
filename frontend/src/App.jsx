@@ -114,7 +114,7 @@ export default function App() {
         <Route path="dashboard"  element={<RoleRoute role="admin"><Dashboard /></RoleRoute>} />
         <Route path="vouchers"   element={<VouchersPanel />} />
         <Route path="calendar"   element={<CalendarPanel />} />
-        <Route path="templates"  element={<RoleRoute role="admin"><TemplatesPanel /></RoleRoute>} />
+        <Route path="templates"  element={<TemplatesPanel />} />
 
          {/* ── Configuración ── */}
 

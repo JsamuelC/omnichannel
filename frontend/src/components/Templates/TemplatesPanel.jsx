@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import api from '../../services/api';
 import GenerateDocModal from './GenerateDocModal';
 import { getSocket } from '../../services/socket';
+import { useAuthStore } from '../../store';
 
 // ─── Solicitudes de documentos ────────────────────────────────────────────────
 const STATUS_CFG = {
@@ -484,7 +485,7 @@ function UploadZone({ onUploaded }) {
 }
 
 // ─── Template Card ────────────────────────────────────────────────────────────
-function TemplateCard({ template, onEdit, onDelete, onGenerate }) {
+function TemplateCard({ template, onEdit, onDelete, onGenerate, canManage }) {
   const manualCount = (template.fields || []).filter(f => f.source === 'manual').length;
   const autoCount   = (template.fields || []).length - manualCount;
 
@@ -544,14 +545,18 @@ function TemplateCard({ template, onEdit, onDelete, onGenerate }) {
           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
           <Download size={12} /> Generar
         </button>
-        <button onClick={() => onEdit(template)}
-          className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
-          <Settings size={12} /> Campos
-        </button>
-        <button onClick={() => onDelete(template.id)}
-          className="flex items-center justify-center w-8 py-1.5 text-xs border border-red-100 text-red-400 rounded-lg hover:bg-red-50 transition-colors">
-          <Trash2 size={12} />
-        </button>
+        {canManage && (
+          <>
+            <button onClick={() => onEdit(template)}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+              <Settings size={12} /> Campos
+            </button>
+            <button onClick={() => onDelete(template.id)}
+              className="flex items-center justify-center w-8 py-1.5 text-xs border border-red-100 text-red-400 rounded-lg hover:bg-red-50 transition-colors">
+              <Trash2 size={12} />
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -559,6 +564,8 @@ function TemplateCard({ template, onEdit, onDelete, onGenerate }) {
 
 // ─── Main Panel ───────────────────────────────────────────────────────────────
 export default function TemplatesPanel() {
+  const { user } = useAuthStore();
+  const canManage = user?.role === 'admin' || user?.role === 'superadmin';
   const [templates,    setTemplates]    = useState([]);
   const [fieldSources, setFieldSources] = useState([]);
   const [loading,      setLoading]      = useState(true);
@@ -602,18 +609,20 @@ export default function TemplatesPanel() {
           <h1 className="text-lg font-bold text-slate-800 dark:text-white">Plantillas de Documentos</h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">Genera contratos y documentos con datos del cliente</p>
         </div>
-        <button onClick={() => setShowUpload(v => !v)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
-          <Plus size={15} />
-          Nueva plantilla
-        </button>
+        {canManage && (
+          <button onClick={() => setShowUpload(v => !v)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
+            <Plus size={15} />
+            Nueva plantilla
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-5xl mx-auto space-y-6">
 
           {/* Upload zone */}
-          {showUpload && (
+          {canManage && showUpload && (
             <UploadZone onUploaded={() => { fetchTemplates(); setShowUpload(false); }} />
           )}
 
@@ -622,12 +631,18 @@ export default function TemplatesPanel() {
             <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center">
               <FileText size={40} className="mx-auto mb-3 text-slate-300" />
               <h3 className="text-base font-semibold text-slate-700 mb-2">Sin plantillas todavía</h3>
-              <p className="text-sm text-slate-500 mb-1">Crea un documento Word (.docx) con marcadores como <code className="bg-slate-100 px-1 rounded text-indigo-600">{'{nombre_cliente}'}</code></p>
-              <p className="text-sm text-slate-500 mb-4">y súbelo para empezar a generar documentos automáticamente.</p>
-              <button onClick={() => setShowUpload(true)}
-                className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors">
-                Subir primera plantilla
-              </button>
+              {canManage ? (
+                <>
+                  <p className="text-sm text-slate-500 mb-1">Crea un documento Word (.docx) con marcadores como <code className="bg-slate-100 px-1 rounded text-indigo-600">{'{nombre_cliente}'}</code></p>
+                  <p className="text-sm text-slate-500 mb-4">y súbelo para empezar a generar documentos automáticamente.</p>
+                  <button onClick={() => setShowUpload(true)}
+                    className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors">
+                    Subir primera plantilla
+                  </button>
+                </>
+              ) : (
+                <p className="text-sm text-slate-500">Todavía no hay plantillas configuradas por un administrador.</p>
+              )}
             </div>
           )}
 
@@ -649,6 +664,7 @@ export default function TemplatesPanel() {
                   onEdit={setEditingTpl}
                   onDelete={handleDelete}
                   onGenerate={setGenerateTpl}
+                  canManage={canManage}
                 />
               ))}
             </div>
