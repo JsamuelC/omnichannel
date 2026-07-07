@@ -119,7 +119,7 @@ const MoonIcon = () => (
 const ALL_NAV_ITEMS = [
   { to: '/inbox',      icon: <InboxIcon />,     label: 'Bandeja',        id: 'inbox',      feature: null,               permission: 'view_inbox',     roles: ['admin','agent','supervisor','superadmin'] },
   { to: '/calendar',   icon: <CalendarIcon />,  label: 'Calendario',     id: 'calendar',   feature: 'appointments',     permission: 'view_calendar',  roles: ['admin','agent','supervisor','superadmin'] },
-  { to: '/templates',  icon: <TemplateIcon />,  label: 'Documentos',     id: 'templates',  feature: 'document_templates', permission: 'view_templates', roles: ['admin','superadmin'] },
+  { to: '/templates',  icon: <TemplateIcon />,  label: 'Documentos',     id: 'templates',  feature: 'document_templates', permission: 'view_templates', roles: ['admin','agent','supervisor','superadmin'] },
 { to: '/campaigns',  icon: <CampaignIcon />,  label: 'Campañas',       id: 'campaigns',  feature: 'campaigns',        permission: 'view_campaigns', roles: ['admin','superadmin'] },
   { to: '/vouchers',   icon: <VoucherIcon />,   label: 'Comprobantes',   id: 'vouchers',   feature: 'vouchers',         permission: 'view_vouchers',  roles: ['admin','agent','supervisor','superadmin'] },
   { to: '/config',     icon: <SettingsIcon />,  label: 'Configuración',  id: 'config',     feature: null,               permission: 'view_config',    roles: ['admin','superadmin'] },
