@@ -1,8 +1,20 @@
 // backend/src/controllers/userController.js
-const { User }           = require('../models');
+const { User, CustomRole } = require('../models');
 const Company            = require('../models/Company');
 const logger             = require('../config/logger');
 const { sendWelcomeEmail } = require('../services/emailService');
+
+const CUSTOM_ROLE_INCLUDE = { model: CustomRole, as: 'custom_role', attributes: ['id', 'name', 'base_role'] };
+
+// Valida que el custom_role_id (si viene) pertenezca a la misma empresa del
+// usuario objetivo — evita que un admin asigne por API un rol de otra empresa.
+async function resolveCustomRoleId(customRoleId, companyId) {
+  if (customRoleId === undefined) return undefined; // no se envió, no tocar
+  if (customRoleId === null || customRoleId === '') return null;
+  const role = await CustomRole.findOne({ where: { id: customRoleId, company_id: companyId } });
+  if (!role) throw new Error('Rol personalizado inválido para esta empresa.');
+  return role.id;
+}
 
 class UserController {
 
@@ -16,6 +28,7 @@ class UserController {
       const users = await User.findAll({
         where,
         attributes: { exclude: ['password_hash', 'reset_token', 'reset_token_expires'] },
+        include: [CUSTOM_ROLE_INCLUDE],
         order: [['created_at', 'ASC']]
       });
       res.json({ success: true, data: { users, total: users.length } });
@@ -32,6 +45,7 @@ class UserController {
         name, email, password, role = 'agent', company_id,
         cedula, identificacion, genero, fecha_nacimiento, fecha_incorporacion,
         idioma_preferido, zona_horaria, movil, telefono, extension_telefono,
+        custom_role_id,
       } = req.body;
 
       if (!name || !email || !password)
@@ -59,6 +73,13 @@ class UserController {
       if (role !== 'superadmin' && !assignedCompany)
         return res.status(400).json({ success: false, message: 'Se requiere company_id.' });
 
+      let resolvedCustomRoleId;
+      try {
+        resolvedCustomRoleId = await resolveCustomRoleId(custom_role_id, assignedCompany);
+      } catch (e) {
+        return res.status(400).json({ success: false, message: e.message });
+      }
+
       // Superadmin no necesita verificar email (cuenta del sistema)
       const needsVerification = role !== 'superadmin';
       const verificationCode    = needsVerification
@@ -77,6 +98,7 @@ class UserController {
         email_verified:             !needsVerification,
         email_verification_code:    verificationCode,
         email_verification_expires: verificationExpires,
+        ...(resolvedCustomRoleId !== undefined && { custom_role_id: resolvedCustomRoleId }),
         ...(cedula              && { cedula }),
         ...(identificacion      && { identificacion }),
         ...(genero              && { genero }),
@@ -150,8 +172,17 @@ class UserController {
         if (req.body[field] !== undefined) updates[field] = req.body[field] || null;
       }
 
+      if (req.body.custom_role_id !== undefined) {
+        try {
+          updates.custom_role_id = await resolveCustomRoleId(req.body.custom_role_id, user.company_id);
+        } catch (e) {
+          return res.status(400).json({ success: false, message: e.message });
+        }
+      }
+
       await user.update(updates);
-      res.json({ success: true, data: user.toJSON() });
+      const updated = await this._findInScope(user.id, req);
+      res.json({ success: true, data: updated.toJSON() });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
     }
@@ -225,7 +256,7 @@ class UserController {
   async _findInScope(id, req) {
     const where = { id };
     if (req.user.role !== 'superadmin') where.company_id = req.user.company_id;
-    return User.findOne({ where, attributes: { exclude: ['reset_token', 'reset_token_expires'] } });
+    return User.findOne({ where, attributes: { exclude: ['reset_token', 'reset_token_expires'] }, include: [CUSTOM_ROLE_INCLUDE] });
   }
 }
 

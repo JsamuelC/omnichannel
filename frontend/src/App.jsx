@@ -20,6 +20,7 @@ import PanelInfoConfig  from './components/Configuration/PanelInfoConfig';
 import VouchersPanel    from './components/Vouchers/VouchersPanel';
 import WhatsappConfig  from './components/Configuration/WhatsappConfig';
 import WASharingConfig        from './components/Configuration/WASharingConfig';
+import RolesConfig            from './components/Configuration/RolesConfig';
 import Integraciones   from './components/Configuration/Integraciones';
 import FlowRulesConfig       from './components/Configuration/FlowRulesConfig';
 import MensajesRapidosConfig  from './components/Configuration/MensajesRapidosConfig';
@@ -124,6 +125,9 @@ export default function App() {
         <Route path="config/upload"         element={<FeatureRoute feature="config_import_contacts"><Placeholder name="Importar" /></FeatureRoute>} />
         <Route path="config/etiquetas"      element={<FeatureRoute feature="labels"><EtiquetasConfig /></FeatureRoute>} />
         <Route path="config/panel-info"     element={<FeatureRoute feature="config_info_panel"><PanelInfoConfig /></FeatureRoute>} />
+
+         {/* Roles y permisos */}
+        <Route path="config/roles" element={<RoleRoute role="admin"><RolesConfig /></RoleRoute>} />
 
          {/* Canales */}
         <Route path="config/whatsapp"  element={<RoleRoute role="admin"><FeatureRoute feature="whatsapp_business"><WhatsappConfig /></FeatureRoute></RoleRoute>} />
