@@ -33,6 +33,7 @@ import CalendarPanel          from './components/Calendar/CalendarPanel';
 import TemplatesPanel         from './components/Templates/TemplatesPanel';
 import SuperAdminPanel        from './components/SuperAdmin/SuperAdminPanel';
 import GestionFuncionalidades from './components/SuperAdmin/GestionFuncionalidades';
+import RolesConfig            from './components/Configuration/RolesConfig';
 
 
 
@@ -150,6 +151,9 @@ export default function App() {
         {/* ── Módulos personalizados ── */}
         <Route path="config/modulos" element={<RoleRoute role="admin"><ModulosConfig /></RoleRoute>} />
         <Route path="modules/:slug"  element={<ModuleView />} />
+
+        {/* ── Roles personalizados (infraestructura, no módulo comprable) ── */}
+        <Route path="config/roles" element={<RoleRoute role="admin"><RolesConfig /></RoleRoute>} />
 
         {/* ── Panel SuperAdministrador ── */}
         <Route path="superadmin"              element={<SuperAdminRoute><SuperAdminPanel /></SuperAdminRoute>} />

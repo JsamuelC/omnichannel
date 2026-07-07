@@ -8,53 +8,61 @@ const SECTIONS = [
   {
     title: 'General',
     items: [
-      { label: 'Perfil de la empresa',  to: '/config/perfilEmpresa',   feature: 'config_company_profile' },
-      { label: 'Operadores',            to: '/team',                   feature: 'team_management' },
-      { label: 'Etiquetas',             to: '/config/etiquetas',       feature: 'labels' },
-      { label: 'Panel de información',  to: '/config/panel-info',      feature: 'config_info_panel' },
-      { label: 'Importar contactos',    to: '/config/upload',          feature: 'config_import_contacts' },
+      { label: 'Perfil de la empresa',  to: '/config/perfilEmpresa',   feature: 'config_company_profile', permission: 'config_company_profile' },
+      { label: 'Operadores',            to: '/team',                   feature: 'team_management',        permission: 'config_team_management' },
+      { label: 'Etiquetas',             to: '/config/etiquetas',       feature: 'labels',                 permission: 'config_labels' },
+      { label: 'Panel de información',  to: '/config/panel-info',      feature: 'config_info_panel',      permission: 'config_info_panel' },
+      { label: 'Importar contactos',    to: '/config/upload',          feature: 'config_import_contacts', permission: 'config_import_contacts' },
+    ],
+  },
+  {
+    title: 'Roles y permisos',
+    items: [
+      // Sin `permission` a propósito: un admin nunca debe poder auto-ocultarse
+      // esta pantalla asignándose un rol personalizado restrictivo.
+      { label: 'Roles personalizados',  to: '/config/roles' },
     ],
   },
   {
     title: 'Canales',
     items: [
-      { label: 'WhatsApp API (Meta)',   to: '/config/whatsapp',   badge: 'Meta', feature: 'whatsapp_business' },
-      { label: 'Compartir WhatsApp',   to: '/config/wa-sharing',  feature: 'whatsapp_personal' },
-      { label: 'Messenger',             to: '/config/messenger',   feature: 'config_messenger' },
-      { label: 'Instagram',             to: '/config/instagram',   feature: 'config_instagram' },
-      { label: 'TikTok',               to: '/config/tiktok',      feature: 'config_tiktok' },
-      { label: 'Telegram',             to: '/config/telegram',    feature: 'config_telegram' },
+      { label: 'WhatsApp API (Meta)',   to: '/config/whatsapp',  badge: 'Meta', feature: 'whatsapp_business', permission: 'config_whatsapp_business' },
+      { label: 'Compartir WhatsApp',   to: '/config/wa-sharing',  feature: 'whatsapp_personal',  permission: 'config_wa_sharing' },
+      { label: 'Messenger',             to: '/config/messenger',  feature: 'config_messenger',   permission: 'config_messenger' },
+      { label: 'Instagram',             to: '/config/instagram',  feature: 'config_instagram',   permission: 'config_instagram' },
+      { label: 'TikTok',               to: '/config/tiktok',     feature: 'config_tiktok',       permission: 'config_tiktok' },
+      { label: 'Telegram',             to: '/config/telegram',   feature: 'config_telegram',     permission: 'config_telegram' },
     ],
   },
   {
     title: 'Bot IA',
     items: [
-      { label: 'Configuración del bot', to: '/bot-config',            feature: 'bot_ai' },
-      { label: 'Reglas de flujo',       to: '/config/flow-rules',     feature: 'flow_rules' },
-      { label: 'Bot de respuesta',      to: '/config/bot-respuesta',  feature: 'config_bot_response' },
+      { label: 'Configuración del bot', to: '/bot-config',            feature: 'bot_ai',              permission: 'config_bot_ai' },
+      { label: 'Reglas de flujo',       to: '/config/flow-rules',     feature: 'flow_rules',          permission: 'config_flow_rules' },
+      { label: 'Bot de respuesta',      to: '/config/bot-respuesta',  feature: 'config_bot_response', permission: 'config_bot_response' },
     ],
   },
   {
     title: 'Automatizaciones',
     items: [
-      { label: 'Campañas masivas',      to: '/campaigns',              feature: 'campaigns' },
-      { label: 'Mensajes rápidos',      to: '/config/mensajesRapidos', feature: 'quick_messages' },
-      { label: 'Enrutamiento de chat',  to: '/config/enrutamiento',    feature: 'config_chat_routing' },
-      { label: 'Programar informe',     to: '/config/informes',        feature: 'config_reports' },
+      { label: 'Campañas masivas',      to: '/campaigns',              feature: 'campaigns',           permission: 'view_campaigns' },
+      { label: 'Mensajes rápidos',      to: '/config/mensajesRapidos', feature: 'quick_messages',      permission: 'config_quick_messages' },
+      { label: 'Enrutamiento de chat',  to: '/config/enrutamiento',    feature: 'config_chat_routing', permission: 'config_chat_routing' },
+      { label: 'Programar informe',     to: '/config/informes',        feature: 'config_reports',      permission: 'config_reports' },
     ],
   },
   {
     title: 'Módulos',
     items: [
-      { label: 'Módulos personalizados', to: '/config/modulos', feature: 'custom_modules' },
+      { label: 'Módulos personalizados', to: '/config/modulos', feature: 'custom_modules', permission: 'config_modules' },
     ],
   },
   {
     title: 'Desarrolladores',
     items: [
-      { label: 'Integraciones',  to: '/config/integraciones', feature: 'config_integrations' },
-      { label: 'Widgets',        to: '/config/widgets',       feature: 'config_widgets' },
-      { label: 'Complementos',   to: '/config/complementos',  feature: 'config_plugins' },
+      { label: 'Integraciones',         to: '/config/integraciones',   feature: 'config_integrations', permission: 'config_integrations' },
+      { label: 'Widgets',               to: '/config/widgets',         feature: 'config_widgets',       permission: 'config_widgets' },
+      { label: 'Complementos',          to: '/config/complementos',    feature: 'config_plugins',       permission: 'config_plugins' },
     ],
   },
 ];
@@ -62,14 +70,15 @@ const SECTIONS = [
 export default function Settings() {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
-  const { hasFeature } = useAuthStore();
+  const { hasFeature, canViewSection } = useAuthStore();
 
   const filtered = SECTIONS
     .map(section => ({
       ...section,
       items: section.items.filter(item =>
         item.label.toLowerCase().includes(query.toLowerCase()) &&
-        (!item.feature || hasFeature(item.feature))
+        (!item.feature || hasFeature(item.feature)) &&
+        (!item.permission || canViewSection(item.permission))
       ),
     }))
     .filter(section => section.items.length > 0);

@@ -154,6 +154,13 @@ const User = sequelize.define('users', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+  // Perfil de acceso personalizado opcional (restringe qué secciones ve dentro
+  // de lo que su role ENUM + active_features de la empresa ya permiten).
+  // NULL = comportamiento estándar de su role, sin restricciones adicionales.
+  custom_role_id: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
 }, {
   hooks: {
     // Hash automático de contraseña antes de guardar

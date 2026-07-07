@@ -7,6 +7,7 @@ import {
   Plus, Trash2, Edit2, KeyRound, ToggleLeft, ToggleRight, Loader2, X,
 } from 'lucide-react';
 import { useTeamStore, useAuthStore } from '../../store';
+import api from '../../services/api';
 import toast from 'react-hot-toast';
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -136,12 +137,13 @@ function Modal({ title, onClose, wide = false, children }) {
 }
 
 // ── Formulario completo de usuario ────────────────────────────
-function UserForm({ initial = {}, onSave, onCancel, isNew }) {
+function UserForm({ initial = {}, onSave, onCancel, isNew, customRoles = [] }) {
   const [form, setForm] = useState({
     // Cuenta
     name:     initial.name     || '',
     email:    initial.email    || '',
     role:     initial.role     || 'agent',
+    custom_role_id: initial.custom_role_id || initial.custom_role?.id || '',
     password: '',
     // Personal
     cedula:              initial.cedula              || '',
@@ -198,7 +200,7 @@ function UserForm({ initial = {}, onSave, onCancel, isNew }) {
             <Field label="Rol" icon={<Shield />} required>
               <div className="grid grid-cols-3 gap-2 mt-1">
                 {ROLES.map(r => (
-                  <button key={r.value} type="button" onClick={() => set('role', r.value)}
+                  <button key={r.value} type="button" onClick={() => setForm(f => ({ ...f, role: r.value, custom_role_id: '' }))}
                     className="p-3 rounded-xl text-left transition-all"
                     style={{
                       border: form.role === r.value ? '2px solid #6366f1' : '2px solid var(--db-card-border)',
@@ -213,6 +215,20 @@ function UserForm({ initial = {}, onSave, onCancel, isNew }) {
               </div>
             </Field>
           </div>
+          {customRoles.filter(r => r.base_role === form.role && r.is_active !== false).length > 0 && (
+            <div className="sm:col-span-2">
+              <Field label="Perfil de acceso (opcional)" icon={<Shield />}
+                hint="Restringe qué secciones ve este operador dentro de su rol. Si no elegís ninguno, ve todo lo habitual para su rol.">
+                <Select icon={<Shield />} value={form.custom_role_id}
+                  onChange={e => set('custom_role_id', e.target.value)}>
+                  <option value="">— Sin restricciones (comportamiento estándar) —</option>
+                  {customRoles.filter(r => r.base_role === form.role && r.is_active !== false).map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+          )}
           {isNew && (
             <div className="sm:col-span-2">
               <Field label="Contraseña temporal" icon={<Lock />} required
@@ -376,6 +392,11 @@ function UserCard({ user, isCurrentUser, onEdit, onToggle, onDelete, onPassword 
           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ROLE_BADGE[user.role] || ROLE_BADGE.agent}`}>
             {user.role === 'admin' ? 'Admin' : user.role === 'supervisor' ? 'Supervisor' : 'Agente'}
           </span>
+          {user.custom_role?.name && (
+            <span className="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded-full" title="Perfil de acceso personalizado">
+              {user.custom_role.name}
+            </span>
+          )}
           {!user.is_active && (
             <span className="bg-red-100 text-red-600 text-xs font-semibold px-2 py-0.5 rounded-full">Inactivo</span>
           )}
@@ -437,8 +458,14 @@ export default function TeamPanel() {
   const [modalPassword, setModalPassword] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting,      setDeleting]      = useState(false);
+  const [customRoles,   setCustomRoles]   = useState([]);
 
   useEffect(() => { fetchUsers(); }, []);
+  // Solo admin/superadmin llegan a este panel (RoleRoute), así que /custom-roles
+  // (admin-only) siempre está permitido acá. Si falla (empresa sin roles aún), no pasa nada.
+  useEffect(() => {
+    api.get('/custom-roles').then(res => setCustomRoles(res.data || [])).catch(() => {});
+  }, []);
 
   const agents     = users.filter(u => u.role === 'agent');
   const supervisors = users.filter(u => u.role === 'supervisor');
@@ -562,13 +589,13 @@ export default function TeamPanel() {
       {/* MODALES */}
       {modalCreate && (
         <Modal title="Nuevo empleado" onClose={() => setModalCreate(false)} wide>
-          <UserForm isNew onSave={handleCreate} onCancel={() => setModalCreate(false)} />
+          <UserForm isNew onSave={handleCreate} onCancel={() => setModalCreate(false)} customRoles={customRoles} />
         </Modal>
       )}
 
       {modalEdit && (
         <Modal title={`Editar: ${modalEdit.name}`} onClose={() => setModalEdit(null)} wide>
-          <UserForm initial={modalEdit} isNew={false} onSave={handleEdit} onCancel={() => setModalEdit(null)} />
+          <UserForm initial={modalEdit} isNew={false} onSave={handleEdit} onCancel={() => setModalEdit(null)} customRoles={customRoles} />
         </Modal>
       )}
 

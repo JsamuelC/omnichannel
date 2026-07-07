@@ -35,6 +35,7 @@ const planController          = require('../controllers/planController');
 const revenueController       = require('../controllers/revenueController');
 const companyPaymentController = require('../controllers/companyPaymentController');
 const channelConfigController  = require('../controllers/channelConfigController');
+const customRoleController     = require('../controllers/customRoleController');
 const { upload: tplUpload }   = require('../middleware/uploadTemplate');
 const { handleCatalogUpload, CATALOG_DIR } = require('../middleware/uploadCatalog');
 
@@ -45,7 +46,8 @@ const {
   companyScope,
   scopeConversations,
   requireConversationAccess,
-  requireFeature
+  requireFeature,
+  requireCustomPermission
 } = require('../middleware/auth');
 
 // ─────────────────────────────────────
@@ -100,6 +102,18 @@ router.patch('/users/me/availability', auth, async (req, res) => {
 
 router.delete('/users/:id',          auth, requireRole('admin'), requireFeature('team_management'), companyScope, userController.remove.bind(userController));
 router.patch ('/users/:id/password', auth,                       companyScope, userController.changePassword.bind(userController));
+
+// ─────────────────────────────────────
+// ROLES PERSONALIZADOS (por empresa, solo admin)
+// ─────────────────────────────────────
+// Las 4 rutas son admin-only. El operador NO necesita leer la lista completa
+// de roles: su propio efectivo ya viaja en /auth/me como custom_permissions.
+// Los únicos consumidores del listado (RolesConfig.jsx y el selector de
+// TeamPanel.jsx) son páginas admin-only.
+router.get   ('/custom-roles',      auth, requireRole('admin'), companyScope, customRoleController.list.bind(customRoleController));
+router.post  ('/custom-roles',      auth, requireRole('admin'), companyScope, customRoleController.create.bind(customRoleController));
+router.put   ('/custom-roles/:id',  auth, requireRole('admin'), companyScope, customRoleController.update.bind(customRoleController));
+router.delete('/custom-roles/:id',  auth, requireRole('admin'), companyScope, customRoleController.remove.bind(customRoleController));
 
 // ── WhatsApp Business sharing ──────────────────────────
 router.get('/wa-sharing', auth, async (req, res) => {
@@ -229,36 +243,36 @@ router.delete('/transfer-criteria/:id',  auth, requireRole('admin'), transferCri
 // ─────────────────────────────────────
 // REGLAS DE FLUJO DEL BOT
 // ─────────────────────────────────────
-router.get   ('/flow-rules',          auth, requireFeature('flow_rules'), companyScope, flowRuleController.getAll);
-router.post  ('/flow-rules',          auth, requireRole('admin'), requireFeature('flow_rules'), companyScope, flowRuleController.create);
-router.put   ('/flow-rules/:id',      auth, requireRole('admin'), requireFeature('flow_rules'), companyScope, flowRuleController.update);
-router.patch ('/flow-rules/:id/toggle', auth, requireRole('admin'), requireFeature('flow_rules'), companyScope, flowRuleController.toggle);
-router.delete('/flow-rules/:id',      auth, requireRole('admin'), requireFeature('flow_rules'), companyScope, flowRuleController.remove);
+router.get   ('/flow-rules',          auth, requireFeature('flow_rules'), requireCustomPermission('config_flow_rules'), companyScope, flowRuleController.getAll);
+router.post  ('/flow-rules',          auth, requireRole('admin'), requireFeature('flow_rules'), requireCustomPermission('config_flow_rules'), companyScope, flowRuleController.create);
+router.put   ('/flow-rules/:id',      auth, requireRole('admin'), requireFeature('flow_rules'), requireCustomPermission('config_flow_rules'), companyScope, flowRuleController.update);
+router.patch ('/flow-rules/:id/toggle', auth, requireRole('admin'), requireFeature('flow_rules'), requireCustomPermission('config_flow_rules'), companyScope, flowRuleController.toggle);
+router.delete('/flow-rules/:id',      auth, requireRole('admin'), requireFeature('flow_rules'), requireCustomPermission('config_flow_rules'), companyScope, flowRuleController.remove);
 
 // ─────────────────────────────────────
 // MÓDULOS PERSONALIZADOS
 // ─────────────────────────────────────
-router.get   ('/custom-modules',              auth, requireFeature('custom_modules'), companyScope, customModuleController.getAll);
-router.get   ('/custom-modules/admin',        auth, requireRole('admin'), requireFeature('custom_modules'), companyScope, customModuleController.getAllAdmin);
-router.get   ('/custom-modules/:slug',        auth, requireFeature('custom_modules'), companyScope, customModuleController.getOne);
-router.post  ('/custom-modules',              auth, requireRole('admin'), requireFeature('custom_modules'), companyScope, customModuleController.create);
-router.put   ('/custom-modules/:id',          auth, requireRole('admin'), requireFeature('custom_modules'), companyScope, customModuleController.update);
-router.delete('/custom-modules/:id',          auth, requireRole('admin'), requireFeature('custom_modules'), companyScope, customModuleController.remove);
+router.get   ('/custom-modules',              auth, requireFeature('custom_modules'), requireCustomPermission('view_custom_modules'), companyScope, customModuleController.getAll);
+router.get   ('/custom-modules/admin',        auth, requireRole('admin'), requireFeature('custom_modules'), requireCustomPermission('view_custom_modules'), companyScope, customModuleController.getAllAdmin);
+router.get   ('/custom-modules/:slug',        auth, requireFeature('custom_modules'), requireCustomPermission('view_custom_modules'), companyScope, customModuleController.getOne);
+router.post  ('/custom-modules',              auth, requireRole('admin'), requireFeature('custom_modules'), requireCustomPermission('view_custom_modules'), companyScope, customModuleController.create);
+router.put   ('/custom-modules/:id',          auth, requireRole('admin'), requireFeature('custom_modules'), requireCustomPermission('view_custom_modules'), companyScope, customModuleController.update);
+router.delete('/custom-modules/:id',          auth, requireRole('admin'), requireFeature('custom_modules'), requireCustomPermission('view_custom_modules'), companyScope, customModuleController.remove);
 
-router.get   ('/module-records',              auth, requireFeature('custom_modules'), companyScope, moduleRecordController.getAll);
-router.get   ('/module-records/stats/:module_id', auth, requireFeature('custom_modules'), companyScope, moduleRecordController.getDailyStats);
-router.post  ('/module-records',              auth, requireFeature('custom_modules'), companyScope, moduleRecordController.create);
-router.put   ('/module-records/:id',          auth, requireFeature('custom_modules'), companyScope, moduleRecordController.update);
-router.delete('/module-records/:id',          auth, requireRole('admin'), requireFeature('custom_modules'), companyScope, moduleRecordController.remove);
+router.get   ('/module-records',              auth, requireFeature('custom_modules'), requireCustomPermission('view_custom_modules'), companyScope, moduleRecordController.getAll);
+router.get   ('/module-records/stats/:module_id', auth, requireFeature('custom_modules'), requireCustomPermission('view_custom_modules'), companyScope, moduleRecordController.getDailyStats);
+router.post  ('/module-records',              auth, requireFeature('custom_modules'), requireCustomPermission('view_custom_modules'), companyScope, moduleRecordController.create);
+router.put   ('/module-records/:id',          auth, requireFeature('custom_modules'), requireCustomPermission('view_custom_modules'), companyScope, moduleRecordController.update);
+router.delete('/module-records/:id',          auth, requireRole('admin'), requireFeature('custom_modules'), requireCustomPermission('view_custom_modules'), companyScope, moduleRecordController.remove);
 
 // ─────────────────────────────────────
 // MENSAJES RÁPIDOS
 // ─────────────────────────────────────
-router.get   ('/quick-messages',        auth, requireFeature('quick_messages'), companyScope, quickMessageController.getAll);
-router.get   ('/quick-messages/admin',  auth, requireRole('admin'), requireFeature('quick_messages'), companyScope, quickMessageController.getAllAdmin);
-router.post  ('/quick-messages',        auth, requireRole('admin'), requireFeature('quick_messages'), companyScope, quickMessageController.create);
-router.put   ('/quick-messages/:id',    auth, requireRole('admin'), requireFeature('quick_messages'), companyScope, quickMessageController.update);
-router.delete('/quick-messages/:id',    auth, requireRole('admin'), requireFeature('quick_messages'), companyScope, quickMessageController.remove);
+router.get   ('/quick-messages',        auth, requireFeature('quick_messages'), requireCustomPermission('config_quick_messages'), companyScope, quickMessageController.getAll);
+router.get   ('/quick-messages/admin',  auth, requireRole('admin'), requireFeature('quick_messages'), requireCustomPermission('config_quick_messages'), companyScope, quickMessageController.getAllAdmin);
+router.post  ('/quick-messages',        auth, requireRole('admin'), requireFeature('quick_messages'), requireCustomPermission('config_quick_messages'), companyScope, quickMessageController.create);
+router.put   ('/quick-messages/:id',    auth, requireRole('admin'), requireFeature('quick_messages'), requireCustomPermission('config_quick_messages'), companyScope, quickMessageController.update);
+router.delete('/quick-messages/:id',    auth, requireRole('admin'), requireFeature('quick_messages'), requireCustomPermission('config_quick_messages'), companyScope, quickMessageController.remove);
 
 // ─────────────────────────────────────
 // CONVERSACIONES
@@ -304,12 +318,12 @@ router.delete('/conversations/:id',
 // ─────────────────────────────────────
 // CAMPAÑAS MASIVAS — solo admin
 // ─────────────────────────────────────
-router.get   ('/campaigns',             auth, requireRole('admin'), requireFeature('campaigns'), companyScope, campaignController.getAll.bind(campaignController));
-router.get   ('/campaigns/:id',         auth, requireRole('admin'), requireFeature('campaigns'), companyScope, campaignController.getOne.bind(campaignController));
-router.post  ('/campaigns',             auth, requireRole('admin'), requireFeature('campaigns'), companyScope, campaignController.create.bind(campaignController));
-router.post  ('/campaigns/:id/launch',  auth, requireRole('admin'), requireFeature('campaigns'), companyScope, campaignController.launch.bind(campaignController));
-router.post  ('/campaigns/:id/pause',   auth, requireRole('admin'), requireFeature('campaigns'), companyScope, campaignController.pause.bind(campaignController));
-router.delete('/campaigns/:id',         auth, requireRole('admin'), requireFeature('campaigns'), companyScope, campaignController.delete.bind(campaignController));
+router.get   ('/campaigns',             auth, requireRole('admin'), requireFeature('campaigns'), requireCustomPermission('view_campaigns'), companyScope, campaignController.getAll.bind(campaignController));
+router.get   ('/campaigns/:id',         auth, requireRole('admin'), requireFeature('campaigns'), requireCustomPermission('view_campaigns'), companyScope, campaignController.getOne.bind(campaignController));
+router.post  ('/campaigns',             auth, requireRole('admin'), requireFeature('campaigns'), requireCustomPermission('view_campaigns'), companyScope, campaignController.create.bind(campaignController));
+router.post  ('/campaigns/:id/launch',  auth, requireRole('admin'), requireFeature('campaigns'), requireCustomPermission('view_campaigns'), companyScope, campaignController.launch.bind(campaignController));
+router.post  ('/campaigns/:id/pause',   auth, requireRole('admin'), requireFeature('campaigns'), requireCustomPermission('view_campaigns'), companyScope, campaignController.pause.bind(campaignController));
+router.delete('/campaigns/:id',         auth, requireRole('admin'), requireFeature('campaigns'), requireCustomPermission('view_campaigns'), companyScope, campaignController.delete.bind(campaignController));
 
 // ─────────────────────────────────────
 // INTEGRACIONES CON PLATAFORMAS EXTERNAS
@@ -610,35 +624,35 @@ router.patch('/conversations/:id',
 // ─────────────────────────────────────
 // CALENDARIO DE CITAS
 // ─────────────────────────────────────
-router.get   ('/appointments/availability', auth, requireFeature('appointments'), appointmentCtrl.getAvailability);
-router.get   ('/appointments/schedule',     auth, requireFeature('appointments'), appointmentCtrl.getSchedule);
-router.put   ('/appointments/schedule',     auth, requireRole('admin'), requireFeature('appointments'), appointmentCtrl.updateSchedule);
-router.get   ('/appointments/next-slots',   auth, requireFeature('appointments'), appointmentCtrl.getNextSlots);
-router.get   ('/appointments',              auth, requireFeature('appointments'), appointmentCtrl.getAll);
-router.post  ('/appointments',              auth, requireFeature('appointments'), appointmentCtrl.create);
-router.put   ('/appointments/:id',          auth, requireFeature('appointments'), appointmentCtrl.update);
-router.delete('/appointments/:id',          auth, requireRole('admin'), requireFeature('appointments'), appointmentCtrl.remove);
+router.get   ('/appointments/availability', auth, requireFeature('appointments'), requireCustomPermission('view_calendar'), appointmentCtrl.getAvailability);
+router.get   ('/appointments/schedule',     auth, requireFeature('appointments'), requireCustomPermission('view_calendar'), appointmentCtrl.getSchedule);
+router.put   ('/appointments/schedule',     auth, requireRole('admin'), requireFeature('appointments'), requireCustomPermission('view_calendar'), appointmentCtrl.updateSchedule);
+router.get   ('/appointments/next-slots',   auth, requireFeature('appointments'), requireCustomPermission('view_calendar'), appointmentCtrl.getNextSlots);
+router.get   ('/appointments',              auth, requireFeature('appointments'), requireCustomPermission('view_calendar'), appointmentCtrl.getAll);
+router.post  ('/appointments',              auth, requireFeature('appointments'), requireCustomPermission('view_calendar'), appointmentCtrl.create);
+router.put   ('/appointments/:id',          auth, requireFeature('appointments'), requireCustomPermission('view_calendar'), appointmentCtrl.update);
+router.delete('/appointments/:id',          auth, requireRole('admin'), requireFeature('appointments'), requireCustomPermission('view_calendar'), appointmentCtrl.remove);
 
 // ─────────────────────────────────────
 // PLANTILLAS DE DOCUMENTOS
 // ─────────────────────────────────────
-router.get   ('/templates/field-sources',   auth, requireFeature('document_templates'), templateCtrl.fieldSources);
-router.get   ('/templates',                 auth, requireFeature('document_templates'), templateCtrl.list);
-router.post  ('/templates/upload',          auth, requireRole('admin'), requireFeature('document_templates'), tplUpload.single('file'), templateCtrl.upload);
-router.get   ('/templates/:id',             auth, requireFeature('document_templates'), templateCtrl.getOne);
-router.put   ('/templates/:id',             auth, requireRole('admin'), requireFeature('document_templates'), templateCtrl.update);
-router.delete('/templates/:id',             auth, requireRole('admin'), requireFeature('document_templates'), templateCtrl.remove);
-router.post  ('/templates/:id/generate',    auth, requireFeature('document_templates'), templateCtrl.generate);
-router.post  ('/templates/:id/send',        auth, requireFeature('document_templates'), templateCtrl.send);
+router.get   ('/templates/field-sources',   auth, requireFeature('document_templates'), requireCustomPermission('view_templates'),templateCtrl.fieldSources);
+router.get   ('/templates',                 auth, requireFeature('document_templates'), requireCustomPermission('view_templates'),templateCtrl.list);
+router.post  ('/templates/upload',          auth, requireRole('admin'), requireFeature('document_templates'), requireCustomPermission('view_templates'),tplUpload.single('file'), templateCtrl.upload);
+router.get   ('/templates/:id',             auth, requireFeature('document_templates'), requireCustomPermission('view_templates'),templateCtrl.getOne);
+router.put   ('/templates/:id',             auth, requireRole('admin'), requireFeature('document_templates'), requireCustomPermission('view_templates'),templateCtrl.update);
+router.delete('/templates/:id',             auth, requireRole('admin'), requireFeature('document_templates'), requireCustomPermission('view_templates'),templateCtrl.remove);
+router.post  ('/templates/:id/generate',    auth, requireFeature('document_templates'), requireCustomPermission('view_templates'),templateCtrl.generate);
+router.post  ('/templates/:id/send',        auth, requireFeature('document_templates'), requireCustomPermission('view_templates'),templateCtrl.send);
 
 // ─────────────────────────────────────
 // SOLICITUDES DE DOCUMENTOS (colección bot)
 // ─────────────────────────────────────
-router.get   ('/document-requests',                auth, requireFeature('document_templates'), docRequestCtrl.list);
-router.post  ('/document-requests/start',          auth, requireFeature('document_templates'), docRequestCtrl.start);
-router.get   ('/document-requests/:id/download',   auth, requireFeature('document_templates'), docRequestCtrl.download);
-router.post  ('/document-requests/:id/send',       auth, requireFeature('document_templates'), docRequestCtrl.send);
-router.post  ('/document-requests/:id/reject',     auth, requireFeature('document_templates'), docRequestCtrl.reject);
+router.get   ('/document-requests',                auth, requireFeature('document_templates'), requireCustomPermission('view_templates'),docRequestCtrl.list);
+router.post  ('/document-requests/start',          auth, requireFeature('document_templates'), requireCustomPermission('view_templates'),docRequestCtrl.start);
+router.get   ('/document-requests/:id/download',   auth, requireFeature('document_templates'), requireCustomPermission('view_templates'),docRequestCtrl.download);
+router.post  ('/document-requests/:id/send',       auth, requireFeature('document_templates'), requireCustomPermission('view_templates'),docRequestCtrl.send);
+router.post  ('/document-requests/:id/reject',     auth, requireFeature('document_templates'), requireCustomPermission('view_templates'),docRequestCtrl.reject);
 
 // Servir archivos generados
 router.use('/uploads/generated', require('express').static(
@@ -665,26 +679,26 @@ router.post  ('/merge-templates/auto-merge/:conversationId', auth, requireFeatur
 // ─────────────────────────────────────
 // COMPROBANTES DE PAGO
 // ─────────────────────────────────────
-router.use('/vouchers', auth, requireFeature('vouchers'), voucherRoutes);
+router.use('/vouchers', auth, requireFeature('vouchers'), requireCustomPermission('view_vouchers'), voucherRoutes);
 console.log('✅ WhatsApp routes cargadas');
 router.use('/whatsapp', whatsappRoutes);
 // ─────────────────────────────────────
 // OUTLOOK CALENDAR
 // ─────────────────────────────────────
-router.get ('/outlook/status',     auth, requireFeature('appointments'), outlookController.status);
-router.get ('/outlook/connect',    auth, requireRole('admin'), requireFeature('appointments'), outlookController.connect);
+router.get ('/outlook/status',     auth, requireFeature('appointments'), requireCustomPermission('view_calendar'), outlookController.status);
+router.get ('/outlook/connect',    auth, requireRole('admin'), requireFeature('appointments'), requireCustomPermission('view_calendar'), outlookController.connect);
 router.get ('/outlook/callback',   outlookController.callback);   // sin auth — viene de Microsoft
-router.delete('/outlook/disconnect', auth, requireRole('admin'), requireFeature('appointments'), outlookController.disconnect);
-router.get ('/outlook/events',     auth, requireFeature('appointments'), outlookController.getEvents);
+router.delete('/outlook/disconnect', auth, requireRole('admin'), requireFeature('appointments'), requireCustomPermission('view_calendar'), outlookController.disconnect);
+router.get ('/outlook/events',     auth, requireFeature('appointments'), requireCustomPermission('view_calendar'), outlookController.getEvents);
 
 // ─────────────────────────────────────
 // GOOGLE CALENDAR
 // ─────────────────────────────────────
-router.get   ('/gcal/status',     auth, requireFeature('appointments'), googleCalendarController.status);
-router.get   ('/gcal/connect',    auth, requireRole('admin'), requireFeature('appointments'), googleCalendarController.connect);
+router.get   ('/gcal/status',     auth, requireFeature('appointments'), requireCustomPermission('view_calendar'), googleCalendarController.status);
+router.get   ('/gcal/connect',    auth, requireRole('admin'), requireFeature('appointments'), requireCustomPermission('view_calendar'), googleCalendarController.connect);
 router.get   ('/gcal/callback',   googleCalendarController.callback);  // sin auth — viene de Google
-router.delete('/gcal/disconnect', auth, requireRole('admin'), requireFeature('appointments'), googleCalendarController.disconnect);
-router.get   ('/gcal/events',     auth, requireFeature('appointments'), googleCalendarController.getEvents);
+router.delete('/gcal/disconnect', auth, requireRole('admin'), requireFeature('appointments'), requireCustomPermission('view_calendar'), googleCalendarController.disconnect);
+router.get   ('/gcal/events',     auth, requireFeature('appointments'), requireCustomPermission('view_calendar'), googleCalendarController.getEvents);
 
 // ─────────────────────────────────────
 // PLANES Y FACTURACIÓN (solo superadmin)

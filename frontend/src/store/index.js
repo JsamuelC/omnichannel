@@ -10,17 +10,18 @@ import { initSocket, disconnectSocket } from '../services/socket';
 // AUTH STORE
 // ══════════════════════════════════════════════════════════════
 export const useAuthStore = create((set, get) => ({
-  user:           null,
-  token:          localStorage.getItem('token'),
-  permissions:    null,
-  activeFeatures: null,  // active_features de la empresa del usuario
-  isLoading:      false,
+  user:              null,
+  token:             localStorage.getItem('token'),
+  permissions:       null,
+  activeFeatures:    null,  // active_features de la empresa del usuario
+  customPermissions: null,  // perfil de acceso personalizado (null = sin restricciones adicionales)
+  isLoading:         false,
 
   // Usado tras verificación de email para iniciar sesión directamente
   _setSession: (token, user) => {
     localStorage.setItem('token', token);
     initSocket(user.id);
-    set({ user, token, permissions: user.permissions, activeFeatures: user.active_features ?? null });
+    set({ user, token, permissions: user.permissions, activeFeatures: user.active_features ?? null, customPermissions: user.custom_permissions ?? null });
   },
 
   login: async (email, password) => {
@@ -33,7 +34,7 @@ export const useAuthStore = create((set, get) => ({
         const { token, user } = res.data;
         localStorage.setItem('token', token);
         initSocket(user.id);
-        set({ user, token, permissions: user.permissions, activeFeatures: user.active_features ?? null, isLoading: false });
+        set({ user, token, permissions: user.permissions, activeFeatures: user.active_features ?? null, customPermissions: user.custom_permissions ?? null, isLoading: false });
         return { success: true };
       }
       // Paso 1: backend envió OTP → necesita segundo factor
@@ -54,7 +55,7 @@ export const useAuthStore = create((set, get) => ({
     localStorage.removeItem('token');
     localStorage.removeItem('ts-admin-company-id');
     disconnectSocket();
-    set({ user: null, token: null, permissions: null, activeFeatures: null });
+    set({ user: null, token: null, permissions: null, activeFeatures: null, customPermissions: null });
     useConversationStore.setState({ conversations: [], activeConversation: null, messages: [], totalConversations: 0 });
     useModuleStore.setState({ modules: [], loading: false });
     useLabelStore.setState({ labels: [], loaded: false });
@@ -65,13 +66,13 @@ export const useAuthStore = create((set, get) => ({
       const res = await api.get('/auth/me');
       const user = res.data;
       initSocket(user.id);
-      set({ user, permissions: user.permissions, activeFeatures: user.active_features ?? null });
+      set({ user, permissions: user.permissions, activeFeatures: user.active_features ?? null, customPermissions: user.custom_permissions ?? null });
     } catch (err) {
       // Solo cerrar sesión si el token es realmente inválido/venció (401).
       // Un error transitorio (red, 500, backend reiniciando) no debe desloguear al usuario.
       if (err?.status === 401) {
         localStorage.removeItem('token');
-        set({ user: null, token: null, permissions: null, activeFeatures: null });
+        set({ user: null, token: null, permissions: null, activeFeatures: null, customPermissions: null });
       }
     }
   },
@@ -81,7 +82,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await api.get('/auth/me');
       const user = res.data;
-      set({ user, permissions: user.permissions, activeFeatures: user.active_features ?? null });
+      set({ user, permissions: user.permissions, activeFeatures: user.active_features ?? null, customPermissions: user.custom_permissions ?? null });
     } catch { /* silencioso */ }
   },
 
@@ -119,6 +120,15 @@ export const useAuthStore = create((set, get) => ({
     if (user?.role === 'superadmin') return true;
     if (!activeFeatures) return true;  // cargando o sin empresa → optimista
     return activeFeatures[featureName] === true;
+  },
+
+  // Verifica si el rol personalizado del usuario permite ver una sección.
+  // Sin rol asignado (customPermissions === null) → sin restricción, visible.
+  // Clave ausente en el perfil (p.ej. se agregó después) → visible (fail-open).
+  canViewSection: (key) => {
+    const { customPermissions } = get();
+    if (!customPermissions) return true;
+    return customPermissions[key] !== false;
   },
 }));
 

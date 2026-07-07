@@ -167,4 +167,37 @@ const requireFeature = (featureName) => async (req, res, next) => {
   }
 };
 
-module.exports = { auth, requireRole, requireSuperAdmin, companyScope, scopeConversations, requireConversationAccess, requireFeature };
+// ── 8. Permiso de rol personalizado (capa OPCIONAL adicional) ──────────────────
+// Se coloca SIEMPRE después de requireRole/requireFeature en la cadena de una
+// ruta, nunca antes ni en su lugar — solo puede restringir, nunca conceder más
+// de lo que esas dos ya permiten. Si el usuario no tiene custom_role_id, deja
+// pasar sin tocar nada (fail-open = comportamiento actual de siempre).
+const requireCustomPermission = (permissionKey) => async (req, res, next) => {
+  if (!req.user) return res.status(401).json({ success: false, message: 'Autenticación requerida.' });
+  if (req.user.role === 'superadmin') return next();
+  if (!req.user.custom_role_id) return next(); // sin rol personalizado asignado -> sin restricción adicional
+
+  try {
+    const CustomRole = require('../models/CustomRole');
+    const role = await CustomRole.findOne({
+      where: { id: req.user.custom_role_id, company_id: req.user.company_id, is_active: true },
+    });
+    if (!role) return next(); // rol borrado/desactivado -> fail-open
+
+    const perms = { ...CustomRole.DEFAULT_PERMISSIONS, ...role.permissions };
+    if (perms[permissionKey] === false) {
+      logger.warn(`🚫 Permiso de rol personalizado denegado: "${permissionKey}" para ${req.user.email} (rol: ${role.name})`);
+      return res.status(403).json({
+        success: false,
+        message: `Tu rol "${role.name}" no tiene acceso a esta sección.`,
+        permission: permissionKey,
+      });
+    }
+    next();
+  } catch (error) {
+    logger.error('Error en requireCustomPermission:', error);
+    next(); // fail-open ante error inesperado — esta capa solo resta privilegios, nunca debe bloquear por un bug propio
+  }
+};
+
+module.exports = { auth, requireRole, requireSuperAdmin, companyScope, scopeConversations, requireConversationAccess, requireFeature, requireCustomPermission };

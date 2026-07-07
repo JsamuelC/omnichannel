@@ -29,6 +29,7 @@ const DocumentRequest    = require('./DocumentRequest');
 const MergeTemplate      = require('./MergeTemplate');
 const CompanyPayment     = require('./CompanyPayment');
 const Notification       = require('./Notification');
+const CustomRole          = require('./CustomRole');
 
 // ============================
 // ASOCIACIONES ORIGINALES
@@ -42,6 +43,10 @@ Message.belongsTo(Conversation, { foreignKey: 'conversation_id', as: 'conversati
 
 User.hasMany(Conversation, { foreignKey: 'assigned_agent_id', as: 'assigned_conversations' });
 Conversation.belongsTo(User, { foreignKey: 'assigned_agent_id', as: 'assigned_agent' });
+
+// Perfil de acceso personalizado (opcional) — ver custom_role_id en User.js
+CustomRole.hasMany(User, { foreignKey: 'custom_role_id', as: 'users' });
+User.belongsTo(CustomRole, { foreignKey: 'custom_role_id', as: 'custom_role' });
 
 const Company = require('./Company');
 User.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
@@ -111,6 +116,8 @@ const migrate = async () => {
       { table: 'users', col: 'login_otp',             def: { type: DT.STRING(6),   allowNull: true } },
       { table: 'users', col: 'login_otp_expires',     def: { type: DT.DATE,        allowNull: true } },
       { table: 'users', col: 'trusted_devices',       def: { type: DT.JSONB,       allowNull: true, defaultValue: [] } },
+      // Perfil de acceso personalizado (roles configurables por empresa)
+      { table: 'users', col: 'custom_role_id',        def: { type: DT.UUID,        allowNull: true } },
       // Google Calendar
       { table: 'company',       col: 'google_calendar_tokens', def: { type: DT.JSONB,       allowNull: true, defaultValue: null } },
       { table: 'appointments',  col: 'google_event_id',        def: { type: DT.STRING(500), allowNull: true } },
@@ -164,6 +171,7 @@ const migrate = async () => {
     await safeSync(MergeTemplate);
     await safeSync(CompanyPayment);
     await safeSync(Notification);
+    await safeSync(CustomRole);
     await safeAdd('merge_templates', 'canal', { type: DT.STRING(30), allowNull: false, defaultValue: 'all' });
 
     // Agregar trigger_keywords a document_templates si no existe
@@ -409,5 +417,6 @@ module.exports = {
   MergeTemplate,
   CompanyPayment,
   Notification,
+  CustomRole,
   migrate
 };

@@ -16,6 +16,21 @@ const loadActiveFeatures = async (user) => {
   } catch { return null; }
 };
 
+// Resuelve el perfil de acceso personalizado del usuario (si tiene uno asignado).
+// null = sin restricciones adicionales (comportamiento estándar de su role).
+// Fail-open: rol borrado/desactivado o error de BD -> null, nunca bloquea login.
+const loadEffectivePermissions = async (user) => {
+  if (!user.custom_role_id) return null;
+  try {
+    const { CustomRole } = require('../models');
+    const role = await CustomRole.findOne({
+      where: { id: user.custom_role_id, company_id: user.company_id, is_active: true },
+    });
+    if (!role) return null;
+    return { ...CustomRole.DEFAULT_PERMISSIONS, ...role.permissions, _roleName: role.name };
+  } catch { return null; }
+};
+
 const generateToken = (user) =>
   jwt.sign(
     { id: user.id, role: user.role, company_id: user.company_id || null },
@@ -64,12 +79,13 @@ class AuthController {
           await user.update({ is_online: true, online_started_at: new Date() });
           const token = generateToken(user);
           const activeFeatures = await loadActiveFeatures(user);
+          const customPermissions = await loadEffectivePermissions(user);
           logger.info(`✅ Login con dispositivo de confianza: ${email}`);
           return res.json({
             success: true,
             data: {
               token,
-              user: { ...user.toJSON(), permissions: buildPermissions(user.role), active_features: activeFeatures },
+              user: { ...user.toJSON(), permissions: buildPermissions(user.role), active_features: activeFeatures, custom_permissions: customPermissions },
             },
           });
         }
@@ -234,13 +250,14 @@ class AuthController {
 
       const token = generateToken(user);
       const activeFeatures = await loadActiveFeatures(user);
+      const customPermissions = await loadEffectivePermissions(user);
       logger.info(`✅ Login OTP verificado: ${user.email} (${user.role})`);
 
       res.json({
         success: true,
         data: {
           token,
-          user: { ...user.toJSON(), permissions: buildPermissions(user.role), active_features: activeFeatures },
+          user: { ...user.toJSON(), permissions: buildPermissions(user.role), active_features: activeFeatures, custom_permissions: customPermissions },
           ...(newDeviceToken ? { deviceToken: newDeviceToken } : {}),
         },
       });
@@ -315,11 +332,12 @@ class AuthController {
         activeFeatures = company?.active_features || null;
       }
 
+      const customPermissions = await loadEffectivePermissions(user);
       logger.info(`✅ Email verificado: ${user.email}`);
       res.json({
         success: true,
         message: '¡Correo verificado! Bienvenido/a a Tecnossync.',
-        data:    { token, user: { ...user.toJSON(), permissions: buildPermissions(user.role), active_features: activeFeatures } },
+        data:    { token, user: { ...user.toJSON(), permissions: buildPermissions(user.role), active_features: activeFeatures, custom_permissions: customPermissions } },
       });
     } catch (error) {
       logger.error('Error verifyEmail:', error);
@@ -393,9 +411,10 @@ class AuthController {
   // GET /auth/me
   async me(req, res) {
     const activeFeatures = await loadActiveFeatures(req.user);
+    const customPermissions = await loadEffectivePermissions(req.user);
     res.json({
       success: true,
-      data: { ...req.user.toJSON(), permissions: buildPermissions(req.user.role), active_features: activeFeatures }
+      data: { ...req.user.toJSON(), permissions: buildPermissions(req.user.role), active_features: activeFeatures, custom_permissions: customPermissions }
     });
   }
 

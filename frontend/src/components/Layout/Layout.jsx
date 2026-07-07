@@ -117,13 +117,13 @@ const MoonIcon = () => (
 // ─── Configuración de nav por rol ───────────────────────────
 // Todos los posibles nav items con su feature flag asociado (null = siempre visible)
 const ALL_NAV_ITEMS = [
-  { to: '/inbox',      icon: <InboxIcon />,     label: 'Bandeja',        id: 'inbox',      feature: null,               roles: ['admin','agent','supervisor','superadmin'] },
-  { to: '/calendar',   icon: <CalendarIcon />,  label: 'Calendario',     id: 'calendar',   feature: 'appointments',     roles: ['admin','agent','supervisor','superadmin'] },
-  { to: '/templates',  icon: <TemplateIcon />,  label: 'Documentos',     id: 'templates',  feature: 'document_templates', roles: ['admin','superadmin'] },
-{ to: '/campaigns',  icon: <CampaignIcon />,  label: 'Campañas',       id: 'campaigns',  feature: 'campaigns',        roles: ['admin','superadmin'] },
-  { to: '/vouchers',   icon: <VoucherIcon />,   label: 'Comprobantes',   id: 'vouchers',   feature: 'vouchers',         roles: ['admin','agent','supervisor','superadmin'] },
-  { to: '/config',     icon: <SettingsIcon />,  label: 'Configuración',  id: 'config',     feature: null,               roles: ['admin','superadmin'] },
-  { to: '/dashboard',  icon: <DashboardIcon />, label: 'Dashboard',      id: 'dashboard',  feature: 'dashboard',        roles: ['admin','superadmin'] },
+  { to: '/inbox',      icon: <InboxIcon />,     label: 'Bandeja',        id: 'inbox',      feature: null,               permission: 'view_inbox',     roles: ['admin','agent','supervisor','superadmin'] },
+  { to: '/calendar',   icon: <CalendarIcon />,  label: 'Calendario',     id: 'calendar',   feature: 'appointments',     permission: 'view_calendar',  roles: ['admin','agent','supervisor','superadmin'] },
+  { to: '/templates',  icon: <TemplateIcon />,  label: 'Documentos',     id: 'templates',  feature: 'document_templates', permission: 'view_templates', roles: ['admin','superadmin'] },
+{ to: '/campaigns',  icon: <CampaignIcon />,  label: 'Campañas',       id: 'campaigns',  feature: 'campaigns',        permission: 'view_campaigns', roles: ['admin','superadmin'] },
+  { to: '/vouchers',   icon: <VoucherIcon />,   label: 'Comprobantes',   id: 'vouchers',   feature: 'vouchers',         permission: 'view_vouchers',  roles: ['admin','agent','supervisor','superadmin'] },
+  { to: '/config',     icon: <SettingsIcon />,  label: 'Configuración',  id: 'config',     feature: null,               permission: 'view_config',    roles: ['admin','superadmin'] },
+  { to: '/dashboard',  icon: <DashboardIcon />, label: 'Dashboard',      id: 'dashboard',  feature: 'dashboard',        permission: 'view_dashboard', roles: ['admin','superadmin'] },
   { to: '/superadmin', icon: <TeamIcon />,       label: 'SuperAdmin',     id: 'superadmin', feature: null,               roles: ['superadmin'] },
   { to: '/gestion-funcionalidades', icon: <SettingsIcon />, label: 'Funcionalidades', id: 'gestion-func', feature: null, roles: ['superadmin'] },
 ];
@@ -131,7 +131,7 @@ const ALL_NAV_ITEMS = [
 const CHANNEL_LABEL = { whatsapp: 'WhatsApp', messenger: 'Messenger', instagram: 'Instagram', web: 'Widget Web' };
 
 export default function Layout() {
-  const { user, logout, isAdmin, hasFeature } = useAuthStore();
+  const { user, logout, isAdmin, hasFeature, canViewSection } = useAuthStore();
   const { addIncomingMessage, fetchConversations, removeConversation } = useConversationStore();
   const { theme, toggleTheme }           = useThemeStore();
   const { modules, fetchModules }        = useModuleStore();
@@ -157,6 +157,7 @@ export default function Layout() {
   const navItems = ALL_NAV_ITEMS.filter(item => {
     if (!item.roles.includes(role)) return false;
     if (item.feature && !hasFeature(item.feature)) return false;
+    if (item.permission && !canViewSection(item.permission)) return false;
     return true;
   });
 
