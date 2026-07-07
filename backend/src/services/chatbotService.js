@@ -395,7 +395,10 @@ class ChatbotService {
 
       if (shouldEscalate) {
         await this.escalateToHuman(conversation, config, io);
-        return config.escalation_message;
+        // handoff:true para que evaluateFlowRules (llamado después por el caller)
+        // dispare las reglas bot_handoff — antes devolvía un string plano y el
+        // handoff se perdía, así que notify_human nunca se enteraba de esta escalación
+        return { text: config.escalation_message, handoff: true, catalogFile: null };
       }
 
       const integration = await this.getActiveIntegration(conversation.company_id);
@@ -490,6 +493,13 @@ class ChatbotService {
       } catch (_) {}
     }
 
+    // company_id: nunca emitir sin scope — si no, agentes de OTRAS empresas
+    // también reciben este evento (fuga multi-tenant)
+    if (conversation.company_id) io?.to(`agents:${conversation.company_id}`).emit('conversation:escalated', {
+      conversationId: conversation.id,
+      channel:        conversation.channel,
+      reason:         'keyword_trigger'
+    });
     io?.to('agents').emit('conversation:escalated', {
       conversationId: conversation.id,
       channel:        conversation.channel,
