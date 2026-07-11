@@ -622,7 +622,17 @@ function MessageMedia({ message }) {
     return (
       <div className="mb-1">
         <img src={url} alt="" className="max-w-full rounded-lg cursor-pointer max-h-64 object-cover"
-          onClick={() => window.open(url, '_blank')} />
+          onClick={() => window.open(url, '_blank')}
+          onError={e => {
+            e.currentTarget.style.display = 'none';
+            e.currentTarget.nextSibling && (e.currentTarget.nextSibling.style.display = 'flex');
+          }} />
+        <div className="hidden items-center gap-2 px-3 py-2 text-xs text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-lg">
+          <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 21h18a.75.75 0 00.75-.75V6a.75.75 0 00-.75-.75H3a.75.75 0 00-.75.75v14.25c0 .414.336.75.75.75z"/>
+          </svg>
+          Imagen no disponible
+        </div>
         {message.content && message.content !== '[Imagen]' && (
           <p className="text-sm whitespace-pre-wrap leading-relaxed mt-1">{message.content}</p>
         )}

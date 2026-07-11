@@ -90,7 +90,19 @@ class WebhookController {
           const senderName = contactInfo?.profile?.name;
 
           // Extraer contenido según tipo de mensaje
-          const { text, mediaUrl, contentType } = this.extractWhatsAppContent(message);
+          const { text, mediaId, contentType } = this.extractWhatsAppContent(message);
+
+          // El webhook solo trae un media ID, no una URL usable — hay que
+          // resolverlo y descargarlo ya, antes de que el link temporal de
+          // Meta expire (~5 min), o el frontend nunca podrá mostrar la imagen.
+          let mediaUrl = null;
+          if (mediaId) {
+            const media = await metaService.downloadWhatsAppMedia(mediaId);
+            mediaUrl = media?.url || null;
+            if (!mediaUrl) {
+              logger.warn(`⚠️  No se pudo descargar media ${mediaId} de ${message.from}`);
+            }
+          }
 
           logger.info(`📱 WhatsApp de ${message.from}: ${text?.substring(0, 50)}`);
 
@@ -123,13 +135,13 @@ class WebhookController {
       case 'text':
         return { text: message.text?.body, contentType: 'text' };
       case 'image':
-        return { text: message.image?.caption, mediaUrl: message.image?.id, contentType: 'image' };
+        return { text: message.image?.caption, mediaId: message.image?.id, contentType: 'image' };
       case 'audio':
-        return { text: '[Audio]', mediaUrl: message.audio?.id, contentType: 'audio' };
+        return { text: '[Audio]', mediaId: message.audio?.id, contentType: 'audio' };
       case 'video':
-        return { text: message.video?.caption || '[Video]', mediaUrl: message.video?.id, contentType: 'video' };
+        return { text: message.video?.caption || '[Video]', mediaId: message.video?.id, contentType: 'video' };
       case 'document':
-        return { text: message.document?.filename || '[Documento]', mediaUrl: message.document?.id, contentType: 'document' };
+        return { text: message.document?.filename || '[Documento]', mediaId: message.document?.id, contentType: 'document' };
       case 'location':
         const loc = message.location;
         return { text: `📍 Ubicación: ${loc?.latitude}, ${loc?.longitude}`, contentType: 'text' };

@@ -2,10 +2,17 @@
 // Servicio para comunicarse con las APIs de WhatsApp, Messenger e Instagram
 
 const axios = require('axios');
+const fs    = require('fs');
+const path  = require('path');
 const logger = require('../config/logger');
 
 const META_API_VERSION = 'v18.0';
 const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
+
+// Misma carpeta que usa whatsappService.js (Baileys) para media — ya servida
+// estáticamente en /uploads (ver index.js) y con el directorio garantizado.
+const MEDIA_DIR = path.join(__dirname, '../../uploads/whatsapp-media');
+fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
 class MetaService {
   constructor() {
@@ -30,6 +37,44 @@ class MetaService {
       }
     } catch (_) {}
     return { token: this.whatsappToken, phoneId: this.whatsappPhoneId };
+  }
+
+  /**
+   * Descarga un archivo multimedia entrante de WhatsApp Cloud API y lo guarda
+   * localmente. El webhook de Meta solo trae un media ID (no una URL usable):
+   * hay que resolverlo a una URL temporal (~5 min, requiere el token) y
+   * descargarla de inmediato, o el link nunca es accesible desde el frontend.
+   * @returns {Promise<{url: string, mimetype: string}|null>}
+   */
+  async downloadWhatsAppMedia(mediaId, companyId = null) {
+    try {
+      const { token } = await this.getWhatsAppCredentials(companyId);
+
+      const meta = await axios.get(`${META_BASE_URL}/${mediaId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const tempUrl  = meta.data?.url;
+      const mimetype = meta.data?.mime_type || 'application/octet-stream';
+      if (!tempUrl) {
+        logger.warn(`⚠️  Meta no devolvió URL para media ${mediaId}`);
+        return null;
+      }
+
+      const fileRes = await axios.get(tempUrl, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        responseType: 'arraybuffer'
+      });
+
+      const ext   = mimetype.split('/')[1]?.split(';')[0] || 'bin';
+      const fname = `${Date.now()}_${mediaId}.${ext}`;
+      fs.writeFileSync(path.join(MEDIA_DIR, fname), fileRes.data);
+
+      return { url: `/uploads/whatsapp-media/${fname}`, mimetype };
+    } catch (error) {
+      const errData = error.response?.data || error.message;
+      logger.error(`❌ Error descargando media de WhatsApp (${mediaId}):`, JSON.stringify(errData));
+      return null;
+    }
   }
 
   // ============================================
