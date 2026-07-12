@@ -398,7 +398,7 @@ class ChatbotService {
         // handoff:true para que evaluateFlowRules (llamado después por el caller)
         // dispare las reglas bot_handoff — antes devolvía un string plano y el
         // handoff se perdía, así que notify_human nunca se enteraba de esta escalación
-        return { text: config.escalation_message, handoff: true, catalogFile: null };
+        return { text: config.escalation_message, handoff: true, catalogFile: null, delaySeconds: this.getResponseDelaySeconds(config) };
       }
 
       const integration = await this.getActiveIntegration(conversation.company_id);
@@ -432,7 +432,7 @@ class ChatbotService {
 
       const { text: botText, catalogFile } = await this.extractFileCommand(afterSchedule);
       logger.info(`🤖 Bot (${integration.provider}) respondió en conversación ${conversation.id}${catalogFile ? ' + archivo adjunto' : ''}`);
-      return { text: botText, catalogFile };
+      return { text: botText, catalogFile, delaySeconds: this.getResponseDelaySeconds(config) };
 
     } catch (error) {
       logger.error('❌ ChatbotService.handleMessage:', error);
@@ -519,6 +519,13 @@ class ChatbotService {
     }) || await BotConfig.findOne({
       where
     });
+  }
+
+  // Normaliza el delay configurado (0-300s) — defensivo ante valores fuera
+  // de rango que pudieran colarse por una escritura directa a BD.
+  getResponseDelaySeconds(config) {
+    const val = Number(config?.response_delay_seconds) || 0;
+    return Math.max(0, Math.min(300, val));
   }
 
   // ─── Construye contexto de disponibilidad para citas ─────────
@@ -983,6 +990,7 @@ class ChatbotService {
     try {
       // 1. Determinar system prompt según bot_mode
       let systemPrompt;
+      let delaySeconds = 0;
       const botMode = chatRecord.bot_mode || 'generic';
       if (botMode === 'custom' && chatRecord.bot_prompt?.trim()) {
         systemPrompt = chatRecord.bot_prompt;
@@ -1001,12 +1009,13 @@ class ChatbotService {
           return null;
         }
         systemPrompt = config.system_prompt;
+        delaySeconds = this.getResponseDelaySeconds(config);
         logger.info(`🤖 Bot WA [${jid}] modo: generic — usando config ${config.id} (canal: ${config.channel})`);
 
         // Verificar keywords de escalación ANTES de llamar a la IA
         if (this.checkEscalationKeywords(body.toLowerCase(), config.escalation_keywords)) {
           logger.info(`🔀 Bot WA [${jid}]: keyword de escalación detectada — handoff directo`);
-          return { text: config.escalation_message || null, handoff: true, catalogFile: null, startDoc: null, schedule: null };
+          return { text: config.escalation_message || null, handoff: true, catalogFile: null, startDoc: null, schedule: null, delaySeconds };
         }
       }
 
@@ -1074,7 +1083,7 @@ class ChatbotService {
       if (docName) {
         logger.info(`📄 Bot WA [${jid}] solicita recolección de doc: "${docName}"`);
       }
-      return { ...result, handoff, startDoc: docName || null, schedule: schedule || null };
+      return { ...result, handoff, startDoc: docName || null, schedule: schedule || null, delaySeconds };
 
     } catch (err) {
       logger.error(`❌ ChatbotService.handleWhatsappMessage [${jid}]:`, err.message);
