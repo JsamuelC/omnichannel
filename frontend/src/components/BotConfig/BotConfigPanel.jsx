@@ -49,6 +49,14 @@ REGLAS:
 
 const TOKEN = () => localStorage.getItem("token");
 
+const formatDelay = (s) => {
+  if (!s) return "Instantáneo";
+  if (s < 60) return `${s} seg`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem === 0 ? `${m} min` : `${m} min ${rem}s`;
+};
+
 const toSlug = (s) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "")
    .toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -350,6 +358,7 @@ function CatalogModal({ catalog, onSave, onClose }) {
 export default function BotConfigPanel() {
   const [instrucciones, setInstrucciones] = useState("");
   const [botActivo,     setBotActivo]     = useState(true);
+  const [responseDelay, setResponseDelay] = useState(0);
   const [saving,        setSaving]        = useState(false);
   const [saved,         setSaved]         = useState(false);
   const [testing,       setTesting]       = useState(false);
@@ -387,6 +396,7 @@ export default function BotConfigPanel() {
           setConfigId(cfgData.data.id);
           setInstrucciones(cfgData.data.system_prompt || "");
           setBotActivo(cfgData.data.is_active ?? true);
+          setResponseDelay(cfgData.data.response_delay_seconds ?? 0);
         }
         if (catData.success) setCatalogs(catData.data);
         if (docData.success) setDocTemplates(docData.data || []);
@@ -403,7 +413,7 @@ export default function BotConfigPanel() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const body   = { system_prompt: instrucciones, is_active: botActivo, name: "Mi Asistente IA" };
+      const body   = { system_prompt: instrucciones, is_active: botActivo, name: "Mi Asistente IA", response_delay_seconds: responseDelay };
       const url    = configId ? `/api/bot-configs/${configId}` : "/api/bot-configs";
       const method = configId ? "PUT" : "POST";
       const res    = await fetch(url, {
@@ -574,7 +584,22 @@ export default function BotConfigPanel() {
           <h1 style={s.title}>Configuración del bot</h1>
           <p style={s.sub}>Define cómo responde tu asistente automático</p>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}
+               title="Espera artificial antes de que el bot responda, para que se sienta más natural.">
+            <Clock size={13} strokeWidth={1.75} color="#6b7280" />
+            <span style={{ fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>Tiempo de respuesta:</span>
+            <input
+              type="range" min={0} max={300} step={5}
+              value={responseDelay}
+              onChange={e => setResponseDelay(Number(e.target.value))}
+              style={{ width: 120, accentColor: "#16a34a" }}
+            />
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#111827",
+                           minWidth: 78, textAlign: "right" }}>
+              {formatDelay(responseDelay)}
+            </span>
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div onClick={() => setBotActivo(!botActivo)}
                  style={{ ...s.toggle, background: botActivo ? "#16a34a" : "#d1d5db" }}>

@@ -575,6 +575,10 @@ async function processWAMessage(msg, isRealtime, sessionId, sessionType, sock) {
             jid = correctedJid
           }
 
+          // Delay configurable (Configuración > Bot) para que la respuesta se sienta más natural
+          const delayMs = (result?.delaySeconds || 0) * 1000
+          if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs))
+
           // Usar el sock activo al momento de enviar — si hubo reconexión durante la IA, sessions[sessionId].sock es el nuevo
           const activeSock = sessions[sessionId]?.sock || sock
           if (sessions[sessionId]?.sock && sessions[sessionId].sock !== sock) {
@@ -1187,6 +1191,8 @@ async function createSession(sessionId, sessionType = 'personal', companyId = nu
         const result = await chatbotService.handleWhatsappMessage(sessionId, jid, body, chatRecord, _io)
         const aiResponse = result?.text || null
         if (aiResponse) {
+          const delayMsSync = (result?.delaySeconds || 0) * 1000
+          if (delayMsSync > 0) await new Promise(r => setTimeout(r, delayMsSync))
           const syncSock = sessions[sessionId]?.sock || sock
           const sentSync  = await syncSock.sendMessage(jid, { text: aiResponse })
           const botTs     = Math.floor(Date.now() / 1000)

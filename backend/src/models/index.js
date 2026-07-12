@@ -315,6 +315,9 @@ const migrate = async () => {
     // ── widget_realtime_response en bot_configs ─────────────────
     await safeAdd('bot_configs', 'widget_realtime_response', { type: DT.BOOLEAN, defaultValue: true, allowNull: false });
 
+    // ── response_delay_seconds en bot_configs (0-300s, simula tiempo de respuesta humano) ──
+    await safeAdd('bot_configs', 'response_delay_seconds', { type: DT.INTEGER, defaultValue: 0, allowNull: false });
+
     // Agregar 'web' al ENUM de canales de bot_configs si aún no existe
     try {
       await sequelize.query(`ALTER TYPE "enum_bot_configs_channel" ADD VALUE IF NOT EXISTS 'web'`);

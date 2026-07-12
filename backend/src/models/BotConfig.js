@@ -108,6 +108,14 @@ Siempre saluda cordialmente y despídete de manera amistosa.`
     type: DataTypes.BOOLEAN,
     defaultValue: true,
     comment: 'Habilita/deshabilita respuestas automáticas del bot en el widget web'
+  },
+
+  // Espera artificial antes de enviar la respuesta, para que se sienta más
+  // natural (0 = responde de inmediato). Tope de 5 minutos.
+  response_delay_seconds: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: { min: 0, max: 300 }
   }
 }, {
   indexes: [

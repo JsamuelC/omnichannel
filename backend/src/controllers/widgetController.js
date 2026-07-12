@@ -147,9 +147,14 @@ exports.sendMessage = async (req, res) => {
           const botText     = result ? (typeof result === 'string' ? result : result.text)   : null;
           const catalogFile = result && typeof result === 'object' ? result.catalogFile      : null;
           const handoff     = result && typeof result === 'object' ? result.handoff || false : false;
+          // Delay configurable (Configuración > Bot). El widget hace polling
+          // cada 3s (ver /api/widget/poll), así que si hay delay no bloqueamos
+          // esta respuesta HTTP — el mensaje se crea en background y el
+          // siguiente ciclo de polling lo recoge. Bloquear el request hasta
+          // 5 minutos causaría timeout en el navegador del visitante.
+          const delayMs = (result && typeof result === 'object' ? result.delaySeconds || 0 : 0) * 1000;
 
-          if (botText) {
-            await new Promise(r => setTimeout(r, 800));
+          const createBotMessage = async () => {
             const botMsg = await Message.create({
               conversation_id,
               direction:    'outbound',
@@ -171,7 +176,17 @@ exports.sendMessage = async (req, res) => {
               io.to('agents').emit('message:sent', p);
             }
 
-            botReply = botMsg.toJSON();
+            return botMsg;
+          };
+
+          if (botText) {
+            if (delayMs > 0) {
+              setTimeout(() => { createBotMessage().catch(e => logger.warn('Widget bot delayed send error:', e.message)); }, delayMs);
+              // botReply queda null — el widget lo recoge por polling cuando esté listo
+            } else {
+              const botMsg = await createBotMessage();
+              botReply = botMsg.toJSON();
+            }
           }
 
           // Evaluar reglas de flujo (notify_human es la única acción que aplica al

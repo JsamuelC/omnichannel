@@ -139,9 +139,12 @@ class MessageService {
       const botText     = result ? (typeof result === 'string' ? result : result.text)         : null;
       const catalogFile = result && typeof result === 'object'  ? result.catalogFile            : null;
       const handoff     = result && typeof result === 'object'  ? result.handoff || false       : false;
+      // Delay configurable (Configuración > Bot > "Tiempo de respuesta") para
+      // que se sienta más natural — 0 = responde de inmediato.
+      const delayMs     = (result && typeof result === 'object' ? result.delaySeconds || 0 : 0) * 1000;
 
       if (botText) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs));
         await this.sendOutgoingMessage({
           conversationId: conversation.id,
           text:           botText,
