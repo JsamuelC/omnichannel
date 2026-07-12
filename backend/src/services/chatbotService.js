@@ -411,7 +411,7 @@ class ChatbotService {
       let resolvedPrompt   = await this.resolvePromptCatalogs(config.system_prompt, conversation.company_id);
 
       // Agregar contexto de calendario si está habilitado
-      const calendarCtx = await this.buildCalendarContext(null);
+      const calendarCtx = await this.buildCalendarContext(null, conversation.company_id);
       if (calendarCtx) resolvedPrompt += '\n\n' + calendarCtx;
 
       const rawResponse    = await this.callAI(
@@ -427,7 +427,7 @@ class ChatbotService {
       // Procesar comandos: [SCHEDULE:...] → [SEND_FILE:id]
       const { text: afterSchedule, schedule } = this.extractScheduleCommand(rawResponse);
       if (schedule) {
-        await this.createAppointmentFromBot(schedule, null, conversation.company_id);
+        await this.createAppointmentFromBot(schedule, null, conversation.company_id, io);
       }
 
       const { text: botText, catalogFile } = await this.extractFileCommand(afterSchedule);
@@ -522,15 +522,21 @@ class ChatbotService {
   }
 
   // ─── Construye contexto de disponibilidad para citas ─────────
-  async buildCalendarContext(sessionId) {
+  // companyIdOverride: cuando el caller ya conoce la empresa (canal principal,
+  // vía conversation.company_id), se pasa directo — sessionId solo aplica al
+  // canal WhatsApp Business (Baileys), donde se resuelve vía WhatsappChat.
+  async buildCalendarContext(sessionId, companyIdOverride = null) {
     try {
       const { BusinessSchedule, Appointment } = require('../models');
       const Company = require('../models/Company');
       const { Op } = require('sequelize');
 
-      const { WhatsappChat } = require('../models');
-      const anyChat = await WhatsappChat.findOne({ where: { session_id: sessionId }, attributes: ['company_id'] });
-      const companyId = anyChat?.company_id;
+      let companyId = companyIdOverride;
+      if (!companyId && sessionId) {
+        const { WhatsappChat } = require('../models');
+        const anyChat = await WhatsappChat.findOne({ where: { session_id: sessionId }, attributes: ['company_id'] });
+        companyId = anyChat?.company_id;
+      }
 
       const schedRows = await BusinessSchedule.findAll({
         where: { ...(companyId ? { company_id: companyId } : {}), is_active: true, bot_scheduling_enabled: true },
@@ -636,12 +642,55 @@ class ChatbotService {
     };
   }
 
+  // Valida que el slot pedido por el modelo de IA (token [SCHEDULE:...]) caiga
+  // dentro del horario configurado y no choque con otra cita — el LLM puede
+  // alucinar o el cliente puede intentar forzar un horario inválido, así que
+  // no confiamos ciegamente en el token igual que ya hace getAvailability().
+  async validateAppointmentSlot(companyId, date, time) {
+    const { Appointment, BusinessSchedule } = require('../models');
+    const { Op } = require('sequelize');
+    const timeToMin = (t) => { const [h, m] = (t || '').split(':').map(Number); return h * 60 + m; };
+
+    const parsedDate = new Date(date + 'T12:00:00');
+    if (isNaN(parsedDate.getTime())) return { valid: false, reason: 'fecha inválida' };
+
+    const sched = await BusinessSchedule.findOne({
+      where: { day_of_week: parsedDate.getDay(), is_active: true, bot_scheduling_enabled: true, ...(companyId ? { company_id: companyId } : {}) },
+    });
+    if (!sched) return { valid: false, reason: 'día fuera del horario configurado para agendar por bot' };
+
+    const reqMin = timeToMin(time);
+    const duration = sched.slot_duration || 30;
+    if (isNaN(reqMin) || reqMin < timeToMin(sched.start_time) || (reqMin + duration) > timeToMin(sched.end_time)) {
+      return { valid: false, reason: `hora fuera de rango (permitido ${sched.start_time}-${sched.end_time})` };
+    }
+
+    const existing = await Appointment.findAll({
+      where: { date, status: { [Op.notIn]: ['cancelled'] }, ...(companyId ? { company_id: companyId } : {}) },
+      attributes: ['start_time', 'duration_minutes'],
+    });
+    const hasConflict = existing.some(a => {
+      const s = timeToMin(a.start_time);
+      const e = s + (a.duration_minutes || 30);
+      return reqMin < e && (reqMin + duration) > s;
+    });
+    if (hasConflict) return { valid: false, reason: 'horario ya ocupado' };
+
+    return { valid: true, duration };
+  }
+
   async createAppointmentFromBot(schedule, sessionId, companyId, io) {
     try {
       const { Appointment } = require('../models');
       const Company = require('../models/Company');
       const outlook = require('./outlookService');
       const gcal    = require('./googleCalendarService');
+
+      const validation = await this.validateAppointmentSlot(companyId, schedule.date, schedule.time);
+      if (!validation.valid) {
+        logger.warn(`📅 Bot intentó agendar cita inválida (${validation.reason}): ${schedule.name} — ${schedule.date} ${schedule.time} (company=${companyId})`);
+        return null;
+      }
 
       const appointment = await Appointment.create({
         company_id:       companyId || null,
@@ -650,7 +699,7 @@ class ChatbotService {
         contact_phone:    schedule.phone,
         date:             schedule.date,
         start_time:       schedule.time,
-        duration_minutes: 30,
+        duration_minutes: validation.duration,
         status:           'confirmed',
       });
 
@@ -673,9 +722,10 @@ class ChatbotService {
 
       logger.info(`📅 Cita creada por bot: ${schedule.name} — ${schedule.date} ${schedule.time}`);
 
-      // Notificar al panel de calendario en tiempo real
+      // Notificar al panel de calendario en tiempo real (scoped por empresa,
+      // + sala global 'agents' para que superadmin también la vea)
       if (io) {
-        io.to('agents').emit('appointment:created', {
+        const payload = {
           id:               appointment.id,
           company_id:       companyId,
           title:            appointment.title,
@@ -685,7 +735,9 @@ class ChatbotService {
           start_time:       appointment.start_time,
           duration_minutes: appointment.duration_minutes,
           status:           appointment.status,
-        });
+        };
+        if (companyId) io.to(`agents:${companyId}`).emit('appointment:created', payload);
+        io.to('agents').emit('appointment:created', payload);
       }
 
       return appointment;
