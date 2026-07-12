@@ -44,27 +44,41 @@ const Placeholder = ({ name }) => (
 );
 
 
+// Pantalla neutra mientras se resuelve la sesión tras un F5 — evita que los
+// guards de abajo redirijan a /login solo porque `user` aún no cargó (el
+// token en localStorage seguía siendo válido, era pura carrera de estado).
+const AuthGate = () => (
+  <div className="flex items-center justify-center h-screen text-sm text-slate-400">
+    Cargando...
+  </div>
+);
+
 const PrivateRoute = ({ children }) => {
-  const { token } = useAuthStore();
-  return token ? children : <Navigate to="/login" replace />;
+  const { token, authReady } = useAuthStore();
+  if (!token) return <Navigate to="/login" replace />;
+  if (!authReady) return <AuthGate />;
+  return children;
 };
 
 const RoleRoute = ({ role, children }) => {
-  const { user } = useAuthStore();
+  const { user, authReady } = useAuthStore();
+  if (!authReady) return <AuthGate />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== role && user.role !== 'superadmin') return <Navigate to="/inbox" replace />;
   return children;
 };
 
 const SuperAdminRoute = ({ children }) => {
-  const { user } = useAuthStore();
+  const { user, authReady } = useAuthStore();
+  if (!authReady) return <AuthGate />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== 'superadmin') return <Navigate to="/inbox" replace />;
   return children;
 };
 
 const FeatureRoute = ({ feature, children }) => {
-  const { user, hasFeature } = useAuthStore();
+  const { user, hasFeature, authReady } = useAuthStore();
+  if (!authReady) return <AuthGate />;
   if (!user) return <Navigate to="/login" replace />;
   if (!hasFeature(feature)) return <Navigate to="/config" replace />;
   return children;
@@ -93,7 +107,10 @@ const FeatureRoute = ({ feature, children }) => {
 
 export default function App() {
   const { token, fetchMe } = useAuthStore();
-  useEffect(() => { if (token) fetchMe(); }, []);
+  useEffect(() => {
+    if (token) fetchMe();
+    else useAuthStore.setState({ authReady: true });
+  }, []);
 
   return (
     <Routes>

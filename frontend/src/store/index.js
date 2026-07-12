@@ -16,6 +16,11 @@ export const useAuthStore = create((set, get) => ({
   activeFeatures:    null,  // active_features de la empresa del usuario
   customPermissions: null,  // perfil de acceso personalizado (null = sin restricciones adicionales)
   isLoading:         false,
+  // false hasta que se resuelve el fetchMe() inicial (o se confirma que no hay
+  // token) — los guards de ruta esperan esto antes de decidir si redirigir,
+  // para no expulsar al usuario a /login solo porque `user` aún no cargó
+  // tras un F5 (el token en localStorage seguía siendo válido).
+  authReady:         false,
 
   // Usado tras verificación de email para iniciar sesión directamente
   _setSession: (token, user) => {
@@ -66,13 +71,17 @@ export const useAuthStore = create((set, get) => ({
       const res = await api.get('/auth/me');
       const user = res.data;
       initSocket(user.id);
-      set({ user, permissions: user.permissions, activeFeatures: user.active_features ?? null, customPermissions: user.custom_permissions ?? null });
+      set({ user, permissions: user.permissions, activeFeatures: user.active_features ?? null, customPermissions: user.custom_permissions ?? null, authReady: true });
     } catch (err) {
       // Solo cerrar sesión si el token es realmente inválido/venció (401).
       // Un error transitorio (red, 500, backend reiniciando) no debe desloguear al usuario.
       if (err?.status === 401) {
         localStorage.removeItem('token');
-        set({ user: null, token: null, permissions: null, activeFeatures: null, customPermissions: null });
+        set({ user: null, token: null, permissions: null, activeFeatures: null, customPermissions: null, authReady: true });
+      } else {
+        // Error transitorio (red, 500, backend reiniciando): no tocamos user/token,
+        // pero igual marcamos authReady para no dejar la app colgada en loading.
+        set({ authReady: true });
       }
     }
   },
